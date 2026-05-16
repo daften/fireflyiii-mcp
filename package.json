@@ -1,0 +1,30 @@
+{
+  "name": "firefly-iii-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Firefly III personal finance manager",
+  "type": "module",
+  "bin": {
+    "firefly-iii-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "FIREFLY_INTEGRATION=true vitest run src/tests/integration.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
