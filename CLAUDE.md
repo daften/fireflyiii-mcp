@@ -174,7 +174,7 @@ server.tool(
 Wraps Firefly III's REST API with authentication and error handling.
 
 ```typescript
-import fetch from 'node-fetch';
+// Node 18+ has global fetch — no import needed
 
 class FireflyClient {
   private baseUrl: string;
