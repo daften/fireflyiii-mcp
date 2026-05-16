@@ -8,6 +8,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.test
 
 # Claude Code — local/machine-specific settings only
 # .claude/settings.json is intentionally NOT ignored (project MCP config)

@@ -8,10 +8,10 @@
   },
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
-    "dev": "tsx src/index.ts",
+    "dev": "dotenv -e .env -- tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "FIREFLY_INTEGRATION=true vitest run src/tests/integration.test.ts"
+    "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "dotenv-cli": "^11.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "vitest": "^2.0.0"
