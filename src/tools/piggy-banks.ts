@@ -9,13 +9,23 @@ export async function fetchPiggyBanks(
   return client.get('/piggy-banks', { page: params.page, limit: params.limit });
 }
 
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  openWorldHint: true,
+  idempotentHint: true,
+} as const;
+
 export function registerPiggyBankTools(server: McpServer, client: FireflyClient): void {
-  server.tool(
+  server.registerTool(
     'get_piggy_banks',
-    'Get all piggy banks (savings goals) from Firefly III, including current saved amount and target amount.',
     {
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+      title: 'Get Piggy Banks',
+      description: 'Get all piggy banks (savings goals) from Firefly III, including current saved amount and target amount.',
+      inputSchema: {
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ page, limit }) => {
       try {

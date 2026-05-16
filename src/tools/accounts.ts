@@ -16,18 +16,28 @@ export async function fetchAccount(client: FireflyClient, id: string): Promise<u
   return client.get(`/accounts/${id}`);
 }
 
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  openWorldHint: true,
+  idempotentHint: true,
+} as const;
+
 export function registerAccountTools(server: McpServer, client: FireflyClient): void {
-  server.tool(
+  server.registerTool(
     'get_accounts',
-    'Get all accounts from Firefly III. Filter by type: asset (bank/cash accounts), expense (merchants), revenue (income sources), liability (loans/debts), or all.',
     {
-      type: z
-        .enum(['asset', 'expense', 'revenue', 'liability', 'all'])
-        .optional()
-        .default('all')
-        .describe('Account type filter'),
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+      title: 'Get Accounts',
+      description: 'Get all accounts from Firefly III. Filter by type: asset (bank/cash accounts), expense (merchants), revenue (income sources), liability (loans/debts), or all. Use get_account to fetch a single account by ID.',
+      inputSchema: {
+        type: z
+          .enum(['asset', 'expense', 'revenue', 'liability', 'all'])
+          .optional()
+          .default('all')
+          .describe('Account type filter'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ type, page, limit }) => {
       try {
@@ -39,11 +49,15 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     }
   );
 
-  server.tool(
+  server.registerTool(
     'get_account',
-    'Get a single Firefly III account by its numeric ID, including the current balance.',
     {
-      id: z.string().describe('Account ID'),
+      title: 'Get Account',
+      description: 'Get a single Firefly III account by its numeric ID, including the current balance. Use get_accounts to find valid account IDs.',
+      inputSchema: {
+        id: z.string().describe('Account ID'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ id }) => {
       try {

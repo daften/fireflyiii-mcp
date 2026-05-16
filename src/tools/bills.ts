@@ -13,15 +13,25 @@ export async function fetchBills(
   return client.get('/bills', query);
 }
 
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  openWorldHint: true,
+  idempotentHint: true,
+} as const;
+
 export function registerBillTools(server: McpServer, client: FireflyClient): void {
-  server.tool(
+  server.registerTool(
     'get_bills',
-    'Get all recurring bills from Firefly III, including the next expected match date and payment status. Optionally filter by date range (YYYY-MM-DD).',
     {
-      start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('End date (YYYY-MM-DD)'),
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+      title: 'Get Bills',
+      description: 'Get all recurring bills from Firefly III, including the next expected match date and payment status. Optionally filter by date range (YYYY-MM-DD).',
+      inputSchema: {
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ start, end, page, limit }) => {
       try {

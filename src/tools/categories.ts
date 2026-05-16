@@ -21,13 +21,23 @@ export async function fetchCategoryTransactions(
   return client.get(`/categories/${categoryId}/transactions`, query);
 }
 
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  openWorldHint: true,
+  idempotentHint: true,
+} as const;
+
 export function registerCategoryTools(server: McpServer, client: FireflyClient): void {
-  server.tool(
+  server.registerTool(
     'get_categories',
-    'Get all spending categories defined in Firefly III.',
     {
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+      title: 'Get Categories',
+      description: 'Get all spending categories defined in Firefly III. Use get_category_transactions to list transactions for a specific category.',
+      inputSchema: {
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ page, limit }) => {
       try {
@@ -39,15 +49,19 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
     }
   );
 
-  server.tool(
+  server.registerTool(
     'get_category_transactions',
-    'Get all transactions belonging to a specific Firefly III category. Optionally filter by date range (YYYY-MM-DD).',
     {
-      categoryId: z.string().describe('Category ID'),
-      start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('End date (YYYY-MM-DD)'),
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+      title: 'Get Category Transactions',
+      description: 'Get all transactions belonging to a specific Firefly III category. Optionally filter by date range (YYYY-MM-DD). Use get_categories to find valid category IDs.',
+      inputSchema: {
+        categoryId: z.string().describe('Category ID — use get_categories to find valid IDs'),
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ categoryId, start, end, page, limit }) => {
       try {

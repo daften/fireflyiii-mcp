@@ -26,20 +26,30 @@ export async function fetchTransaction(client: FireflyClient, id: string): Promi
   return client.get(`/transactions/${id}`);
 }
 
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  openWorldHint: true,
+  idempotentHint: true,
+} as const;
+
 export function registerTransactionTools(server: McpServer, client: FireflyClient): void {
-  server.tool(
+  server.registerTool(
     'get_transactions',
-    'Get transactions from Firefly III. Filter by transaction type (withdrawal/deposit/transfer/reconciliation), account ID, date range, and pagination. Dates must be YYYY-MM-DD format.',
     {
-      type: z
-        .enum(['withdrawal', 'deposit', 'transfer', 'reconciliation'])
-        .optional()
-        .describe('Transaction type filter'),
-      accountId: z.string().optional().describe('Filter by account ID'),
-      start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('End date (YYYY-MM-DD)'),
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+      title: 'Get Transactions',
+      description: 'Get transactions from Firefly III. Filter by type (withdrawal/deposit/transfer/reconciliation), account ID, or date range. Dates must be YYYY-MM-DD. Use get_transaction to fetch a single transaction by ID.',
+      inputSchema: {
+        type: z
+          .enum(['withdrawal', 'deposit', 'transfer', 'reconciliation'])
+          .optional()
+          .describe('Transaction type filter'),
+        accountId: z.string().optional().describe('Filter by account ID — use get_accounts to find valid IDs'),
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ type, accountId, start, end, page, limit }) => {
       try {
@@ -51,11 +61,15 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     }
   );
 
-  server.tool(
+  server.registerTool(
     'get_transaction',
-    'Get a single Firefly III transaction by its numeric ID, including all splits.',
     {
-      id: z.string().describe('Transaction ID'),
+      title: 'Get Transaction',
+      description: 'Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs.',
+      inputSchema: {
+        id: z.string().describe('Transaction ID'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ id }) => {
       try {
