@@ -46,7 +46,7 @@ export type UnwrappedSingle = { id: string } & Record<string, unknown>;
 
 export function unwrapList(response: JsonApiListResponse): UnwrappedList {
   return {
-    data: response.data.map(item => ({ id: item.id, ...item.attributes })),
+    data: response.data.map(item => ({ ...item.attributes, id: item.id })),
     pagination: response.meta?.pagination
       ? {
           page: response.meta.pagination.current_page,
@@ -58,7 +58,7 @@ export function unwrapList(response: JsonApiListResponse): UnwrappedList {
 }
 
 export function unwrapSingle(response: JsonApiSingleResponse): UnwrappedSingle {
-  return { id: response.data.id, ...response.data.attributes };
+  return { ...response.data.attributes, id: response.data.id };
 }
 
 export function cleanSummary(response: RawSummaryItem[]): CleanSummaryItem[] {
