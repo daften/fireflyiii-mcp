@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Claude Code — local/machine-specific settings only
+# .claude/settings.json is intentionally NOT ignored (project MCP config)
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Editor
+.vscode/settings.json
+.idea/
