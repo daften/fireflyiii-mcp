@@ -11,10 +11,20 @@ export async function fetchBudgetLimits(client, budgetId, start, end) {
         query['end'] = end;
     return client.get(`/budgets/${budgetId}/limits`, query);
 }
+const READ_ANNOTATIONS = {
+    readOnlyHint: true,
+    openWorldHint: true,
+    idempotentHint: true,
+};
 export function registerBudgetTools(server, client) {
-    server.tool('get_budgets', 'Get all budgets from Firefly III, including spent and available amounts for the current period.', {
-        page: z.number().int().positive().optional().default(1).describe('Page number'),
-        limit: z.number().int().positive().optional().default(50).describe('Results per page'),
+    server.registerTool('get_budgets', {
+        title: 'Get Budgets',
+        description: 'Get all budgets from Firefly III, including spent and available amounts for the current period. Use get_budget_limits for period-specific spending limits.',
+        inputSchema: {
+            page: z.number().int().positive().optional().default(1).describe('Page number'),
+            limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+        },
+        annotations: READ_ANNOTATIONS,
     }, async ({ page, limit }) => {
         try {
             const result = await fetchBudgets(client, { page, limit });
@@ -24,10 +34,15 @@ export function registerBudgetTools(server, client) {
             return { content: [{ type: 'text', text: formatError(err) }], isError: true };
         }
     });
-    server.tool('get_budget_limits', 'Get the spending limits for a specific Firefly III budget. Optionally filter by date range (YYYY-MM-DD). Returns limits and how much has been spent against each.', {
-        budgetId: z.string().describe('Budget ID'),
-        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+    server.registerTool('get_budget_limits', {
+        title: 'Get Budget Limits',
+        description: 'Get spending limits for a specific Firefly III budget, including how much has been spent against each limit. Optionally filter by date range (YYYY-MM-DD). Use get_budgets to find valid budget IDs.',
+        inputSchema: {
+            budgetId: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        },
+        annotations: READ_ANNOTATIONS,
     }, async ({ budgetId, start, end }) => {
         try {
             const result = await fetchBudgetLimits(client, budgetId, start, end);
