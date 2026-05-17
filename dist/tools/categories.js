@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList } from '../transform.js';
 export async function fetchCategories(client, params) {
-    return client.get('/categories', { page: params.page, limit: params.limit });
+    const response = await client.get('/categories', { page: params.page, limit: params.limit });
+    return unwrapList(response);
 }
 export async function fetchCategoryTransactions(client, categoryId, params) {
     const query = { page: params.page, limit: params.limit };
@@ -9,7 +11,8 @@ export async function fetchCategoryTransactions(client, categoryId, params) {
         query['start'] = params.start;
     if (params.end)
         query['end'] = params.end;
-    return client.get(`/categories/${categoryId}/transactions`, query);
+    const response = await client.get(`/categories/${categoryId}/transactions`, query);
+    return unwrapList(response);
 }
 const READ_ANNOTATIONS = {
     readOnlyHint: true,

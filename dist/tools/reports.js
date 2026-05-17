@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList, cleanSummary } from '../transform.js';
 export async function fetchTags(client, params) {
-    return client.get('/tags', { page: params.page, limit: params.limit });
+    const response = await client.get('/tags', { page: params.page, limit: params.limit });
+    return unwrapList(response);
 }
 export async function fetchTagTransactions(client, tag, params) {
     const query = { page: params.page, limit: params.limit };
@@ -9,13 +11,15 @@ export async function fetchTagTransactions(client, tag, params) {
         query['start'] = params.start;
     if (params.end)
         query['end'] = params.end;
-    return client.get(`/tags/${encodeURIComponent(tag)}/transactions`, query);
+    const response = await client.get(`/tags/${encodeURIComponent(tag)}/transactions`, query);
+    return unwrapList(response);
 }
 export async function fetchSummary(client, start, end, currencyCode) {
     const query = { start, end };
     if (currencyCode)
         query['currency_code'] = currencyCode;
-    return client.get('/summary/basic', query);
+    const response = await client.get('/summary/basic', query);
+    return cleanSummary(response);
 }
 export async function fetchInsightExpenses(client, start, end) {
     return client.get('/insight/expense/category', { start, end });

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList } from '../transform.js';
 export async function fetchBudgets(client, params) {
-    return client.get('/budgets', { page: params.page, limit: params.limit });
+    const response = await client.get('/budgets', { page: params.page, limit: params.limit });
+    return unwrapList(response);
 }
 export async function fetchBudgetLimits(client, budgetId, start, end) {
     const query = {};
@@ -9,7 +11,8 @@ export async function fetchBudgetLimits(client, budgetId, start, end) {
         query['start'] = start;
     if (end)
         query['end'] = end;
-    return client.get(`/budgets/${budgetId}/limits`, query);
+    const response = await client.get(`/budgets/${budgetId}/limits`, query);
+    return unwrapList(response);
 }
 const READ_ANNOTATIONS = {
     readOnlyHint: true,

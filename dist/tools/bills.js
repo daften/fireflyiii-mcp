@@ -1,12 +1,14 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList } from '../transform.js';
 export async function fetchBills(client, params) {
     const query = { page: params.page, limit: params.limit };
     if (params.start)
         query['start'] = params.start;
     if (params.end)
         query['end'] = params.end;
-    return client.get('/bills', query);
+    const response = await client.get('/bills', query);
+    return unwrapList(response);
 }
 const READ_ANNOTATIONS = {
     readOnlyHint: true,

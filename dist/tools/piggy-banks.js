@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList } from '../transform.js';
 export async function fetchPiggyBanks(client, params) {
-    return client.get('/piggy-banks', { page: params.page, limit: params.limit });
+    const response = await client.get('/piggy-banks', { page: params.page, limit: params.limit });
+    return unwrapList(response);
 }
 const READ_ANNOTATIONS = {
     readOnlyHint: true,

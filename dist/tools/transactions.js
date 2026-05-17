@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList, unwrapSingle } from '../transform.js';
 export async function fetchTransactions(client, params) {
     const query = { page: params.page, limit: params.limit };
     if (params.type)
@@ -10,10 +11,12 @@ export async function fetchTransactions(client, params) {
         query['start'] = params.start;
     if (params.end)
         query['end'] = params.end;
-    return client.get('/transactions', query);
+    const response = await client.get('/transactions', query);
+    return unwrapList(response);
 }
 export async function fetchTransaction(client, id) {
-    return client.get(`/transactions/${id}`);
+    const response = await client.get(`/transactions/${id}`);
+    return unwrapSingle(response);
 }
 const READ_ANNOTATIONS = {
     readOnlyHint: true,

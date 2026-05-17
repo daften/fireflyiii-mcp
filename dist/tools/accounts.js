@@ -1,13 +1,16 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import { unwrapList, unwrapSingle } from '../transform.js';
 export async function fetchAccounts(client, params) {
     const query = { page: params.page, limit: params.limit };
     if (params.type && params.type !== 'all')
         query['type'] = params.type;
-    return client.get('/accounts', query);
+    const response = await client.get('/accounts', query);
+    return unwrapList(response);
 }
 export async function fetchAccount(client, id) {
-    return client.get(`/accounts/${id}`);
+    const response = await client.get(`/accounts/${id}`);
+    return unwrapSingle(response);
 }
 const READ_ANNOTATIONS = {
     readOnlyHint: true,
