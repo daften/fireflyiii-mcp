@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchAccounts, fetchAccount } from '../tools/accounts.js';
+import { fetchAccounts, fetchAccount, createAccount, updateAccount, deleteAccount } from '../tools/accounts.js';
 
-const mockClient = { get: vi.fn() } as unknown as FireflyClient;
+const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
 const listFixture = {
   data: [
@@ -63,5 +63,55 @@ describe('fetchAccount', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(singleFixture);
     const result = await fetchAccount(mockClient, '42');
     expect(result).toEqual({ name: 'Savings', current_balance: '5000.00', active: true, id: '42' });
+  });
+});
+
+const accountSingleFixture = {
+  data: {
+    id: '10',
+    type: 'accounts',
+    attributes: { name: 'New Account', type: 'asset', active: true },
+    links: {},
+  },
+};
+
+describe('createAccount', () => {
+  it('posts to /accounts with params', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    await createAccount(mockClient, { name: 'New Account', type: 'asset', currency_code: 'EUR' });
+    expect(mockClient.post).toHaveBeenCalledWith('/accounts', {
+      name: 'New Account', type: 'asset', currency_code: 'EUR',
+    });
+  });
+  it('returns unwrapped single', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    const result = await createAccount(mockClient, { name: 'New Account', type: 'asset' });
+    expect(result).toEqual({ name: 'New Account', type: 'asset', active: true, id: '10' });
+  });
+});
+
+describe('updateAccount', () => {
+  it('puts to /accounts/:id', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    await updateAccount(mockClient, '10', { name: 'Renamed' });
+    expect(mockClient.put).toHaveBeenCalledWith('/accounts/10', { name: 'Renamed' });
+  });
+  it('returns unwrapped single', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    const result = await updateAccount(mockClient, '10', { name: 'Renamed' });
+    expect(result).toEqual({ name: 'New Account', type: 'asset', active: true, id: '10' });
+  });
+});
+
+describe('deleteAccount', () => {
+  it('calls delete on /accounts/:id', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    await deleteAccount(mockClient, '10');
+    expect(mockClient.delete).toHaveBeenCalledWith('/accounts/10');
+  });
+  it('returns deleted confirmation', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await deleteAccount(mockClient, '10');
+    expect(result).toEqual({ deleted: true, id: '10' });
   });
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
-import { unwrapList, cleanSummary } from '../transform.js';
+import { unwrapList, unwrapSingle, cleanSummary } from '../transform.js';
 export async function fetchTags(client, params) {
     const response = await client.get('/tags', { page: params.page, limit: params.limit });
     return unwrapList(response);
@@ -27,11 +27,26 @@ export async function fetchInsightExpenses(client, start, end) {
 export async function fetchInsightIncome(client, start, end) {
     return client.get('/insight/income/category', { start, end });
 }
+export async function createTag(client, params) {
+    const response = await client.post('/tags', params);
+    return unwrapSingle(response);
+}
+export async function updateTag(client, id, params) {
+    const response = await client.put(`/tags/${id}`, params);
+    return unwrapSingle(response);
+}
+export async function deleteTag(client, id) {
+    await client.delete(`/tags/${id}`);
+    return { deleted: true, id };
+}
 const READ_ANNOTATIONS = {
     readOnlyHint: true,
     openWorldHint: true,
     idempotentHint: true,
 };
+const WRITE_ANNOTATIONS = { openWorldHint: true };
+const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
+const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerReportTools(server, client) {
     server.registerTool('get_tags', {
         title: 'Get Tags',
@@ -116,6 +131,57 @@ export function registerReportTools(server, client) {
     }, async ({ start, end }) => {
         try {
             const result = await fetchInsightIncome(client, start, end);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('create_tag', {
+        title: 'Create Tag',
+        description: 'Create a new tag in Firefly III.',
+        inputSchema: {
+            tag: z.string().describe('Tag name'),
+            date: z.string().optional().describe('Tag date (YYYY-MM-DD)'),
+            description: z.string().optional().describe('Tag description'),
+        },
+        annotations: WRITE_ANNOTATIONS,
+    }, async (params) => {
+        try {
+            const result = await createTag(client, params);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('update_tag', {
+        title: 'Update Tag',
+        description: 'Update an existing tag in Firefly III. Only fields provided will be changed. Use get_tags to find valid tag IDs.',
+        inputSchema: {
+            id: z.string().describe('Tag ID — use get_tags to find valid IDs'),
+            tag: z.string().optional().describe('Tag name'),
+            date: z.string().optional().describe('Tag date (YYYY-MM-DD)'),
+            description: z.string().optional().describe('Tag description'),
+        },
+        annotations: UPDATE_ANNOTATIONS,
+    }, async ({ id, ...params }) => {
+        try {
+            const result = await updateTag(client, id, params);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('delete_tag', {
+        title: 'Delete Tag',
+        description: 'Permanently delete a tag from Firefly III. **This action cannot be undone.** Transactions with this tag will have it removed. Use get_tags to confirm the ID before deleting.',
+        inputSchema: { id: z.string().describe('Tag ID — use get_tags to find valid IDs') },
+        annotations: DELETE_ANNOTATIONS,
+    }, async ({ id }) => {
+        try {
+            const result = await deleteTag(client, id);
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
         catch (err) {
