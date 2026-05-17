@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
-import { unwrapList, cleanSummary, type JsonApiListResponse, type RawSummaryItem, type CleanSummaryItem, type UnwrappedList } from '../transform.js';
+import { unwrapList, cleanSummary, type JsonApiListResponse, type RawSummaryResponse, type CleanSummaryItem, type UnwrappedList } from '../transform.js';
 
 export async function fetchTags(
   client: FireflyClient,
@@ -32,7 +32,7 @@ export async function fetchSummary(
 ): Promise<CleanSummaryItem[]> {
   const query: QueryParams = { start, end };
   if (currencyCode) query['currency_code'] = currencyCode;
-  const response = await client.get<RawSummaryItem[]>('/summary/basic', query);
+  const response = await client.get<RawSummaryResponse>('/summary/basic', query);
   return cleanSummary(response);
 }
 

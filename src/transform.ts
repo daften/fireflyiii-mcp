@@ -20,10 +20,7 @@ export interface JsonApiSingleResponse {
   data: JsonApiItem;
 }
 
-export interface RawSummaryItem {
-  key: string;
-  value: Record<string, unknown>;
-}
+export type RawSummaryResponse = Record<string, Record<string, unknown>>;
 
 export interface CleanSummaryItem {
   key: string;
@@ -61,16 +58,16 @@ export function unwrapSingle(response: JsonApiSingleResponse): UnwrappedSingle {
   return { ...response.data.attributes, id: response.data.id };
 }
 
-export function cleanSummary(response: RawSummaryItem[]): CleanSummaryItem[] {
-  return response.map(item => ({
-    key: item.key,
+export function cleanSummary(response: RawSummaryResponse): CleanSummaryItem[] {
+  return Object.entries(response).map(([key, value]) => ({
+    key,
     value: {
-      key: item.value['key'] as string,
-      title: item.value['title'] as string,
-      monetary_value: item.value['monetary_value'] as string,
-      currency_id: item.value['currency_id'] as string,
-      currency_code: item.value['currency_code'] as string,
-      value_parsed: item.value['value_parsed'] as string,
+      key: value['key'] as string,
+      title: value['title'] as string,
+      monetary_value: value['monetary_value'] as string,
+      currency_id: value['currency_id'] as string,
+      currency_code: value['currency_code'] as string,
+      value_parsed: value['value_parsed'] as string,
     },
   }));
 }

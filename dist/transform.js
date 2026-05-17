@@ -14,15 +14,15 @@ export function unwrapSingle(response) {
     return { ...response.data.attributes, id: response.data.id };
 }
 export function cleanSummary(response) {
-    return response.map(item => ({
-        key: item.key,
+    return Object.entries(response).map(([key, value]) => ({
+        key,
         value: {
-            key: item.value['key'],
-            title: item.value['title'],
-            monetary_value: item.value['monetary_value'],
-            currency_id: item.value['currency_id'],
-            currency_code: item.value['currency_code'],
-            value_parsed: item.value['value_parsed'],
+            key: value['key'],
+            title: value['title'],
+            monetary_value: value['monetary_value'],
+            currency_id: value['currency_id'],
+            currency_code: value['currency_code'],
+            value_parsed: value['value_parsed'],
         },
     }));
 }
