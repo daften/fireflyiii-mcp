@@ -12,7 +12,7 @@ export declare function createBudget(client: FireflyClient, params: {
     auto_budget_type?: 'reset' | 'rollover' | 'none';
     auto_budget_currency_code?: string;
     auto_budget_amount?: string;
-    auto_budget_period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-year' | 'yearly';
+    auto_budget_period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half_year' | 'yearly';
 }): Promise<UnwrappedSingle>;
 export declare function updateBudget(client: FireflyClient, id: string, params: {
     name?: string;
@@ -20,7 +20,7 @@ export declare function updateBudget(client: FireflyClient, id: string, params: 
     auto_budget_type?: 'reset' | 'rollover' | 'none';
     auto_budget_currency_code?: string;
     auto_budget_amount?: string;
-    auto_budget_period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-year' | 'yearly';
+    auto_budget_period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half_year' | 'yearly';
 }): Promise<UnwrappedSingle>;
 export declare function deleteBudget(client: FireflyClient, id: string): Promise<{
     deleted: true;

@@ -91,7 +91,7 @@ export function registerBudgetTools(server, client) {
             auto_budget_type: z.enum(['reset', 'rollover', 'none']).optional().describe('Auto-budget type'),
             auto_budget_currency_code: z.string().optional().describe('Currency code for auto-budget'),
             auto_budget_amount: z.string().optional().describe('Auto-budget amount as a number string'),
-            auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).optional().describe('Auto-budget period'),
+            auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Auto-budget period'),
         },
         annotations: WRITE_ANNOTATIONS,
     }, async (params) => {
@@ -113,7 +113,7 @@ export function registerBudgetTools(server, client) {
             auto_budget_type: z.enum(['reset', 'rollover', 'none']).optional().describe('Auto-budget type'),
             auto_budget_currency_code: z.string().optional().describe('Currency code for auto-budget'),
             auto_budget_amount: z.string().optional().describe('Auto-budget amount as a number string'),
-            auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).optional().describe('Auto-budget period'),
+            auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Auto-budget period'),
         },
         annotations: UPDATE_ANNOTATIONS,
     }, async ({ id, ...params }) => {
