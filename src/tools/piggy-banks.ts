@@ -1,12 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
+import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
 
 export async function fetchPiggyBanks(
   client: FireflyClient,
   params: { page?: number; limit?: number }
-): Promise<unknown> {
-  return client.get('/piggy-banks', { page: params.page, limit: params.limit });
+): Promise<UnwrappedList> {
+  const response = await client.get<JsonApiListResponse>('/piggy-banks', { page: params.page, limit: params.limit });
+  return unwrapList(response);
 }
 
 const READ_ANNOTATIONS = {
