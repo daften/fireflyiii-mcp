@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchBills } from '../tools/bills.js';
+import { fetchBills, createBill, updateBill, deleteBill } from '../tools/bills.js';
 
-const mockClient = { get: vi.fn() } as unknown as FireflyClient;
+const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
 const listFixture = {
   data: [
@@ -39,5 +39,39 @@ describe('fetchBills', () => {
     const result = await fetchBills(mockClient, { page: 1, limit: 50 });
     expect(result.data[0]).toEqual({ name: 'Rent', amount_min: '800.00', amount_max: '800.00', active: true, id: '5' });
     expect(result.pagination).toEqual({ page: 1, totalPages: 1, total: 1 });
+  });
+});
+
+const billSingleFixture = {
+  data: { id: '2', type: 'bills', attributes: { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', repeat_freq: 'monthly', active: true }, links: {} },
+};
+
+describe('createBill', () => {
+  it('posts to /bills', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(billSingleFixture);
+    await createBill(mockClient, { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', date: '2024-01-01', repeat_freq: 'monthly' });
+    expect(mockClient.post).toHaveBeenCalledWith('/bills', expect.objectContaining({ name: 'Netflix' }));
+  });
+  it('returns unwrapped single', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(billSingleFixture);
+    const result = await createBill(mockClient, { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', date: '2024-01-01', repeat_freq: 'monthly' });
+    expect(result).toEqual({ name: 'Netflix', amount_min: '10.00', amount_max: '15.00', repeat_freq: 'monthly', active: true, id: '2' });
+  });
+});
+
+describe('updateBill', () => {
+  it('puts to /bills/:id', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(billSingleFixture);
+    await updateBill(mockClient, '2', { name: 'Netflix Premium' });
+    expect(mockClient.put).toHaveBeenCalledWith('/bills/2', { name: 'Netflix Premium' });
+  });
+});
+
+describe('deleteBill', () => {
+  it('calls delete and returns confirmation', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await deleteBill(mockClient, '2');
+    expect(mockClient.delete).toHaveBeenCalledWith('/bills/2');
+    expect(result).toEqual({ deleted: true, id: '2' });
   });
 });

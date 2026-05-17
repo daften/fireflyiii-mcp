@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
-import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
+import { unwrapList, unwrapSingle, type JsonApiListResponse, type JsonApiSingleResponse, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
 
 export async function fetchBills(
   client: FireflyClient,
@@ -15,11 +15,60 @@ export async function fetchBills(
   return unwrapList(response);
 }
 
+export async function createBill(
+  client: FireflyClient,
+  params: {
+    name: string;
+    amount_min: string;
+    amount_max: string;
+    date: string;
+    repeat_freq: 'weekly' | 'monthly' | 'quarterly' | 'half-year' | 'yearly';
+    currency_code?: string;
+    end_date?: string;
+    active?: boolean;
+    notes?: string;
+  }
+): Promise<UnwrappedSingle> {
+  const response = await client.post<JsonApiSingleResponse>('/bills', params);
+  return unwrapSingle(response);
+}
+
+export async function updateBill(
+  client: FireflyClient,
+  id: string,
+  params: {
+    name?: string;
+    amount_min?: string;
+    amount_max?: string;
+    date?: string;
+    repeat_freq?: 'weekly' | 'monthly' | 'quarterly' | 'half-year' | 'yearly';
+    currency_code?: string;
+    end_date?: string;
+    active?: boolean;
+    notes?: string;
+  }
+): Promise<UnwrappedSingle> {
+  const response = await client.put<JsonApiSingleResponse>(`/bills/${id}`, params);
+  return unwrapSingle(response);
+}
+
+export async function deleteBill(
+  client: FireflyClient,
+  id: string
+): Promise<{ deleted: true; id: string }> {
+  await client.delete(`/bills/${id}`);
+  return { deleted: true, id };
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
   idempotentHint: true,
 } as const;
+
+const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
+const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
+const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
 
 export function registerBillTools(server: McpServer, client: FireflyClient): void {
   server.registerTool(
@@ -44,4 +93,67 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       }
     }
   );
+
+  server.registerTool('create_bill', {
+    title: 'Create Bill',
+    description: 'Create a new recurring bill in Firefly III.',
+    inputSchema: {
+      name: z.string().describe('Bill name'),
+      amount_min: z.string().describe('Minimum expected amount as a number string'),
+      amount_max: z.string().describe('Maximum expected amount as a number string'),
+      date: z.string().describe('First expected payment date (YYYY-MM-DD)'),
+      repeat_freq: z.enum(['weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).describe('Repeat frequency'),
+      currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
+      end_date: z.string().optional().describe('End date for the bill (YYYY-MM-DD)'),
+      active: z.boolean().optional().describe('Whether the bill is active'),
+      notes: z.string().optional().describe('Notes'),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async (params) => {
+    try {
+      const result = await createBill(client, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('update_bill', {
+    title: 'Update Bill',
+    description: 'Update an existing bill in Firefly III. Only fields provided will be changed. Use get_bills to find valid bill IDs.',
+    inputSchema: {
+      id: z.string().describe('Bill ID — use get_bills to find valid IDs'),
+      name: z.string().optional().describe('Bill name'),
+      amount_min: z.string().optional().describe('Minimum expected amount as a number string'),
+      amount_max: z.string().optional().describe('Maximum expected amount as a number string'),
+      date: z.string().optional().describe('First expected payment date (YYYY-MM-DD)'),
+      repeat_freq: z.enum(['weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).optional().describe('Repeat frequency'),
+      currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
+      end_date: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      active: z.boolean().optional().describe('Whether the bill is active'),
+      notes: z.string().optional().describe('Notes'),
+    },
+    annotations: UPDATE_ANNOTATIONS,
+  }, async ({ id, ...params }) => {
+    try {
+      const result = await updateBill(client, id, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('delete_bill', {
+    title: 'Delete Bill',
+    description: 'Permanently delete a bill from Firefly III. **This action cannot be undone.** Use get_bills to confirm the ID before deleting.',
+    inputSchema: { id: z.string().describe('Bill ID — use get_bills to find valid IDs') },
+    annotations: DELETE_ANNOTATIONS,
+  }, async ({ id }) => {
+    try {
+      const result = await deleteBill(client, id);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
 }
