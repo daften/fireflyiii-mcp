@@ -2,18 +2,22 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
+import { unwrapList, unwrapSingle } from '../transform.js';
+import type { JsonApiListResponse, JsonApiSingleResponse, UnwrappedList, UnwrappedSingle } from '../transform.js';
 
 export async function fetchAccounts(
   client: FireflyClient,
   params: { type?: string; page?: number; limit?: number }
-): Promise<unknown> {
+): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
   if (params.type && params.type !== 'all') query['type'] = params.type;
-  return client.get('/accounts', query);
+  const response = await client.get<JsonApiListResponse>('/accounts', query);
+  return unwrapList(response);
 }
 
-export async function fetchAccount(client: FireflyClient, id: string): Promise<unknown> {
-  return client.get(`/accounts/${id}`);
+export async function fetchAccount(client: FireflyClient, id: string): Promise<UnwrappedSingle> {
+  const response = await client.get<JsonApiSingleResponse>(`/accounts/${id}`);
+  return unwrapSingle(response);
 }
 
 const READ_ANNOTATIONS = {
