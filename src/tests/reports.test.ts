@@ -6,9 +6,12 @@ import {
   fetchSummary,
   fetchInsightExpenses,
   fetchInsightIncome,
+  createTag,
+  updateTag,
+  deleteTag,
 } from '../tools/reports.js';
 
-const mockClient = { get: vi.fn() } as unknown as FireflyClient;
+const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
 const tagListFixture = {
   data: [
@@ -140,5 +143,39 @@ describe('fetchInsightIncome', () => {
       start: '2026-01-01',
       end: '2026-01-31',
     });
+  });
+});
+
+const tagSingleFixture = {
+  data: { id: '6', type: 'tags', attributes: { tag: 'vacation', description: 'holiday expenses' }, links: {} },
+};
+
+describe('createTag', () => {
+  it('posts to /tags', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(tagSingleFixture);
+    await createTag(mockClient, { tag: 'vacation' });
+    expect(mockClient.post).toHaveBeenCalledWith('/tags', { tag: 'vacation' });
+  });
+  it('returns unwrapped single', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(tagSingleFixture);
+    const result = await createTag(mockClient, { tag: 'vacation' });
+    expect(result).toEqual({ tag: 'vacation', description: 'holiday expenses', id: '6' });
+  });
+});
+
+describe('updateTag', () => {
+  it('puts to /tags/:id', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(tagSingleFixture);
+    await updateTag(mockClient, '6', { tag: 'holiday' });
+    expect(mockClient.put).toHaveBeenCalledWith('/tags/6', { tag: 'holiday' });
+  });
+});
+
+describe('deleteTag', () => {
+  it('calls delete and returns confirmation', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await deleteTag(mockClient, '6');
+    expect(mockClient.delete).toHaveBeenCalledWith('/tags/6');
+    expect(result).toEqual({ deleted: true, id: '6' });
   });
 });

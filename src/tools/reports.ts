@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
-import { unwrapList, cleanSummary, type JsonApiListResponse, type RawSummaryResponse, type CleanSummaryItem, type UnwrappedList } from '../transform.js';
+import { unwrapList, unwrapSingle, cleanSummary, type JsonApiListResponse, type JsonApiSingleResponse, type RawSummaryResponse, type CleanSummaryItem, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
 
 export async function fetchTags(
   client: FireflyClient,
@@ -52,11 +52,40 @@ export async function fetchInsightIncome(
   return client.get('/insight/income/category', { start, end });
 }
 
+export async function createTag(
+  client: FireflyClient,
+  params: { tag: string; date?: string; description?: string }
+): Promise<UnwrappedSingle> {
+  const response = await client.post<JsonApiSingleResponse>('/tags', params);
+  return unwrapSingle(response);
+}
+
+export async function updateTag(
+  client: FireflyClient,
+  id: string,
+  params: { tag?: string; date?: string; description?: string }
+): Promise<UnwrappedSingle> {
+  const response = await client.put<JsonApiSingleResponse>(`/tags/${id}`, params);
+  return unwrapSingle(response);
+}
+
+export async function deleteTag(
+  client: FireflyClient,
+  id: string
+): Promise<{ deleted: true; id: string }> {
+  await client.delete(`/tags/${id}`);
+  return { deleted: true, id };
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
   idempotentHint: true,
 } as const;
+
+const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
+const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
+const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
 
 export function registerReportTools(server: McpServer, client: FireflyClient): void {
   server.registerTool(
@@ -167,4 +196,55 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       }
     }
   );
+
+  server.registerTool('create_tag', {
+    title: 'Create Tag',
+    description: 'Create a new tag in Firefly III.',
+    inputSchema: {
+      tag: z.string().describe('Tag name'),
+      date: z.string().optional().describe('Tag date (YYYY-MM-DD)'),
+      description: z.string().optional().describe('Tag description'),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async (params) => {
+    try {
+      const result = await createTag(client, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('update_tag', {
+    title: 'Update Tag',
+    description: 'Update an existing tag in Firefly III. Only fields provided will be changed. Use get_tags to find valid tag IDs.',
+    inputSchema: {
+      id: z.string().describe('Tag ID — use get_tags to find valid IDs'),
+      tag: z.string().optional().describe('Tag name'),
+      date: z.string().optional().describe('Tag date (YYYY-MM-DD)'),
+      description: z.string().optional().describe('Tag description'),
+    },
+    annotations: UPDATE_ANNOTATIONS,
+  }, async ({ id, ...params }) => {
+    try {
+      const result = await updateTag(client, id, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('delete_tag', {
+    title: 'Delete Tag',
+    description: 'Permanently delete a tag from Firefly III. **This action cannot be undone.** Transactions with this tag will have it removed. Use get_tags to confirm the ID before deleting.',
+    inputSchema: { id: z.string().describe('Tag ID — use get_tags to find valid IDs') },
+    annotations: DELETE_ANNOTATIONS,
+  }, async ({ id }) => {
+    try {
+      const result = await deleteTag(client, id);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
 }
