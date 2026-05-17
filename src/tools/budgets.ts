@@ -2,12 +2,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
+import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
 
 export async function fetchBudgets(
   client: FireflyClient,
   params: { page?: number; limit?: number }
-): Promise<unknown> {
-  return client.get('/budgets', { page: params.page, limit: params.limit });
+): Promise<UnwrappedList> {
+  const response = await client.get<JsonApiListResponse>('/budgets', { page: params.page, limit: params.limit });
+  return unwrapList(response);
 }
 
 export async function fetchBudgetLimits(
@@ -15,11 +17,12 @@ export async function fetchBudgetLimits(
   budgetId: string,
   start?: string,
   end?: string
-): Promise<unknown> {
+): Promise<UnwrappedList> {
   const query: QueryParams = {};
   if (start) query['start'] = start;
   if (end) query['end'] = end;
-  return client.get(`/budgets/${budgetId}/limits`, query);
+  const response = await client.get<JsonApiListResponse>(`/budgets/${budgetId}/limits`, query);
+  return unwrapList(response);
 }
 
 const READ_ANNOTATIONS = {
