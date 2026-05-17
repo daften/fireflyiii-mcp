@@ -2,8 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
-import { unwrapList, unwrapSingle } from '../transform.js';
-import type { JsonApiListResponse, JsonApiSingleResponse, UnwrappedList, UnwrappedSingle } from '../transform.js';
+import { unwrapList, unwrapSingle, type JsonApiListResponse, type JsonApiSingleResponse, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
 
 export async function fetchAccounts(
   client: FireflyClient,
