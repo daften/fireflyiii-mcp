@@ -15,8 +15,8 @@ Users can query their finances in natural language through Claude, getting answe
 
 - **Language:** TypeScript (ESM modules, strict mode)
 - **Runtime:** Node.js 18+ with tsx for development
-- **MCP SDK:** `@modelcontextprotocol/sdk` v1.0.0+
-- **Validation:** Zod for request/response schema validation
+- **MCP SDK:** `@modelcontextprotocol/sdk` v1.29.0+
+- **Validation:** Zod for input schemas (inline in each tool file)
 - **Testing:** Vitest for unit and integration tests
 - **Build:** TypeScript compiler to ES2022 with source maps
 - **Transport:** stdio transport only (Phase 1); HTTP support to be added in Phase 2
@@ -39,166 +39,183 @@ Both are required to start the server. Store in `.env` file (which is gitignored
 ```
 fireflyiii-mcp/
 ├── src/
-│   ├── index.ts                 # MCP server entry point (stdio transport)
-│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + auth)
-│   ├── types.ts                 # Shared types, validation schemas (Zod)
+│   ├── index.ts                 # MCP server entry point — validates env, wires client + server + transport
+│   ├── server.ts                # Server factory: createServer(client) → McpServer
+│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth)
+│   ├── transform.ts             # JSON:API response transforms (unwrapList, unwrapSingle, cleanSummary)
+│   ├── types.ts                 # Shared utility types (QueryParams)
 │   ├── tools/
-│   │   ├── accounts.ts          # Account-related tools (get_accounts, get_account)
-│   │   ├── transactions.ts      # Transaction tools (get_transactions, get_transaction)
-│   │   ├── budgets.ts           # Budget tools (get_budgets, get_budget_limits)
-│   │   ├── categories.ts        # Category tools (get_categories, get_category_transactions)
-│   │   ├── bills.ts             # Bill tools (get_bills)
-│   │   ├── piggybanks.ts        # Piggy bank tools (get_piggy_banks)
-│   │   ├── tags.ts              # Tag tools (get_tags, get_tag_transactions)
-│   │   ├── insights.ts          # Insights tools (get_insight_expenses, get_insight_income)
-│   │   ├── summary.ts           # Summary tool (get_summary)
-│   │   └── registry.ts          # Tool registration (exports all tools to MCP server)
-│   ├── tests/
-│   │   ├── unit/
-│   │   │   ├── accounts.test.ts
-│   │   │   ├── transactions.test.ts
-│   │   │   └── ...
-│   │   └── integration.test.ts   # Live Firefly III integration tests
-│   └── http.ts                  # HTTP transport entry point (Phase 2)
-├── dist/                        # Compiled output (gitignored)
-├── package.json                 # Dependencies and scripts
-├── tsconfig.json                # TypeScript configuration
-├── .env.example                 # Environment variable template
-├── LICENSE                      # MIT license
-├── README.md                    # User documentation
-├── CLAUDE.md                    # This file
-└── .gitignore                   # Already exists, comprehensive
+│   │   ├── index.ts             # Aggregator: registerAllTools(server, client) calls each registerXxx
+│   │   ├── accounts.ts          # get_accounts, get_account
+│   │   ├── transactions.ts      # get_transactions, get_transaction
+│   │   ├── budgets.ts           # get_budgets, get_budget_limits
+│   │   ├── categories.ts        # get_categories, get_category_transactions
+│   │   ├── bills.ts             # get_bills
+│   │   ├── piggy-banks.ts       # get_piggy_banks
+│   │   └── reports.ts           # get_tags, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income
+│   └── tests/
+│       ├── accounts.test.ts
+│       ├── bills.test.ts
+│       ├── budgets.test.ts
+│       ├── categories.test.ts
+│       ├── client.test.ts
+│       ├── integration.test.ts  # Live Firefly III tests (skipped unless FIREFLY_INTEGRATION=true)
+│       ├── piggy-banks.test.ts
+│       ├── reports.test.ts
+│       ├── transactions.test.ts
+│       └── transform.test.ts
+├── dist/                        # Compiled output — committed to git (not gitignored)
+├── package.json
+├── tsconfig.json
+├── .env.example
+├── LICENSE
+├── README.md
+└── CLAUDE.md                    # This file
 ```
 
 ---
 
 ## Tool Pattern
 
-All tools follow a consistent structure:
+Each tool file follows a consistent three-part structure.
 
-### 1. Define Request/Response Schemas (in `types.ts`)
+### 1. Fetch Function
 
-```typescript
-export const GetAccountsRequestSchema = z.object({
-  type: z.enum(['asset', 'liability', 'revenue', 'expense']).optional(),
-});
-export type GetAccountsRequest = z.infer<typeof GetAccountsRequestSchema>;
-
-export const AccountSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.string(),
-  balance: z.number(),
-});
-export type Account = z.infer<typeof AccountSchema>;
-```
-
-### 2. Implement Fetch Function (in tool file, e.g., `tools/accounts.ts`)
+Calls `client.get()` and pipes the raw Firefly III response through a transform from `src/transform.ts`.
 
 ```typescript
-import { Account, GetAccountsRequest } from '../types.js';
+import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
+import type { FireflyClient } from '../client.js';
 
 export async function fetchAccounts(
-  request: GetAccountsRequest
-): Promise<Account[]> {
-  const params = new URLSearchParams();
-  if (request.type) params.set('type', request.type);
-  
-  const response = await client.get(`/accounts?${params.toString()}`);
-  return response.data.map((account: any) => ({
-    id: account.id,
-    name: account.attributes.name,
-    type: account.attributes.type,
-    balance: account.attributes.current_balance,
-  }));
+  client: FireflyClient,
+  params: { type?: string; page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { page: params.page, limit: params.limit };
+  if (params.type) query['type'] = params.type;
+  const response = await client.get<JsonApiListResponse>('/accounts', query);
+  return unwrapList(response);
 }
 ```
 
-### 3. Test the Fetch Function (in `tests/unit/accounts.test.ts`)
+`client` is always passed as the first argument — never imported as a singleton.
+
+### 2. Register Function
+
+Each tool file exports a `registerXxxTools(server, client)` function that calls `server.registerTool()` for each tool it owns.
 
 ```typescript
-import { describe, it, expect, vi } from 'vitest';
-import { fetchAccounts } from '../../tools/accounts.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { type FireflyClient, formatError } from '../client.js';
 
-describe('fetchAccounts', () => {
-  it('should fetch accounts and filter by type', async () => {
-    // Mock the client
-    const accounts = await fetchAccounts({ type: 'asset' });
-    expect(accounts).toHaveLength(2);
-  });
-});
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  openWorldHint: true,
+  idempotentHint: true,
+} as const;
+
+export function registerAccountTools(server: McpServer, client: FireflyClient): void {
+  server.registerTool(
+    'get_accounts',
+    {
+      title: 'Get Accounts',
+      description: 'Get all accounts from Firefly III.',
+      inputSchema: {
+        type: z.enum(['asset', 'liability', 'revenue', 'expense']).optional()
+          .describe('Filter by account type'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50)
+          .describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ type, page, limit }) => {
+      try {
+        const result = await fetchAccounts(client, { type, page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+}
 ```
 
-### 4. Register Tool (in `tools/registry.ts`)
+### 3. Wire into aggregator (`src/tools/index.ts`)
 
 ```typescript
-import { fetchAccounts } from './accounts.js';
+import { registerAccountTools } from './accounts.js';
+// ... other imports
 
-export function registerTools(server: StdioServer) {
-  server.tool('get_accounts', GetAccountsRequestSchema, async (request) => {
-    const accounts = await fetchAccounts(request);
-    return {
-      content: [{ type: 'text', text: JSON.stringify(accounts, null, 2) }],
-    };
-  });
+export function registerAllTools(server: McpServer, client: FireflyClient): void {
+  registerAccountTools(server, client);
+  // ... other register calls
 }
+```
+
+---
+
+## Transform Layer (`src/transform.ts`)
+
+Firefly III returns JSON:API envelopes (`data[].attributes`, `meta.pagination`, etc.). The transform layer strips the envelope so Claude receives flat, compact data.
+
+### `unwrapList(response: JsonApiListResponse): UnwrappedList`
+
+Merges each `data[i].attributes` with `data[i].id` (id pinned after the spread so attributes cannot overwrite it), strips `type` and `links`, and extracts compact pagination.
+
+```typescript
+// Input
+{ data: [{ id: '1', type: 'accounts', attributes: { name: 'Checking', balance: '1000' }, links: {...} }],
+  meta: { pagination: { current_page: 1, total_pages: 3, total: 120 } } }
+
+// Output
+{ data: [{ name: 'Checking', balance: '1000', id: '1' }],
+  pagination: { page: 1, totalPages: 3, total: 120 } }
+```
+
+### `unwrapSingle(response: JsonApiSingleResponse): UnwrappedSingle`
+
+Same flattening for a single-item response (`data` is an object, not an array).
+
+### `cleanSummary(response: RawSummaryResponse): CleanSummaryItem[]`
+
+The `/summary/basic` endpoint returns a **dict** keyed by currency slug (e.g. `"balance-in-EUR": {...}`), not an array. `cleanSummary` converts it to a flat array and strips UI-only fields (`local_icon`, `sub_title`, `currency_symbol`, `currency_decimal_places`).
+
+```typescript
+// RawSummaryResponse = Record<string, Record<string, unknown>>
+// Input: { "balance-in-EUR": { key, title, monetary_value, ..., local_icon, sub_title } }
+// Output: [{ key: "balance-in-EUR", value: { key, title, monetary_value, currency_id, currency_code, value_parsed } }]
 ```
 
 ---
 
 ## Tool Annotations
 
-Use the optional `readOnlyHint` and `destructiveHint` fields in tool definitions:
-
-- **Read tools:** `readOnlyHint: true` — tells Claude the tool doesn't modify state.
-- **Write tools (Phase 2):** `destructiveHint: true` — tells Claude the tool modifies state.
+All Phase 1 tools use:
 
 ```typescript
-server.tool(
-  'get_accounts',
-  {
-    description: 'List all accounts',
-    schema: GetAccountsRequestSchema,
-    readOnlyHint: true, // Phase 1: all tools are read-only
-  },
-  async (request) => {
-    // ...
-  }
-);
+const READ_ANNOTATIONS = {
+  readOnlyHint: true,    // tool does not modify state
+  openWorldHint: true,   // results may vary (live data)
+  idempotentHint: true,  // safe to call multiple times
+} as const;
 ```
+
+Phase 2 write tools will use `{ destructiveHint: true }`.
 
 ---
 
 ## HTTP Client (`src/client.ts`)
 
-Wraps Firefly III's REST API with authentication and error handling.
+Wraps Firefly III's REST API with Bearer auth and error handling. Accepts typed generic for the response shape.
 
 ```typescript
-// Node 18+ has global fetch — no import needed
-
-class FireflyClient {
-  private baseUrl: string;
-  private token: string;
-
-  constructor(baseUrl: string, token: string) {
-    this.baseUrl = baseUrl;
-    this.token = token;
-  }
-
-  async get(path: string): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/api/v1${path}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-    });
-    if (!response.ok) throw new Error(`API error: ${response.statusText}`);
-    return response.json();
-  }
-}
-
-export const client = new FireflyClient(
-  process.env.FIREFLY_URL!,
-  process.env.FIREFLY_TOKEN!
-);
+const client = new FireflyClient(url, token);
+const response = await client.get<JsonApiListResponse>('/accounts', { page: 1, limit: 50 });
 ```
+
+Query params are passed as a `QueryParams` object (`Record<string, string | number | undefined>`); `undefined` values are omitted automatically.
 
 ---
 
@@ -213,52 +230,63 @@ npm run test:watch             # Watch mode for unit tests
 npm run test:integration       # Run integration tests against live Firefly III
 ```
 
-**Important:** The `build` script runs `chmod +x` on the compiled index.js so it can be executed directly as an executable.
+**Important:** `dist/` is committed to git so the server can be used without a build step. Always run `npm run build` and commit `dist/` alongside source changes.
 
 ---
 
 ## Adding a New Tool
 
-1. **Define schemas** in `src/types.ts` (request + response).
-2. **Implement fetch function** in `src/tools/{category}.ts`.
-3. **Test the fetch function** in `src/tests/unit/{category}.test.ts`.
-4. **Register the tool** in `src/tools/registry.ts`.
+1. **Implement fetch function** in `src/tools/{category}.ts`. Call `client.get<JsonApiListResponse>(...)` and pipe through `unwrapList` (or `unwrapSingle` for single-item endpoints).
+2. **Add `registerXxxTools` call** in `src/tools/index.ts`.
+3. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
+4. **Run `npm run build`** and commit source + dist together.
 
-Example: Adding `get_account_details` tool:
+Example — adding `get_account` (single account by ID):
 
 ```typescript
-// 1. types.ts
-export const GetAccountDetailsRequestSchema = z.object({
-  id: z.string(),
-});
+// src/tools/accounts.ts
+import { unwrapSingle, type JsonApiSingleResponse, type UnwrappedSingle } from '../transform.js';
 
-// 2. tools/accounts.ts
-export async function fetchAccountDetails(
-  request: GetAccountDetailsRequest
-): Promise<AccountDetail> {
-  const response = await client.get(`/accounts/${request.id}`);
-  return parseAccountDetail(response.data);
+export async function fetchAccount(client: FireflyClient, id: string): Promise<UnwrappedSingle> {
+  const response = await client.get<JsonApiSingleResponse>(`/accounts/${id}`);
+  return unwrapSingle(response);
 }
 
-// 3. tests/unit/accounts.test.ts
-it('should fetch account details by ID', async () => {
-  const detail = await fetchAccountDetails({ id: '123' });
-  expect(detail.id).toBe('123');
-});
+// in registerAccountTools():
+server.registerTool(
+  'get_account',
+  {
+    title: 'Get Account',
+    description: 'Get a single account by ID.',
+    inputSchema: { id: z.string().describe('Account ID') },
+    annotations: READ_ANNOTATIONS,
+  },
+  async ({ id }) => {
+    try {
+      const result = await fetchAccount(client, id);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  }
+);
 
-// 4. tools/registry.ts
-server.tool('get_account_details', GetAccountDetailsRequestSchema, async (request) => {
-  const detail = await fetchAccountDetails(request);
-  return { content: [{ type: 'text', text: JSON.stringify(detail, null, 2) }] };
-});
+// src/tests/accounts.test.ts — use a JSON:API envelope fixture
+const singleFixture: JsonApiSingleResponse = {
+  data: { id: '1', type: 'accounts', attributes: { name: 'Checking', current_balance: '1000' }, links: {} },
+};
+mockClient.get = vi.fn().mockResolvedValueOnce(singleFixture);
+const result = await fetchAccount(mockClient, '1');
+expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 ```
 
 ---
 
 ## Testing Strategy
 
-- **Unit tests** test fetch functions in isolation (mock HTTP).
-- **Integration tests** run against a real Firefly III instance (only when `FIREFLY_INTEGRATION=true`).
+- **Unit tests** in `src/tests/` test fetch functions in isolation (mock `client.get`).
+- Fixtures use **realistic JSON:API envelopes** — the full `{ data: [{ id, type, attributes, links }], meta: { pagination } }` shape — so tests catch transform regressions.
+- **Integration tests** in `src/tests/integration.test.ts` run against a real Firefly III instance (only when `FIREFLY_INTEGRATION=true`).
 - Run unit tests in CI; integration tests manually or in a staging environment.
 
 ---
@@ -286,10 +314,10 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ## Security & Open Source
 
 - **No hardcoded secrets.** All credentials come from environment variables.
-- **Validate all input.** Use Zod schemas for strict type checking.
-- **Error handling.** Catch and log errors; never expose raw API responses in logs.
+- **Validate all input.** Use Zod schemas defined inline in each `server.registerTool()` call.
+- **Error handling.** Every tool handler wraps in try/catch and returns `{ isError: true }` on failure.
 - **Dependencies.** Keep them minimal and up-to-date.
-- **License.** MIT — include LICENSE file and header comments where appropriate.
+- **License.** MIT — include LICENSE file.
 
 ---
 
@@ -298,23 +326,26 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 **Phase 1 (current):**
 - Read-only tools only
 - Stdio transport only
-- All tools have `readOnlyHint: true`
+- All tools have `readOnlyHint: true, openWorldHint: true, idempotentHint: true`
 
 **Phase 2 (future):**
 - Add write tools (create/update transactions, budgets, etc.)
 - Add HTTP transport (`src/http.ts`)
-- Write tools have `destructiveHint: true`
+- Write tools use `destructiveHint: true`
 - Implement request validation and user confirmation for destructive actions
 
 ---
 
 ## Development Notes
 
-- Use ESM imports (`import ... from '...js'`) — Node's default for `"type": "module"`.
-- Keep test files in `src/tests/` and they're excluded from the build by `tsconfig.json`.
+- Use ESM imports with `.js` extension (`import ... from '../transform.js'`) — required for Node ESM.
+- Use a single merged import from each module — avoid two `import` statements from the same path.
+- Test files are in `src/tests/` (flat, not a `unit/` subdirectory) and excluded from the build by `tsconfig.json`.
+- `dist/` is **committed to git**. Run `npm run build` and include `dist/` in commits that change source.
 - The MCP SDK handles serialization; just return plain objects from tool handlers.
 - Firefly III API is REST; pagination is via query params (`limit`, `page`).
-- All monetary amounts are returned as floats; handle precision carefully.
+- `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.
+- Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly.
 
 ---
 
