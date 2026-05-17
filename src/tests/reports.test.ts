@@ -10,17 +10,58 @@ import {
 
 const mockClient = { get: vi.fn() } as unknown as FireflyClient;
 
+const tagListFixture = {
+  data: [
+    {
+      id: '9',
+      type: 'tags',
+      attributes: { tag: 'vacation', date: null },
+      links: { self: 'https://firefly.example.com/api/v1/tags/9' },
+    },
+  ],
+  meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+};
+
+const summaryFixture = [
+  {
+    key: 'balance-in-EUR',
+    value: {
+      key: 'balance-in-EUR',
+      title: 'Balance (€)',
+      monetary_value: '8818.16',
+      currency_id: '1',
+      currency_code: 'EUR',
+      currency_symbol: '€',
+      currency_decimal_places: 2,
+      value_parsed: '€8,818.16',
+      local_icon: 'balance-scale',
+      sub_title: '-€20,448.98 + €29,267.14',
+    },
+  },
+];
+
+const insightFixture = [
+  { id: '20', name: 'Bank costs', difference: '-102.97', difference_float: -102.97, currency_id: '1', currency_code: 'EUR' },
+];
+
 describe('fetchTags', () => {
   it('calls /tags with pagination', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce({ data: [] });
+    mockClient.get = vi.fn().mockResolvedValueOnce(tagListFixture);
     await fetchTags(mockClient, { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/tags', { page: 1, limit: 50 });
+  });
+
+  it('returns flat items with pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(tagListFixture);
+    const result = await fetchTags(mockClient, { page: 1, limit: 50 });
+    expect(result.data[0]).toEqual({ tag: 'vacation', date: null, id: '9' });
+    expect(result.pagination).toEqual({ page: 1, totalPages: 1, total: 1 });
   });
 });
 
 describe('fetchTagTransactions', () => {
   it('calls /tags/:tag/transactions with all params', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce({ data: [] });
+    mockClient.get = vi.fn().mockResolvedValueOnce(tagListFixture);
     await fetchTagTransactions(mockClient, 'vacation', {
       start: '2026-01-01',
       end: '2026-12-31',
@@ -36,18 +77,21 @@ describe('fetchTagTransactions', () => {
   });
 
   it('omits undefined date params', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce({ data: [] });
+    mockClient.get = vi.fn().mockResolvedValueOnce(tagListFixture);
     await fetchTagTransactions(mockClient, 'vacation', { page: 1, limit: 50 });
-    expect(mockClient.get).toHaveBeenCalledWith('/tags/vacation/transactions', {
-      page: 1,
-      limit: 50,
-    });
+    expect(mockClient.get).toHaveBeenCalledWith('/tags/vacation/transactions', { page: 1, limit: 50 });
+  });
+
+  it('returns flat items with pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(tagListFixture);
+    const result = await fetchTagTransactions(mockClient, 'vacation', { page: 1, limit: 50 });
+    expect(result.data[0]).toEqual({ tag: 'vacation', date: null, id: '9' });
   });
 });
 
 describe('fetchSummary', () => {
   it('calls /summary/basic with required date range', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce({});
+    mockClient.get = vi.fn().mockResolvedValueOnce(summaryFixture);
     await fetchSummary(mockClient, '2026-01-01', '2026-12-31');
     expect(mockClient.get).toHaveBeenCalledWith('/summary/basic', {
       start: '2026-01-01',
@@ -56,7 +100,7 @@ describe('fetchSummary', () => {
   });
 
   it('includes currency_code when provided', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce({});
+    mockClient.get = vi.fn().mockResolvedValueOnce(summaryFixture);
     await fetchSummary(mockClient, '2026-01-01', '2026-12-31', 'EUR');
     expect(mockClient.get).toHaveBeenCalledWith('/summary/basic', {
       start: '2026-01-01',
@@ -64,11 +108,25 @@ describe('fetchSummary', () => {
       currency_code: 'EUR',
     });
   });
+
+  it('returns cleaned summary without UI fields', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(summaryFixture);
+    const result = await fetchSummary(mockClient, '2026-01-01', '2026-12-31');
+    expect(result[0].value).toEqual({
+      key: 'balance-in-EUR',
+      title: 'Balance (€)',
+      monetary_value: '8818.16',
+      currency_id: '1',
+      currency_code: 'EUR',
+      value_parsed: '€8,818.16',
+    });
+    expect(result[0].value).not.toHaveProperty('local_icon');
+  });
 });
 
 describe('fetchInsightExpenses', () => {
   it('calls /insight/expense/category with date range', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce([]);
+    mockClient.get = vi.fn().mockResolvedValueOnce(insightFixture);
     await fetchInsightExpenses(mockClient, '2026-01-01', '2026-01-31');
     expect(mockClient.get).toHaveBeenCalledWith('/insight/expense/category', {
       start: '2026-01-01',
@@ -79,7 +137,7 @@ describe('fetchInsightExpenses', () => {
 
 describe('fetchInsightIncome', () => {
   it('calls /insight/income/category with date range', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce([]);
+    mockClient.get = vi.fn().mockResolvedValueOnce(insightFixture);
     await fetchInsightIncome(mockClient, '2026-01-01', '2026-01-31');
     expect(mockClient.get).toHaveBeenCalledWith('/insight/income/category', {
       start: '2026-01-01',

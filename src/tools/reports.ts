@@ -2,23 +2,26 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
+import { unwrapList, cleanSummary, type JsonApiListResponse, type RawSummaryItem, type CleanSummaryItem, type UnwrappedList } from '../transform.js';
 
 export async function fetchTags(
   client: FireflyClient,
   params: { page?: number; limit?: number }
-): Promise<unknown> {
-  return client.get('/tags', { page: params.page, limit: params.limit });
+): Promise<UnwrappedList> {
+  const response = await client.get<JsonApiListResponse>('/tags', { page: params.page, limit: params.limit });
+  return unwrapList(response);
 }
 
 export async function fetchTagTransactions(
   client: FireflyClient,
   tag: string,
   params: { start?: string; end?: string; page?: number; limit?: number }
-): Promise<unknown> {
+): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
   if (params.start) query['start'] = params.start;
   if (params.end) query['end'] = params.end;
-  return client.get(`/tags/${encodeURIComponent(tag)}/transactions`, query);
+  const response = await client.get<JsonApiListResponse>(`/tags/${encodeURIComponent(tag)}/transactions`, query);
+  return unwrapList(response);
 }
 
 export async function fetchSummary(
@@ -26,10 +29,11 @@ export async function fetchSummary(
   start: string,
   end: string,
   currencyCode?: string
-): Promise<unknown> {
+): Promise<CleanSummaryItem[]> {
   const query: QueryParams = { start, end };
   if (currencyCode) query['currency_code'] = currencyCode;
-  return client.get('/summary/basic', query);
+  const response = await client.get<RawSummaryItem[]>('/summary/basic', query);
+  return cleanSummary(response);
 }
 
 export async function fetchInsightExpenses(
