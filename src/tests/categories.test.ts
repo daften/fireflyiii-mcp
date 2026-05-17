@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchCategories, fetchCategoryTransactions } from '../tools/categories.js';
+import { fetchCategories, fetchCategoryTransactions, createCategory, updateCategory, deleteCategory } from '../tools/categories.js';
 
-const mockClient = { get: vi.fn() } as unknown as FireflyClient;
+const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
 const listFixture = {
   data: [
@@ -58,5 +58,39 @@ describe('fetchCategoryTransactions', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     const result = await fetchCategoryTransactions(mockClient, '7', { page: 1, limit: 50 });
     expect(result.data[0]).toEqual({ name: 'Food & Dining', id: '7' });
+  });
+});
+
+const categorySingleFixture = {
+  data: { id: '8', type: 'categories', attributes: { name: 'Groceries' }, links: {} },
+};
+
+describe('createCategory', () => {
+  it('posts to /categories', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(categorySingleFixture);
+    await createCategory(mockClient, { name: 'Groceries' });
+    expect(mockClient.post).toHaveBeenCalledWith('/categories', { name: 'Groceries' });
+  });
+  it('returns unwrapped single', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(categorySingleFixture);
+    const result = await createCategory(mockClient, { name: 'Groceries' });
+    expect(result).toEqual({ name: 'Groceries', id: '8' });
+  });
+});
+
+describe('updateCategory', () => {
+  it('puts to /categories/:id', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(categorySingleFixture);
+    await updateCategory(mockClient, '8', { name: 'Food' });
+    expect(mockClient.put).toHaveBeenCalledWith('/categories/8', { name: 'Food' });
+  });
+});
+
+describe('deleteCategory', () => {
+  it('calls delete and returns confirmation', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await deleteCategory(mockClient, '8');
+    expect(mockClient.delete).toHaveBeenCalledWith('/categories/8');
+    expect(result).toEqual({ deleted: true, id: '8' });
   });
 });

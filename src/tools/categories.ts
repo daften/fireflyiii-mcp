@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
-import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
+import { unwrapList, unwrapSingle, type JsonApiListResponse, type JsonApiSingleResponse, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
 
 export async function fetchCategories(
   client: FireflyClient,
@@ -24,11 +24,40 @@ export async function fetchCategoryTransactions(
   return unwrapList(response);
 }
 
+export async function createCategory(
+  client: FireflyClient,
+  params: { name: string; notes?: string }
+): Promise<UnwrappedSingle> {
+  const response = await client.post<JsonApiSingleResponse>('/categories', params);
+  return unwrapSingle(response);
+}
+
+export async function updateCategory(
+  client: FireflyClient,
+  id: string,
+  params: { name?: string; notes?: string }
+): Promise<UnwrappedSingle> {
+  const response = await client.put<JsonApiSingleResponse>(`/categories/${id}`, params);
+  return unwrapSingle(response);
+}
+
+export async function deleteCategory(
+  client: FireflyClient,
+  id: string
+): Promise<{ deleted: true; id: string }> {
+  await client.delete(`/categories/${id}`);
+  return { deleted: true, id };
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
   idempotentHint: true,
 } as const;
+
+const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
+const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
+const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
 
 export function registerCategoryTools(server: McpServer, client: FireflyClient): void {
   server.registerTool(
@@ -75,4 +104,53 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       }
     }
   );
+
+  server.registerTool('create_category', {
+    title: 'Create Category',
+    description: 'Create a new spending category in Firefly III.',
+    inputSchema: {
+      name: z.string().describe('Category name'),
+      notes: z.string().optional().describe('Notes'),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async (params) => {
+    try {
+      const result = await createCategory(client, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('update_category', {
+    title: 'Update Category',
+    description: 'Update an existing category in Firefly III. Only fields provided will be changed. Use get_categories to find valid category IDs.',
+    inputSchema: {
+      id: z.string().describe('Category ID — use get_categories to find valid IDs'),
+      name: z.string().optional().describe('Category name'),
+      notes: z.string().optional().describe('Notes'),
+    },
+    annotations: UPDATE_ANNOTATIONS,
+  }, async ({ id, ...params }) => {
+    try {
+      const result = await updateCategory(client, id, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('delete_category', {
+    title: 'Delete Category',
+    description: 'Permanently delete a category from Firefly III. **This action cannot be undone.** Transactions in this category will become uncategorised. Use get_categories to confirm the ID.',
+    inputSchema: { id: z.string().describe('Category ID — use get_categories to find valid IDs') },
+    annotations: DELETE_ANNOTATIONS,
+  }, async ({ id }) => {
+    try {
+      const result = await deleteCategory(client, id);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
 }
