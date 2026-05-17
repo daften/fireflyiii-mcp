@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
-import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
+import { unwrapList, unwrapSingle, type JsonApiListResponse, type JsonApiSingleResponse, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
 
 export async function fetchBudgets(
   client: FireflyClient,
@@ -25,11 +25,92 @@ export async function fetchBudgetLimits(
   return unwrapList(response);
 }
 
+export async function createBudget(
+  client: FireflyClient,
+  params: {
+    name: string;
+    active?: boolean;
+    auto_budget_type?: 'reset' | 'rollover' | 'none';
+    auto_budget_currency_code?: string;
+    auto_budget_amount?: string;
+    auto_budget_period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-year' | 'yearly';
+  }
+): Promise<UnwrappedSingle> {
+  const response = await client.post<JsonApiSingleResponse>('/budgets', params);
+  return unwrapSingle(response);
+}
+
+export async function updateBudget(
+  client: FireflyClient,
+  id: string,
+  params: {
+    name?: string;
+    active?: boolean;
+    auto_budget_type?: 'reset' | 'rollover' | 'none';
+    auto_budget_currency_code?: string;
+    auto_budget_amount?: string;
+    auto_budget_period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-year' | 'yearly';
+  }
+): Promise<UnwrappedSingle> {
+  const response = await client.put<JsonApiSingleResponse>(`/budgets/${id}`, params);
+  return unwrapSingle(response);
+}
+
+export async function deleteBudget(
+  client: FireflyClient,
+  id: string
+): Promise<{ deleted: true; id: string }> {
+  await client.delete(`/budgets/${id}`);
+  return { deleted: true, id };
+}
+
+export async function createBudgetLimit(
+  client: FireflyClient,
+  budgetId: string,
+  params: {
+    start: string;
+    end: string;
+    amount: string;
+    currency_code?: string;
+    period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half_year' | 'yearly';
+  }
+): Promise<UnwrappedSingle> {
+  const response = await client.post<JsonApiSingleResponse>(`/budgets/${budgetId}/limits`, params);
+  return unwrapSingle(response);
+}
+
+export async function updateBudgetLimit(
+  client: FireflyClient,
+  id: string,
+  params: {
+    start?: string;
+    end?: string;
+    amount?: string;
+    currency_code?: string;
+    period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half_year' | 'yearly';
+  }
+): Promise<UnwrappedSingle> {
+  const response = await client.put<JsonApiSingleResponse>(`/budget-limits/${id}`, params);
+  return unwrapSingle(response);
+}
+
+export async function deleteBudgetLimit(
+  client: FireflyClient,
+  id: string
+): Promise<{ deleted: true; id: string }> {
+  await client.delete(`/budget-limits/${id}`);
+  return { deleted: true, id };
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
   idempotentHint: true,
 } as const;
+
+const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
+const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
+const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
 
 export function registerBudgetTools(server: McpServer, client: FireflyClient): void {
   server.registerTool(
@@ -74,4 +155,117 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       }
     }
   );
+
+  server.registerTool('create_budget', {
+    title: 'Create Budget',
+    description: 'Create a new budget in Firefly III.',
+    inputSchema: {
+      name: z.string().describe('Budget name'),
+      active: z.boolean().optional().describe('Whether the budget is active'),
+      auto_budget_type: z.enum(['reset', 'rollover', 'none']).optional().describe('Auto-budget type'),
+      auto_budget_currency_code: z.string().optional().describe('Currency code for auto-budget'),
+      auto_budget_amount: z.string().optional().describe('Auto-budget amount as a number string'),
+      auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).optional().describe('Auto-budget period'),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async (params) => {
+    try {
+      const result = await createBudget(client, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('update_budget', {
+    title: 'Update Budget',
+    description: 'Update an existing budget in Firefly III. Only fields provided will be changed. Use get_budgets to find valid budget IDs.',
+    inputSchema: {
+      id: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+      name: z.string().optional().describe('Budget name'),
+      active: z.boolean().optional().describe('Whether the budget is active'),
+      auto_budget_type: z.enum(['reset', 'rollover', 'none']).optional().describe('Auto-budget type'),
+      auto_budget_currency_code: z.string().optional().describe('Currency code for auto-budget'),
+      auto_budget_amount: z.string().optional().describe('Auto-budget amount as a number string'),
+      auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).optional().describe('Auto-budget period'),
+    },
+    annotations: UPDATE_ANNOTATIONS,
+  }, async ({ id, ...params }) => {
+    try {
+      const result = await updateBudget(client, id, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('delete_budget', {
+    title: 'Delete Budget',
+    description: 'Permanently delete a budget from Firefly III. **This action cannot be undone.** Use get_budgets to confirm the ID before deleting.',
+    inputSchema: { id: z.string().describe('Budget ID — use get_budgets to find valid IDs') },
+    annotations: DELETE_ANNOTATIONS,
+  }, async ({ id }) => {
+    try {
+      const result = await deleteBudget(client, id);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('create_budget_limit', {
+    title: 'Create Budget Limit',
+    description: 'Create a spending limit for a budget in Firefly III for a specific date range.',
+    inputSchema: {
+      budget_id: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+      start: z.string().describe('Start date (YYYY-MM-DD)'),
+      end: z.string().describe('End date (YYYY-MM-DD)'),
+      amount: z.string().describe('Limit amount as a number string'),
+      currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
+      period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Budget period'),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ budget_id, ...params }) => {
+    try {
+      const result = await createBudgetLimit(client, budget_id, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('update_budget_limit', {
+    title: 'Update Budget Limit',
+    description: 'Update an existing budget limit in Firefly III. Only fields provided will be changed. Use get_budget_limits to find valid limit IDs.',
+    inputSchema: {
+      id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs'),
+      start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+      end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      amount: z.string().optional().describe('Limit amount as a number string'),
+      currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
+      period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Budget period'),
+    },
+    annotations: UPDATE_ANNOTATIONS,
+  }, async ({ id, ...params }) => {
+    try {
+      const result = await updateBudgetLimit(client, id, params);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
+
+  server.registerTool('delete_budget_limit', {
+    title: 'Delete Budget Limit',
+    description: 'Permanently delete a budget limit from Firefly III. **This action cannot be undone.** Use get_budget_limits to confirm the ID before deleting.',
+    inputSchema: { id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs') },
+    annotations: DELETE_ANNOTATIONS,
+  }, async ({ id }) => {
+    try {
+      const result = await deleteBudgetLimit(client, id);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+    }
+  });
 }
