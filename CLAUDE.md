@@ -6,8 +6,9 @@
 
 Users can query their finances in natural language through Claude, getting answers about accounts, transactions, budgets, categories, bills, piggy banks, and financial insights without writing queries themselves.
 
-**Phase 1 (current):** Read-only tools for querying financial data.  
-**Phase 2 (future):** Write tools for creating/updating transactions, budgets, etc.
+**Phase 1 (complete):** Read-only tools for querying financial data.  
+**Phase 2 (complete):** Full CRUD write tools and HTTP transport.  
+**Phase 3 (future):** OAuth via Firefly III for HTTP transport.
 
 ---
 
@@ -19,7 +20,7 @@ Users can query their finances in natural language through Claude, getting answe
 - **Validation:** Zod for input schemas (inline in each tool file)
 - **Testing:** Vitest for unit and integration tests
 - **Build:** TypeScript compiler to ES2022 with source maps
-- **Transport:** stdio transport only (Phase 1); HTTP support to be added in Phase 2
+- **Transport:** stdio (default) or HTTP (`--transport http`); HTTP is stateless StreamableHTTP
 
 ---
 
@@ -202,7 +203,10 @@ const READ_ANNOTATIONS = {
 } as const;
 ```
 
-Phase 2 write tools will use `{ destructiveHint: true }`.
+Phase 2 write tools use:
+- Create: `{ openWorldHint: true }`
+- Update: `{ openWorldHint: true, idempotentHint: true }`
+- Delete: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
 
 ---
 
@@ -228,6 +232,8 @@ npm run dev                    # Run with tsx (no build required)
 npm test                       # Run unit tests (vitest run)
 npm run test:watch             # Watch mode for unit tests
 npm run test:integration       # Run integration tests against live Firefly III
+npm run dev -- --transport http          # Run HTTP server in dev mode
+npm run dev -- --transport http --port 4000  # Run on a specific port
 ```
 
 **Important:** `dist/` is committed to git so the server can be used without a build step. Always run `npm run build` and commit `dist/` alongside source changes.
@@ -323,16 +329,23 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ## Phase 1 vs Phase 2
 
-**Phase 1 (current):**
+**Phase 1 (complete):**
 - Read-only tools only
 - Stdio transport only
 - All tools have `readOnlyHint: true, openWorldHint: true, idempotentHint: true`
 
-**Phase 2 (future):**
-- Add write tools (create/update transactions, budgets, etc.)
-- Add HTTP transport (`src/http.ts`)
-- Write tools use `destructiveHint: true`
-- Implement request validation and user confirmation for destructive actions
+**Phase 2 (complete):**
+- Full CRUD write tools for all resources (transactions, accounts, budgets, budget limits, categories, bills, piggy banks, tags)
+- Write tools: `{ openWorldHint: true }`
+- Update tools: `{ openWorldHint: true, idempotentHint: true }`
+- Delete tools: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
+- HTTP transport via `--transport http` (default: stdio)
+- CLI flags: `--transport stdio|http`, `--host <host>` (default 127.0.0.1), `--port <n>` (default 3000, auto-increments if taken)
+- No HTTP auth (Phase 3: OAuth via Firefly III)
+
+**Phase 3 (future):**
+- OAuth via Firefly III for HTTP transport (replaces PAT token in HTTP mode)
+- Multi-split transaction support
 
 ---
 
