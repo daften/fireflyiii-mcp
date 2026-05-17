@@ -60,7 +60,7 @@ export class FireflyClient {
                 headers: {
                     Authorization: `Bearer ${this.token}`,
                     Accept: 'application/json',
-                    'Content-Type': 'application/json',
+                    ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
                 },
                 ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
             });

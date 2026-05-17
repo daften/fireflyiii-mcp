@@ -2,6 +2,7 @@ import type { QueryParams } from './types.js';
 export declare class FireflyError extends Error {
     readonly status: number;
     readonly url: string;
+    readonly body: string;
     constructor(status: number, url: string, body: string);
 }
 export declare function formatError(err: unknown): string;
@@ -10,6 +11,10 @@ export declare class FireflyClient {
     private readonly baseUrl;
     private readonly timeoutMs;
     constructor(baseUrl: string, token: string);
+    private request;
     get<T = unknown>(path: string, params?: QueryParams): Promise<T>;
+    post<T = unknown>(path: string, body: unknown): Promise<T>;
+    put<T = unknown>(path: string, body: unknown): Promise<T>;
+    delete(path: string): Promise<void>;
 }
 //# sourceMappingURL=client.d.ts.map

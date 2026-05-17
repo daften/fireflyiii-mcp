@@ -10,5 +10,35 @@ export declare function fetchTransactions(client: FireflyClient, params: {
     limit?: number;
 }): Promise<UnwrappedList>;
 export declare function fetchTransaction(client: FireflyClient, id: string): Promise<UnwrappedSingle>;
+export declare function createTransaction(client: FireflyClient, params: {
+    type: 'withdrawal' | 'deposit' | 'transfer';
+    date: string;
+    amount: string;
+    description: string;
+    source_id?: string;
+    destination_id?: string;
+    category_name?: string;
+    budget_id?: string;
+    currency_code?: string;
+    notes?: string;
+    tags?: string[];
+}): Promise<UnwrappedSingle>;
+export declare function updateTransaction(client: FireflyClient, id: string, params: {
+    type?: 'withdrawal' | 'deposit' | 'transfer';
+    date?: string;
+    amount?: string;
+    description?: string;
+    source_id?: string;
+    destination_id?: string;
+    category_name?: string;
+    budget_id?: string;
+    currency_code?: string;
+    notes?: string;
+    tags?: string[];
+}): Promise<UnwrappedSingle>;
+export declare function deleteTransaction(client: FireflyClient, id: string): Promise<{
+    deleted: true;
+    id: string;
+}>;
 export declare function registerTransactionTools(server: McpServer, client: FireflyClient): void;
 //# sourceMappingURL=transactions.d.ts.map

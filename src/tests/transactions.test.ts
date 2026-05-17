@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchTransactions, fetchTransaction } from '../tools/transactions.js';
+import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction } from '../tools/transactions.js';
 
-const mockClient = { get: vi.fn() } as unknown as FireflyClient;
+const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
 const listFixture = {
   data: [
@@ -71,5 +71,83 @@ describe('fetchTransaction', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(singleFixture);
     const result = await fetchTransaction(mockClient, '123');
     expect(result).toEqual({ description: 'Salary', amount: '3000.00', date: '2026-01-01', id: '123' });
+  });
+});
+
+const writeSingleFixture = {
+  data: {
+    id: '5',
+    type: 'transactions',
+    attributes: { description: 'Groceries', amount: '42.50', type: 'withdrawal' },
+    links: {},
+  },
+};
+
+describe('createTransaction', () => {
+  it('posts to /transactions with wrapped body', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2024-01-15',
+      amount: '42.50',
+      description: 'Groceries',
+      source_id: '1',
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/transactions', {
+      apply_rules: true,
+      fire_webhooks: true,
+      transactions: [
+        expect.objectContaining({
+          type: 'withdrawal',
+          date: '2024-01-15',
+          amount: '42.50',
+          description: 'Groceries',
+          source_id: '1',
+        }),
+      ],
+    });
+  });
+
+  it('returns unwrapped single', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    const result = await createTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2024-01-15',
+      amount: '42.50',
+      description: 'Groceries',
+    });
+    expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
+  });
+});
+
+describe('updateTransaction', () => {
+  it('puts to /transactions/:id with wrapped body', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '5', { description: 'Updated' });
+    expect(mockClient.put).toHaveBeenCalledWith('/transactions/5', {
+      apply_rules: true,
+      fire_webhooks: true,
+      transactions: [{ description: 'Updated' }],
+    });
+  });
+
+  it('returns unwrapped single', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    const result = await updateTransaction(mockClient, '5', { amount: '50.00' });
+    expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
+  });
+});
+
+describe('deleteTransaction', () => {
+  it('calls delete on /transactions/:id', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    await deleteTransaction(mockClient, '5');
+    expect(mockClient.delete).toHaveBeenCalledWith('/transactions/5');
+  });
+
+  it('returns deleted confirmation', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await deleteTransaction(mockClient, '5');
+    expect(result).toEqual({ deleted: true, id: '5' });
   });
 });
