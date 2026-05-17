@@ -17,10 +17,7 @@ export interface JsonApiListResponse {
 export interface JsonApiSingleResponse {
     data: JsonApiItem;
 }
-export interface RawSummaryItem {
-    key: string;
-    value: Record<string, unknown>;
-}
+export type RawSummaryResponse = Record<string, Record<string, unknown>>;
 export interface CleanSummaryItem {
     key: string;
     value: {
@@ -47,5 +44,5 @@ export type UnwrappedSingle = {
 } & Record<string, unknown>;
 export declare function unwrapList(response: JsonApiListResponse): UnwrappedList;
 export declare function unwrapSingle(response: JsonApiSingleResponse): UnwrappedSingle;
-export declare function cleanSummary(response: RawSummaryItem[]): CleanSummaryItem[];
+export declare function cleanSummary(response: RawSummaryResponse): CleanSummaryItem[];
 //# sourceMappingURL=transform.d.ts.map

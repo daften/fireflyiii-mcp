@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { unwrapList, unwrapSingle, cleanSummary } from '../transform.js';
-import type { JsonApiListResponse, JsonApiSingleResponse, RawSummaryItem } from '../transform.js';
+import type { JsonApiListResponse, JsonApiSingleResponse, RawSummaryResponse } from '../transform.js';
 
 const listFixture: JsonApiListResponse = {
   data: [
@@ -25,23 +25,20 @@ const singleFixture: JsonApiSingleResponse = {
   },
 };
 
-const summaryFixture: RawSummaryItem[] = [
-  {
+const summaryFixture: RawSummaryResponse = {
+  'balance-in-EUR': {
     key: 'balance-in-EUR',
-    value: {
-      key: 'balance-in-EUR',
-      title: 'Balance (€)',
-      monetary_value: '8818.16',
-      currency_id: '1',
-      currency_code: 'EUR',
-      currency_symbol: '€',
-      currency_decimal_places: 2,
-      value_parsed: '€8,818.16',
-      local_icon: 'balance-scale',
-      sub_title: '-€20,448.98 + €29,267.14',
-    },
+    title: 'Balance (€)',
+    monetary_value: '8818.16',
+    currency_id: '1',
+    currency_code: 'EUR',
+    currency_symbol: '€',
+    currency_decimal_places: 2,
+    value_parsed: '€8,818.16',
+    local_icon: 'balance-scale',
+    sub_title: '-€20,448.98 + €29,267.14',
   },
-];
+};
 
 describe('unwrapList', () => {
   it('flattens id and attributes, strips type and links', () => {

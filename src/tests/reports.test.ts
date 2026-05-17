@@ -22,23 +22,20 @@ const tagListFixture = {
   meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
 };
 
-const summaryFixture = [
-  {
+const summaryFixture = {
+  'balance-in-EUR': {
     key: 'balance-in-EUR',
-    value: {
-      key: 'balance-in-EUR',
-      title: 'Balance (€)',
-      monetary_value: '8818.16',
-      currency_id: '1',
-      currency_code: 'EUR',
-      currency_symbol: '€',
-      currency_decimal_places: 2,
-      value_parsed: '€8,818.16',
-      local_icon: 'balance-scale',
-      sub_title: '-€20,448.98 + €29,267.14',
-    },
+    title: 'Balance (€)',
+    monetary_value: '8818.16',
+    currency_id: '1',
+    currency_code: 'EUR',
+    currency_symbol: '€',
+    currency_decimal_places: 2,
+    value_parsed: '€8,818.16',
+    local_icon: 'balance-scale',
+    sub_title: '-€20,448.98 + €29,267.14',
   },
-];
+};
 
 const insightFixture = [
   { id: '20', name: 'Bank costs', difference: '-102.97', difference_float: -102.97, currency_id: '1', currency_code: 'EUR' },
