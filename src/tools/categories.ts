@@ -2,23 +2,26 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { type FireflyClient, formatError } from '../client.js';
 import type { QueryParams } from '../types.js';
+import { unwrapList, type JsonApiListResponse, type UnwrappedList } from '../transform.js';
 
 export async function fetchCategories(
   client: FireflyClient,
   params: { page?: number; limit?: number }
-): Promise<unknown> {
-  return client.get('/categories', { page: params.page, limit: params.limit });
+): Promise<UnwrappedList> {
+  const response = await client.get<JsonApiListResponse>('/categories', { page: params.page, limit: params.limit });
+  return unwrapList(response);
 }
 
 export async function fetchCategoryTransactions(
   client: FireflyClient,
   categoryId: string,
   params: { start?: string; end?: string; page?: number; limit?: number }
-): Promise<unknown> {
+): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
   if (params.start) query['start'] = params.start;
   if (params.end) query['end'] = params.end;
-  return client.get(`/categories/${categoryId}/transactions`, query);
+  const response = await client.get<JsonApiListResponse>(`/categories/${categoryId}/transactions`, query);
+  return unwrapList(response);
 }
 
 const READ_ANNOTATIONS = {
