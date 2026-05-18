@@ -83,16 +83,24 @@ npm run dev -- --transport http --port 4000
 
 ### Step 4: Point Claude at the server
 
-Add to your MCP config:
+Add to your MCP config (`.mcp.json` or `~/.claude.json`):
 ```json
 {
   "mcpServers": {
     "fireflyiii": {
-      "url": "http://127.0.0.1:3000/mcp"
+      "type": "http",
+      "url": "http://127.0.0.1:3000"
     }
   }
 }
 ```
+
+Or via the CLI:
+```bash
+claude mcp add --transport http fireflyiii http://127.0.0.1:3000
+```
+
+The `type: "http"` field is required — without it Claude Code assumes a stdio server and fails with `command: expected string`.
 
 On first connection Claude opens a browser window to authorize with Firefly III. After that, tokens are managed automatically (including refresh).
 
