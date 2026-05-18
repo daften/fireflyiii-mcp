@@ -43,6 +43,78 @@ Add to your Claude Code MCP configuration (`.claude/mcp.json` or Claude Desktop 
 }
 ```
 
+## HTTP Transport with OAuth
+
+The HTTP transport uses OAuth (Authorization Code + PKCE) instead of a Personal Access Token. The MCP client (e.g. Claude Desktop) handles the OAuth flow automatically — no manual token management needed.
+
+### Step 1: Register an OAuth client in Firefly III
+
+Go to **Profile → OAuth → OAuth Clients → Create New Client** and fill in:
+
+| Field | Value |
+|-------|-------|
+| **Name** | Anything, e.g. `Claude MCP` |
+| **Redirect URL** | `http://127.0.0.1:3000/oauth/callback` |
+| **Confidential** | **Uncheck this box** |
+
+> **Why uncheck Confidential?**  
+> Confidential clients require a client secret stored securely on a server. Our flow uses PKCE precisely because the MCP client (Claude) cannot securely store a secret — it runs locally on your machine. Unchecking "Confidential" creates a *public client*, which is the correct and secure choice for PKCE-based flows.
+
+> **Redirect URL note**  
+> Claude uses a random port for its OAuth callback (e.g. `http://localhost:61234/callback`), but Firefly III requires an exact URI match. The MCP server acts as a full OAuth proxy:
+> 1. It intercepts Claude's authorization request, substitutes `http://127.0.0.1:3000/oauth/callback` as the redirect URI, and forwards to Firefly III.
+> 2. Firefly III redirects back to `http://127.0.0.1:3000/oauth/callback`, which forwards to Claude's real dynamic-port callback.
+> 3. The same substitution is applied to the token exchange request.
+>
+> This means you register one fixed URL once and never touch it again.
+
+Save the client and copy the **Client ID** (you do not need the secret).
+
+### Step 2: Configure `.env` for HTTP mode
+
+```bash
+FIREFLY_URL=https://your-firefly-instance.example.com
+FIREFLY_OAUTH_CLIENT_ID=your-client-id-here
+# FIREFLY_TOKEN is not used in HTTP mode
+```
+
+### Step 3: Start the server in HTTP mode
+
+```bash
+npm run dev -- --transport http
+# or on a specific port:
+npm run dev -- --transport http --port 4000
+```
+
+### Step 4: Point Claude at the server
+
+Add to your MCP config (`.mcp.json` or `~/.claude.json`):
+```json
+{
+  "mcpServers": {
+    "fireflyiii": {
+      "type": "http",
+      "url": "http://127.0.0.1:3000"
+    }
+  }
+}
+```
+
+Or via the CLI:
+```bash
+claude mcp add --transport http fireflyiii http://127.0.0.1:3000
+```
+
+The `type: "http"` field is required — without it Claude Code assumes a stdio server and fails with `command: expected string`.
+
+The URL has no `/mcp` path — Claude Code uses the base URL as-is for all MCP protocol requests. The server accepts MCP messages at any path after the Bearer guard.
+
+On first connection Claude opens a browser window to authorize with Firefly III. After that, tokens are managed automatically (including refresh).
+
+### OAuth discovery
+
+The server exposes `GET /.well-known/oauth-authorization-server` (no auth required) which returns RFC 8414 metadata pointing to your Firefly III instance. MCP clients use this to discover the authorization and token endpoints automatically — no manual OAuth configuration needed in Claude.
+
 ## Available Tools
 
 | Tool | Description |
