@@ -419,6 +419,7 @@ Gaps identified by comparing against [fabianonetto/mcp-server-firefly-iii](https
 
 ## Development Notes
 
+- **Always verify new or changed tool fields against the Firefly III OpenAPI spec before implementing.** Fetch the YAML with `curl -s "https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml" -A "Mozilla/5.0"` and grep for the relevant schema (e.g. `grep -A 100 "TransactionSplitStore:"`). Field names, required/optional status, enums (especially `weekend`), and response shapes differ from what documentation summaries or memory suggest — the spec is authoritative.
 - Use ESM imports with `.js` extension (`import ... from '../transform.js'`) — required for Node ESM.
 - Use a single merged import from each module — avoid two `import` statements from the same path.
 - Test files are in `src/tests/` (flat, not a `unit/` subdirectory) and excluded from the build by `tsconfig.json`.
@@ -432,6 +433,7 @@ Gaps identified by comparing against [fabianonetto/mcp-server-firefly-iii](https
 
 ## Useful Resources
 
-- [Firefly III API Docs](https://api-docs.firefly-iii.org/)
+- [Firefly III API Docs](https://api-docs.firefly-iii.org/) — Swagger UI listing all versions
+- [Firefly III OpenAPI YAML (latest stable)](https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml) — machine-readable spec; fetch with `curl -s "https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml" -A "Mozilla/5.0"` (WebFetch is blocked by bot protection on this host)
 - [MCP Documentation](https://modelcontextprotocol.io/)
 - [TypeScript ESM Guide](https://nodejs.org/en/docs/guides/ecmascript-modules/)

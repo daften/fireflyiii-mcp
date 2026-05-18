@@ -176,6 +176,12 @@ npm run build             # Compile TypeScript to dist/
 - Webhooks (better managed in the Firefly III UI)
 - HTTP API key auth (PAT and OAuth already cover authentication)
 
+## Resources
+
+- [Firefly III API Documentation](https://api-docs.firefly-iii.org/) — interactive Swagger UI for all API versions
+- [Firefly III Docs](https://docs.firefly-iii.org/)
+- [MCP Documentation](https://modelcontextprotocol.io/)
+
 ## Acknowledgements
 
 Feature comparison informed by [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp).
