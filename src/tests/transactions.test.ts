@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction } from '../tools/transactions.js';
+import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction, searchTransactions } from '../tools/transactions.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -149,5 +149,24 @@ describe('deleteTransaction', () => {
     mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
     const result = await deleteTransaction(mockClient, '5');
     expect(result).toEqual({ deleted: true, id: '5' });
+  });
+});
+
+describe('searchTransactions', () => {
+  it('calls /search/transactions with query and pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await searchTransactions(mockClient, { query: 'groceries', page: 1, limit: 20 });
+    expect(mockClient.get).toHaveBeenCalledWith('/search/transactions', {
+      query: 'groceries',
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it('returns flat items with pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    const result = await searchTransactions(mockClient, { query: 'groceries' });
+    expect(result.data[0]).toEqual({ description: 'Groceries', amount: '-45.00', date: '2026-01-15', id: '101' });
+    expect(result.pagination).toEqual({ page: 1, totalPages: 3, total: 120 });
   });
 });

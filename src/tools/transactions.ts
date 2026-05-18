@@ -111,6 +111,15 @@ export async function deleteTransaction(
   return { deleted: true, id };
 }
 
+export async function searchTransactions(
+  client: FireflyClient,
+  params: { query: string; page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { query: params.query, page: params.page, limit: params.limit };
+  const response = await client.get<JsonApiListResponse>('/search/transactions', query);
+  return unwrapList(response);
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
@@ -244,6 +253,28 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     async ({ id }) => {
       try {
         const result = await deleteTransaction(client, id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'search_transactions',
+    {
+      title: 'Search Transactions',
+      description: 'Search for transactions in Firefly III by keyword. Searches across descriptions, notes, and other fields.',
+      inputSchema: {
+        query: z.string().describe('Search query'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ query, page, limit }) => {
+      try {
+        const result = await searchTransactions(client, { query, page, limit });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
