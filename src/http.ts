@@ -16,10 +16,12 @@ export function createOAuthHandler(
 ): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
   return async (req, res) => {
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
+      const host = req.headers['host'] ?? '127.0.0.1:3000';
       const metadata = {
         issuer: fireflyUrl,
         authorization_endpoint: `${fireflyUrl}/oauth/authorize`,
         token_endpoint: `${fireflyUrl}/oauth/token`,
+        registration_endpoint: `http://${host}/oauth/register`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],
@@ -27,6 +29,23 @@ export function createOAuthHandler(
       };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(metadata));
+      return;
+    }
+
+    // Dynamic client registration stub (RFC 7591) — no auth required.
+    // Firefly III does not support dynamic registration, so we handle it here.
+    // Always returns the pre-configured client_id from FIREFLY_OAUTH_CLIENT_ID.
+    if (req.method === 'POST' && req.url === '/oauth/register') {
+      const registration = {
+        client_id: oauthClientId,
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        client_secret_expires_at: 0,
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+      };
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(registration));
       return;
     }
 

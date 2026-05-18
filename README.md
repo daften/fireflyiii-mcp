@@ -61,7 +61,7 @@ Go to **Profile → OAuth → OAuth Clients → Create New Client** and fill in:
 > Confidential clients require a client secret stored securely on a server. Our flow uses PKCE precisely because the MCP client (Claude) cannot securely store a secret — it runs locally on your machine. Unchecking "Confidential" creates a *public client*, which is the correct and secure choice for PKCE-based flows.
 
 > **Redirect URL note**  
-> The redirect URL is where Firefly III sends the browser after you authorize. This is controlled by the MCP client (Claude), not this server. On first connection Claude will tell you the exact URL it needs — if Firefly III rejects it, update the registered redirect URL to match. Starting with `http://localhost` works for most MCP clients.
+> The redirect URL is where Firefly III sends the browser after you authorize. This is controlled by the MCP client (Claude), not this server. Claude uses a dynamic localhost port (e.g. `http://127.0.0.1:PORT/callback`). Because the port varies, start with `http://localhost` as a best guess. If Firefly III rejects the redirect URI during the first auth attempt, the error message will show the exact URL Claude used — update the registered redirect URL in Firefly III to match and try again.
 
 Save the client and copy the **Client ID** (you do not need the secret).
 
