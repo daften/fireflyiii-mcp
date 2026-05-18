@@ -6,6 +6,7 @@ type MockRequest = {
   method: string;
   url: string;
   headers: Record<string, string>;
+  on: (event: string, listener: (...args: unknown[]) => void) => MockRequest;
 };
 
 type MockResponse = {
@@ -20,9 +21,20 @@ type MockResponse = {
 function mockReq(
   method: string,
   url: string,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  body = ''
 ): MockRequest {
-  return { method, url, headers };
+  const req: MockRequest = {
+    method,
+    url,
+    headers,
+    on(event: string, listener: (...args: unknown[]) => void) {
+      if (event === 'data' && body) listener(Buffer.from(body));
+      if (event === 'end') listener();
+      return req;
+    },
+  };
+  return req;
 }
 
 function mockRes(): MockResponse {
@@ -88,7 +100,32 @@ describe('createOAuthHandler — metadata endpoint', () => {
 });
 
 describe('createOAuthHandler — registration endpoint', () => {
-  it('returns 201 with client registration response for POST /oauth/register', async () => {
+  it('returns 201 with redirect_uris echoed back', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1:9999/callback'] });
+    const req = mockReq('POST', '/oauth/register', {}, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed['client_id']).toBe('client-id-123');
+    expect(parsed['client_secret_expires_at']).toBe(0);
+    expect(parsed['token_endpoint_auth_method']).toBe('none');
+    expect(parsed['grant_types']).toEqual(['authorization_code', 'refresh_token']);
+    expect(parsed['response_types']).toEqual(['code']);
+    expect(parsed['redirect_uris']).toEqual(['http://127.0.0.1:9999/callback']);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns empty redirect_uris when none provided in request', async () => {
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
@@ -103,11 +140,7 @@ describe('createOAuthHandler — registration endpoint', () => {
 
     expect(res.statusCode).toBe(201);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['client_id']).toBe('client-id-123');
-    expect(parsed['client_secret_expires_at']).toBe(0);
-    expect(parsed['token_endpoint_auth_method']).toBe('none');
-    expect(parsed['grant_types']).toEqual(['authorization_code', 'refresh_token']);
-    expect(parsed['response_types']).toEqual(['code']);
+    expect(parsed['redirect_uris']).toEqual([]);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 

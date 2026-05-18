@@ -22,8 +22,24 @@ export function createOAuthHandler(fireflyUrl, oauthClientId, mcpHandler) {
         }
         // Dynamic client registration stub (RFC 7591) — no auth required.
         // Firefly III does not support dynamic registration, so we handle it here.
-        // Always returns the pre-configured client_id from FIREFLY_OAUTH_CLIENT_ID.
+        // Always returns the pre-configured client_id; echoes back redirect_uris from the request.
         if (req.method === 'POST' && req.url === '/oauth/register') {
+            const body = await new Promise((resolve, reject) => {
+                let data = '';
+                req.on('data', (chunk) => { data += chunk.toString(); });
+                req.on('end', () => resolve(data));
+                req.on('error', reject);
+            });
+            let redirectUris = [];
+            try {
+                const parsed = JSON.parse(body);
+                if (Array.isArray(parsed['redirect_uris'])) {
+                    redirectUris = parsed['redirect_uris'];
+                }
+            }
+            catch {
+                // no body or invalid JSON — return empty redirect_uris
+            }
             const registration = {
                 client_id: oauthClientId,
                 client_id_issued_at: Math.floor(Date.now() / 1000),
@@ -31,6 +47,7 @@ export function createOAuthHandler(fireflyUrl, oauthClientId, mcpHandler) {
                 token_endpoint_auth_method: 'none',
                 grant_types: ['authorization_code', 'refresh_token'],
                 response_types: ['code'],
+                redirect_uris: redirectUris,
             };
             res.writeHead(201, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(registration));
