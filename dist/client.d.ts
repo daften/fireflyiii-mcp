@@ -7,10 +7,11 @@ export declare class FireflyError extends Error {
 }
 export declare function formatError(err: unknown): string;
 export declare class FireflyClient {
-    private readonly token;
+    private readonly tokenResolver;
     private readonly baseUrl;
     private readonly timeoutMs;
-    constructor(baseUrl: string, token: string);
+    constructor(baseUrl: string, tokenResolver: string | (() => string));
+    private getToken;
     private request;
     get<T = unknown>(path: string, params?: QueryParams): Promise<T>;
     post<T = unknown>(path: string, body: unknown): Promise<T>;

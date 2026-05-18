@@ -1,12 +1,51 @@
 import * as http from 'node:http';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-async function tryListen(
-  httpServer: http.Server,
-  host: string,
-  port: number
-): Promise<void> {
+interface RequestContext {
+  token: string;
+}
+
+export const requestContext = new AsyncLocalStorage<RequestContext>();
+
+export function createOAuthHandler(
+  fireflyUrl: string,
+  oauthClientId: string,
+  mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
+  return async (req, res) => {
+    if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
+      const metadata = {
+        issuer: fireflyUrl,
+        authorization_endpoint: `${fireflyUrl}/oauth/authorize`,
+        token_endpoint: `${fireflyUrl}/oauth/token`,
+        response_types_supported: ['code'],
+        grant_types_supported: ['authorization_code', 'refresh_token'],
+        code_challenge_methods_supported: ['S256'],
+        client_id: oauthClientId,
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(metadata));
+      return;
+    }
+
+    const authHeader = req.headers['authorization'];
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) {
+      res.writeHead(401, {
+        'WWW-Authenticate': 'Bearer resource="Firefly III MCP"',
+        'Content-Type': 'application/json',
+      });
+      res.end(JSON.stringify({ error: 'unauthorized', error_description: 'Bearer token required' }));
+      return;
+    }
+
+    await requestContext.run({ token }, () => mcpHandler(req, res));
+  };
+}
+
+async function tryListen(httpServer: http.Server, host: string, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     httpServer.once('error', reject);
     httpServer.listen(port, host, () => {
@@ -20,13 +59,18 @@ export async function startHttpServer(
   server: McpServer,
   host: string,
   requestedPort: number,
-  portWasExplicit: boolean
+  portWasExplicit: boolean,
+  oauthClientId: string,
+  fireflyUrl: string
 ): Promise<void> {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const oauthHandler = createOAuthHandler(fireflyUrl, oauthClientId, (req, res) =>
+    transport.handleRequest(req, res)
+  );
 
   const httpServer = http.createServer(async (req, res) => {
     try {
-      await transport.handleRequest(req, res);
+      await oauthHandler(req, res);
     } catch (err) {
       process.stderr.write(`HTTP request handler error: ${err}\n`);
       if (!res.headersSent) {

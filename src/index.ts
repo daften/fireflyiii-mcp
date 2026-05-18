@@ -58,8 +58,10 @@ if (!url || !token) {
 const client = new FireflyClient(url, token);
 const server = createServer(client);
 
+const oauthClientId = process.env['OAUTH_CLIENT_ID'] ?? '';
+
 if (transport === 'http') {
-  await startHttpServer(server, host, port, portWasExplicit);
+  await startHttpServer(server, host, port, portWasExplicit, oauthClientId, url);
 } else {
   const stdioTransport = new StdioServerTransport();
   await server.connect(stdioTransport);

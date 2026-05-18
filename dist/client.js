@@ -42,12 +42,15 @@ export function formatError(err) {
     return 'An unknown error occurred.';
 }
 export class FireflyClient {
-    token;
+    tokenResolver;
     baseUrl;
     timeoutMs = 30_000;
-    constructor(baseUrl, token) {
-        this.token = token;
+    constructor(baseUrl, tokenResolver) {
+        this.tokenResolver = tokenResolver;
         this.baseUrl = baseUrl.replace(/\/$/, '');
+    }
+    getToken() {
+        return typeof this.tokenResolver === 'function' ? this.tokenResolver() : this.tokenResolver;
     }
     async request(method, url, body) {
         const controller = new AbortController();
@@ -58,7 +61,7 @@ export class FireflyClient {
                 method,
                 signal: controller.signal,
                 headers: {
-                    Authorization: `Bearer ${this.token}`,
+                    Authorization: `Bearer ${this.getToken()}`,
                     Accept: 'application/json',
                     ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
                 },
