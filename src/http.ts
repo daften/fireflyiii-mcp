@@ -164,17 +164,21 @@ async function tryListen(httpServer: http.Server, host: string, port: number): P
 }
 
 export async function startHttpServer(
-  server: McpServer,
+  createMcpServer: () => McpServer,
   host: string,
   requestedPort: number,
   portWasExplicit: boolean,
   oauthClientId: string,
   fireflyUrl: string
 ): Promise<void> {
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  const oauthHandler = createOAuthHandler(fireflyUrl, oauthClientId, (req, res) =>
-    transport.handleRequest(req, res)
-  );
+  // Stateless HTTP transport requires a fresh transport + server per request.
+  // The WebStandardStreamableHTTPServerTransport throws if reused across requests.
+  const oauthHandler = createOAuthHandler(fireflyUrl, oauthClientId, async (req, res) => {
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const server = createMcpServer();
+    await server.connect(transport);
+    await transport.handleRequest(req, res);
+  });
 
   const httpServer = http.createServer(async (req, res) => {
     try {
@@ -219,8 +223,6 @@ export async function startHttpServer(
   httpServer.on('error', (err) => {
     process.stderr.write(`HTTP server error: ${err}\n`);
   });
-
-  await server.connect(transport);
 
   process.stdout.write(`Firefly III MCP server listening on http://${host}:${port}\n`);
   if (moved) {

@@ -139,9 +139,15 @@ async function tryListen(httpServer, host, port) {
         });
     });
 }
-export async function startHttpServer(server, host, requestedPort, portWasExplicit, oauthClientId, fireflyUrl) {
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    const oauthHandler = createOAuthHandler(fireflyUrl, oauthClientId, (req, res) => transport.handleRequest(req, res));
+export async function startHttpServer(createMcpServer, host, requestedPort, portWasExplicit, oauthClientId, fireflyUrl) {
+    // Stateless HTTP transport requires a fresh transport + server per request.
+    // The WebStandardStreamableHTTPServerTransport throws if reused across requests.
+    const oauthHandler = createOAuthHandler(fireflyUrl, oauthClientId, async (req, res) => {
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        const server = createMcpServer();
+        await server.connect(transport);
+        await transport.handleRequest(req, res);
+    });
     const httpServer = http.createServer(async (req, res) => {
         try {
             await oauthHandler(req, res);
@@ -182,7 +188,6 @@ export async function startHttpServer(server, host, requestedPort, portWasExplic
     httpServer.on('error', (err) => {
         process.stderr.write(`HTTP server error: ${err}\n`);
     });
-    await server.connect(transport);
     process.stdout.write(`Firefly III MCP server listening on http://${host}:${port}\n`);
     if (moved) {
         process.stdout.write(`(port ${requestedPort} was in use — moved up automatically)\n`);

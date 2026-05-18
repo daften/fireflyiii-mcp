@@ -60,8 +60,7 @@ if (transport === 'http') {
     if (!store) throw new Error('No request context — Bearer token was not set before this call');
     return store.token;
   });
-  const server = createServer(client);
-  await startHttpServer(server, host, port, portWasExplicit, oauthClientId, url);
+  await startHttpServer(() => createServer(client), host, port, portWasExplicit, oauthClientId, url);
 } else {
   const token = process.env['FIREFLY_TOKEN'];
   if (!url || !token) {
