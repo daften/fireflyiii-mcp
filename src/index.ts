@@ -2,7 +2,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { FireflyClient } from './client.js';
 import { createServer } from './server.js';
-import { startHttpServer } from './http.js';
+import { startHttpServer, requestContext } from './http.js';
 
 interface ParsedArgs {
   transport: 'stdio' | 'http';
@@ -45,24 +45,34 @@ function parseArgs(): ParsedArgs {
 const { transport, host, port, portWasExplicit } = parseArgs();
 
 const url = process.env['FIREFLY_URL'];
-const token = process.env['FIREFLY_TOKEN'];
-
-if (!url || !token) {
-  process.stderr.write(
-    'Error: FIREFLY_URL and FIREFLY_TOKEN environment variables are required.\n' +
-    'See .env.example for configuration instructions.\n'
-  );
-  process.exit(1);
-}
-
-const client = new FireflyClient(url, token);
-const server = createServer(client);
-
-const oauthClientId = process.env['OAUTH_CLIENT_ID'] ?? '';
 
 if (transport === 'http') {
+  const oauthClientId = process.env['FIREFLY_OAUTH_CLIENT_ID'];
+  if (!url || !oauthClientId) {
+    process.stderr.write(
+      'Error: FIREFLY_URL and FIREFLY_OAUTH_CLIENT_ID environment variables are required for HTTP transport.\n' +
+      'See .env.example for configuration instructions.\n'
+    );
+    process.exit(1);
+  }
+  const client = new FireflyClient(url, () => {
+    const store = requestContext.getStore();
+    if (!store) throw new Error('No request context — Bearer token was not set before this call');
+    return store.token;
+  });
+  const server = createServer(client);
   await startHttpServer(server, host, port, portWasExplicit, oauthClientId, url);
 } else {
+  const token = process.env['FIREFLY_TOKEN'];
+  if (!url || !token) {
+    process.stderr.write(
+      'Error: FIREFLY_URL and FIREFLY_TOKEN environment variables are required for stdio transport.\n' +
+      'See .env.example for configuration instructions.\n'
+    );
+    process.exit(1);
+  }
+  const client = new FireflyClient(url, token);
+  const server = createServer(client);
   const stdioTransport = new StdioServerTransport();
   await server.connect(stdioTransport);
 }
