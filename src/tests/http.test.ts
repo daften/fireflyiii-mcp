@@ -2,18 +2,33 @@ import { describe, it, expect, vi } from 'vitest';
 import * as http from 'node:http';
 import { createOAuthHandler, requestContext } from '../http.js';
 
+type MockRequest = {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+};
+
+type MockResponse = {
+  statusCode: number;
+  writtenHeaders: Record<string, string | string[]>;
+  body: string;
+  headersSent: boolean;
+  writeHead: (code: number, hdrs?: Record<string, string>) => void;
+  end: (data?: string) => void;
+};
+
 function mockReq(
   method: string,
   url: string,
   headers: Record<string, string> = {}
-): http.IncomingMessage {
-  return { method, url, headers } as unknown as http.IncomingMessage;
+): MockRequest {
+  return { method, url, headers };
 }
 
-function mockRes() {
-  const result = {
+function mockRes(): MockResponse {
+  const result: MockResponse = {
     statusCode: 200,
-    writtenHeaders: {} as Record<string, string | string[]>,
+    writtenHeaders: {},
     body: '',
     headersSent: false,
     writeHead(code: number, hdrs?: Record<string, string>) {
