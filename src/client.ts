@@ -41,8 +41,12 @@ export class FireflyClient {
   private readonly baseUrl: string;
   private readonly timeoutMs = 30_000;
 
-  constructor(baseUrl: string, private readonly token: string) {
+  constructor(baseUrl: string, private readonly tokenResolver: string | (() => string)) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+  }
+
+  private getToken(): string {
+    return typeof this.tokenResolver === 'function' ? this.tokenResolver() : this.tokenResolver;
   }
 
   private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -54,7 +58,7 @@ export class FireflyClient {
         method,
         signal: controller.signal,
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          Authorization: `Bearer ${this.getToken()}`,
           Accept: 'application/json',
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         },

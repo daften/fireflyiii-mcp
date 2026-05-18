@@ -80,6 +80,38 @@ describe('FireflyClient', () => {
     expect(err).toBeInstanceOf(FireflyError);
     expect((err as FireflyError).status).toBe(500);
   });
+
+  it('calls token resolver function at request time', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: [] }), { status: 200 })
+    );
+    const resolver = vi.fn().mockReturnValue('resolved-token');
+    const client = new FireflyClient('https://firefly.example.com', resolver);
+    await client.get('/accounts');
+    expect(resolver).toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer resolved-token' }),
+      })
+    );
+  });
+
+  it('resolver is called on every request, not just construction', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
+    let callCount = 0;
+    const resolver = vi.fn().mockImplementation(() => `token-${++callCount}`);
+    const client = new FireflyClient('https://firefly.example.com', resolver);
+    await client.get('/accounts');
+    await client.get('/budgets');
+    expect(resolver).toHaveBeenCalledTimes(2);
+    const firstCall = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    const secondCall = vi.mocked(fetch).mock.calls[1][1] as RequestInit;
+    expect((firstCall.headers as Record<string, string>)['Authorization']).toBe('Bearer token-1');
+    expect((secondCall.headers as Record<string, string>)['Authorization']).toBe('Bearer token-2');
+  });
 });
 
 describe('formatError', () => {
