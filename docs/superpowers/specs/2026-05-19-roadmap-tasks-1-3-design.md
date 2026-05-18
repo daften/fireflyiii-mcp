@@ -133,11 +133,13 @@ Response shape: standard JSON:API envelope — `unwrapList` and `unwrapSingle` a
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `type` | `'withdrawal' \| 'deposit' \| 'transfer'` | Yes (create) | Transaction type for all generated transactions |
 | `title` | `string` | Yes (create) | Name of the recurring transaction |
-| `description` | `string` | No | Optional notes |
-| `first_date` | `string` | Yes (create) | YYYY-MM-DD — date of first occurrence |
-| `repeat_until` | `string` | No | YYYY-MM-DD — stop after this date; don't combine with `nr_of_repetitions` (API rejects both) |
-| `nr_of_repetitions` | `number` | No | Stop after N occurrences; don't combine with `repeat_until` (API rejects both) |
+| `description` | `string` | No | Description of the recurrence (not the transaction) |
+| `notes` | `string` | No | Optional notes |
+| `first_date` | `string` | Yes (create) | YYYY-MM-DD — date of first occurrence (must be in the future) |
+| `repeat_until` | `string` | No | YYYY-MM-DD — stop after this date; pass `null` explicitly if using `nr_of_repetitions` |
+| `nr_of_repetitions` | `number` | No | Stop after N occurrences; don't combine with `repeat_until` |
 | `apply_rules` | `boolean` | No | Default `true` |
 | `active` | `boolean` | No | Default `true` |
 
@@ -146,22 +148,19 @@ Response shape: standard JSON:API envelope — `unwrapList` and `unwrapSingle` a
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `repeat_type` | `'daily' \| 'weekly' \| 'monthly' \| 'ndom' \| 'yearly'` | Yes (create) | Frequency |
-| `repeat_moment` | `string` | Yes (create) | Day-of-month for `monthly` (e.g. `"1"`); weekday 1–7 for `weekly`; `MM-DD` for `yearly`; `"Nth WEEKDAY"` for `ndom` |
-| `skip` | `number` | No | Skip every N occurrences (0 = no skip) |
-| `weekend` | `'skip' \| 'previous-friday' \| 'next-monday'` | No | What to do when occurrence falls on a weekend |
-
-The `weekend` values map to Firefly III API integers: `skip` → `1`, `previous-friday` → `2`, `next-monday` → `3`.
+| `repeat_moment` | `string` | Yes (create) | Empty string for `daily`; weekday 1–7 for `weekly` (1=Mon, 7=Sun); day of month 1–31 for `monthly`; `"week,day"` for `ndom` (e.g. `"2,3"` = 2nd Wednesday); full date `YYYY-MM-DD` for `yearly` (year ignored) |
+| `skip` | `number` | No | Skip every N occurrences (0 = no skip, 1 = every other) |
+| `weekend` | `number` | No | What to do when occurrence falls on a weekend: `1`=do nothing, `2`=skip (no transaction), `3`=previous Friday, `4`=next Monday |
 
 **Transaction template fields** (sent as a single-item `transactions` array):
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `type` | `'withdrawal' \| 'deposit' \| 'transfer'` | Yes (create) | |
 | `amount` | `string` | Yes (create) | Positive number string |
-| `description` | `string` | Yes (create) | |
-| `source_id` | `string` | No | |
-| `destination_id` | `string` | No | |
-| `category_name` | `string` | No | |
+| `description` | `string` | Yes (create) | Description of the generated transaction |
+| `source_id` | `string` | Yes (create) | Source account ID |
+| `destination_id` | `string` | Yes (create) | Destination account ID |
+| `category_id` | `string` | No | Category ID (recurring API only accepts ID, not name) |
 | `budget_id` | `string` | No | |
 | `currency_code` | `string` | No | |
 | `tags` | `string[]` | No | |
@@ -170,6 +169,7 @@ The `weekend` values map to Firefly III API integers: `skip` → `1`, `previous-
 **Example create body:**
 ```json
 {
+  "type": "withdrawal",
   "title": "Monthly rent",
   "first_date": "2026-06-01",
   "repeat_until": "2027-06-01",
@@ -179,15 +179,14 @@ The `weekend` values map to Firefly III API integers: `skip` → `1`, `previous-
     "type": "monthly",
     "moment": "1",
     "skip": 0,
-    "weekend": 3
+    "weekend": 4
   }],
   "transactions": [{
-    "type": "withdrawal",
     "amount": "950.00",
     "description": "Rent",
     "source_id": "1",
     "destination_id": "5",
-    "category_name": "Housing"
+    "category_id": "12"
   }]
 }
 ```
