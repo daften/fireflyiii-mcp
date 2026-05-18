@@ -8,7 +8,7 @@ Users can query their finances in natural language through Claude, getting answe
 
 **Phase 1 (complete):** Read-only tools for querying financial data.  
 **Phase 2 (complete):** Full CRUD write tools and HTTP transport.  
-**Phase 3 (future):** OAuth via Firefly III for HTTP transport.
+**Phase 3 (complete):** OAuth via Firefly III for HTTP transport.
 
 ---
 
@@ -20,18 +20,27 @@ Users can query their finances in natural language through Claude, getting answe
 - **Validation:** Zod for input schemas (inline in each tool file)
 - **Testing:** Vitest for unit and integration tests
 - **Build:** TypeScript compiler to ES2022 with source maps
-- **Transport:** stdio (default) or HTTP (`--transport http`); HTTP is stateless StreamableHTTP
+- **Transport:** stdio (default) or HTTP (`--transport http`); HTTP is stateless StreamableHTTP with OAuth proxy
 
 ---
 
 ## Environment Variables
 
+**stdio transport:**
 ```
 FIREFLY_URL       String, required. Base URL of Firefly III instance (no trailing slash).
 FIREFLY_TOKEN     String, required. Personal Access Token from Firefly III Profile → OAuth → Personal Access Tokens.
 ```
 
-Both are required to start the server. Store in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
+**HTTP transport:**
+```
+FIREFLY_URL                String, required. Base URL of Firefly III instance (no trailing slash).
+FIREFLY_OAUTH_CLIENT_ID    String, required. OAuth client ID from Firefly III Profile → OAuth → Clients.
+```
+
+In HTTP mode, the Bearer token is resolved per-request from the Authorization header (set by the MCP client after completing the OAuth flow). `FIREFLY_TOKEN` is not used in HTTP mode.
+
+Store credentials in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
 
 ---
 
@@ -42,24 +51,26 @@ fireflyiii-mcp/
 ├── src/
 │   ├── index.ts                 # MCP server entry point — validates env, wires client + server + transport
 │   ├── server.ts                # Server factory: createServer(client) → McpServer
-│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth)
+│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth; accepts token string or getter fn)
+│   ├── http.ts                  # HTTP server + OAuth proxy (authorize, token, callback, register stubs)
 │   ├── transform.ts             # JSON:API response transforms (unwrapList, unwrapSingle, cleanSummary)
 │   ├── types.ts                 # Shared utility types (QueryParams)
 │   ├── tools/
 │   │   ├── index.ts             # Aggregator: registerAllTools(server, client) calls each registerXxx
-│   │   ├── accounts.ts          # get_accounts, get_account
-│   │   ├── transactions.ts      # get_transactions, get_transaction
-│   │   ├── budgets.ts           # get_budgets, get_budget_limits
-│   │   ├── categories.ts        # get_categories, get_category_transactions
-│   │   ├── bills.ts             # get_bills
-│   │   ├── piggy-banks.ts       # get_piggy_banks
-│   │   └── reports.ts           # get_tags, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income
+│   │   ├── accounts.ts          # get_accounts, get_account, create_account, update_account, delete_account
+│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction
+│   │   ├── budgets.ts           # get_budgets, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit
+│   │   ├── categories.ts        # get_categories, get_category_transactions, create_category, update_category, delete_category
+│   │   ├── bills.ts             # get_bills, create_bill, update_bill, delete_bill
+│   │   ├── piggy-banks.ts       # get_piggy_banks, create_piggy_bank, update_piggy_bank, delete_piggy_bank
+│   │   └── reports.ts           # get_tags, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag
 │   └── tests/
 │       ├── accounts.test.ts
 │       ├── bills.test.ts
 │       ├── budgets.test.ts
 │       ├── categories.test.ts
 │       ├── client.test.ts
+│       ├── http.test.ts
 │       ├── integration.test.ts  # Live Firefly III tests (skipped unless FIREFLY_INTEGRATION=true)
 │       ├── piggy-banks.test.ts
 │       ├── reports.test.ts
@@ -193,7 +204,7 @@ The `/summary/basic` endpoint returns a **dict** keyed by currency slug (e.g. `"
 
 ## Tool Annotations
 
-All Phase 1 tools use:
+Read tools use:
 
 ```typescript
 const READ_ANNOTATIONS = {
@@ -203,7 +214,7 @@ const READ_ANNOTATIONS = {
 } as const;
 ```
 
-Phase 2 write tools use:
+Write tools use:
 - Create: `{ openWorldHint: true }`
 - Update: `{ openWorldHint: true, idempotentHint: true }`
 - Delete: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
@@ -212,14 +223,30 @@ Phase 2 write tools use:
 
 ## HTTP Client (`src/client.ts`)
 
-Wraps Firefly III's REST API with Bearer auth and error handling. Accepts typed generic for the response shape.
+Wraps Firefly III's REST API with Bearer auth and error handling. Accepts either a static token string or a getter function (used in HTTP mode to read the per-request token from `AsyncLocalStorage`).
 
 ```typescript
-const client = new FireflyClient(url, token);
+const client = new FireflyClient(url, token);          // stdio: static PAT
+const client = new FireflyClient(url, () => getToken()); // HTTP: per-request via AsyncLocalStorage
 const response = await client.get<JsonApiListResponse>('/accounts', { page: 1, limit: 50 });
 ```
 
 Query params are passed as a `QueryParams` object (`Record<string, string | number | undefined>`); `undefined` values are omitted automatically.
+
+---
+
+## OAuth Proxy (`src/http.ts`)
+
+In HTTP mode, `createOAuthHandler` wraps the MCP request handler with an OAuth proxy that sits in front of Firefly III's own OAuth server. This solves the redirect URI mismatch problem: Firefly III requires exact URI matching, but MCP clients use a dynamic localhost port each session.
+
+Routes handled by the proxy (no auth required):
+- `GET /.well-known/oauth-authorization-server` — returns OAuth metadata pointing at our proxy endpoints
+- `GET /oauth/authorize` — stores the MCP client's dynamic `redirect_uri`, substitutes our stable `/oauth/callback` URL, and 302s to Firefly III
+- `POST /oauth/register` — RFC 7591 dynamic client registration stub (Firefly III doesn't support this; we return the configured `FIREFLY_OAUTH_CLIENT_ID`)
+- `POST /oauth/token` — substitutes `redirect_uri` back to our stable callback, proxies token exchange to Firefly III
+- `GET /oauth/callback` — receives Firefly III's redirect, forwards `code`+`state` to the MCP client's original dynamic callback URL
+
+All other requests require a `Bearer` token in the `Authorization` header. The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
 
 ---
 
@@ -327,7 +354,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
-## Phase 1 vs Phase 2
+## Completed Phases
 
 **Phase 1 (complete):**
 - Read-only tools only
@@ -341,11 +368,52 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - Delete tools: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
 - HTTP transport via `--transport http` (default: stdio)
 - CLI flags: `--transport stdio|http`, `--host <host>` (default 127.0.0.1), `--port <n>` (default 3000, auto-increments if taken)
-- No HTTP auth (Phase 3: OAuth via Firefly III)
 
-**Phase 3 (future):**
-- OAuth via Firefly III for HTTP transport (replaces PAT token in HTTP mode)
-- Multi-split transaction support
+**Phase 3 (complete):**
+- OAuth via Firefly III for HTTP transport — full proxy in `src/http.ts`
+- `FIREFLY_OAUTH_CLIENT_ID` env var required for HTTP mode; `FIREFLY_TOKEN` used only for stdio
+- Per-request Bearer token propagation via `AsyncLocalStorage`
+- Dynamic client registration stub (RFC 7591) — Firefly III doesn't support it natively
+- Redirect URI substitution proxy solves the dynamic-port mismatch between MCP clients and Firefly III's exact URI matching
+
+---
+
+## Roadmap — Feature Parity Tasks
+
+Gaps identified by comparing against [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp). Both repos are credited as inspiration throughout this list.
+
+### High Priority
+
+- [ ] **Split transactions** — add `create_split_transaction` to `src/tools/transactions.ts`; accepts an array of splits (amount, category, budget, description per split); one receipt across multiple categories is the primary use case. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
+- [ ] **Transaction search** — add `search_transactions` to `src/tools/transactions.ts`; keyword search via `/transactions?query=` with configurable limit. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
+- [ ] **Recurring transactions** — new `src/tools/recurring.ts` and `src/tests/recurring.test.ts`; full CRUD (`get_recurring`, `create_recurring`, `update_recurring`, `delete_recurring`); frequencies: daily/weekly/monthly/yearly. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Insight "no X" variants** — add to `src/tools/reports.ts`: tools that return expenses/income for transactions with *nothing* attached to a given field; e.g. `get_insight_expenses_no_category` returns all expenses where no category has been set — useful for finding uncategorized/untagged transactions; endpoints: `/insight/expense/no-bill`, `/insight/expense/no-budget`, `/insight/expense/no-category`, `/insight/expense/no-tag`, `/insight/income/no-category`, `/insight/income/no-tag`. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Docker container** — add `Dockerfile` (multi-stage, `node:18-alpine`) and `docker-compose.yml`; runs the server in HTTP mode with `--host 0.0.0.0`; requires a new `MCP_BASE_URL` env var (the externally reachable URL of the container, e.g. `https://mcp.example.com`) used in `src/http.ts` to generate the stable OAuth callback URL (`${MCP_BASE_URL}/oauth/callback`) and OAuth metadata issuer — this URL must match the redirect URI registered in Firefly III; env vars needed in container: `FIREFLY_URL`, `FIREFLY_OAUTH_CLIENT_ID`, `MCP_BASE_URL`; `src/http.ts` must be updated to prefer `MCP_BASE_URL` over the `Host` header when building redirect URIs
+- [ ] **npm package publishing** — configure `package.json` with `files` (include only `dist/`, `README.md`, `LICENSE`, `.env.example`), `publishConfig`, and a `prepublishOnly` script that runs `npm run build`; add GitHub Actions workflow (`.github/workflows/publish.yml`) that publishes to npm on a version tag push; decide on package name (e.g. `fireflyiii-mcp` or `@fireflyiii-community/mcp-server`)
+
+### Medium Priority
+
+- [ ] **Automation rules & rule groups** — new `src/tools/rules.ts` and `src/tests/rules.test.ts`; CRUD for rules and rule groups; include `trigger_rule_group` (POST `/rule-groups/{id}/trigger`) to manually run a group against existing transactions. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **File attachments** — new `src/tools/attachments.ts` and `src/tests/attachments.test.ts`; `get_attachments`, `get_attachment`, `create_attachment`, `delete_attachment`, `upload_attachment` (base64-encoded content POST to `/attachments/{id}/upload`). *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Tool preset/filter system** — update `src/tools/index.ts` to accept an optional preset name; define named presets (`default`, `full`, `budget`, `reporting`, `automation`) that limit which tool files are registered; expose via `--preset` CLI flag in `src/index.ts`; reduces context window usage as tool count grows toward 60+. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+
+### Low Priority
+
+- [ ] **Currency management** — new `src/tools/currencies.ts` and `src/tests/currencies.test.ts`; `get_currencies`, `get_currency`, `create_currency`, `update_currency` (enable/disable), `delete_currency`. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Net worth & chart data** — add to `src/tools/reports.ts`: `get_net_worth_summary` (`/summary/net-worth`) and `get_account_overview_chart` (`/chart/account/overview`); both accept start/end date params. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Available budgets** — add to `src/tools/budgets.ts`: `get_available_budgets` (`/available-budgets`) and `get_available_budget` (`/available-budgets/{id}`). *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Piggy bank events** — add to `src/tools/piggy-banks.ts`: `get_piggy_bank_events` (`/piggy-banks/{id}/events`), `create_piggy_bank_event`, `delete_piggy_bank_event`; granular deposit/withdrawal event tracking per piggy bank. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **Data export** — add to `src/tools/reports.ts` or new `src/tools/exports.ts`: per-entity CSV exports (`export_transactions`, `export_accounts`, `export_bills`, etc.) via `/data/export` endpoints. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [ ] **get_about** — add to `src/tools/reports.ts`: system info from `/about`; useful for version checking and diagnostics. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
+- [ ] **Object groups** — new `src/tools/object-groups.ts` and `src/tests/object-groups.test.ts`; `get_object_groups`, `create_object_group`; used to organize accounts and piggy banks. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
+
+### Won't Do
+
+- **Destroy/purge data** — exposes Firefly III's bulk data deletion endpoints; too destructive and too easy to trigger accidentally via natural language; out of scope for a finance assistant.
+- **User preferences** — read/write of low-level system preferences; not relevant to financial queries or actions; adds complexity without user-facing value.
+- **Cloudflare Workers deployment** — adds a separate deployment target with its own toolchain (Hono, `McpAgent`); maintenance burden outweighs benefit; Docker covers the remote hosting use case. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- **Webhooks** — configuring Firefly III webhooks via MCP is a meta-task (managing the system, not using it); better handled directly in the Firefly III UI. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- **HTTP API key auth** — PAT (stdio) and OAuth (HTTP) already provide authentication; an additional API key layer adds no meaningful security and complicates setup. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
 
 ---
 

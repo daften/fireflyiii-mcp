@@ -145,6 +145,41 @@ npm run dev               # Run without building (uses tsx)
 npm run build             # Compile TypeScript to dist/
 ```
 
+## Roadmap
+
+**High priority:**
+- Split transactions (one receipt, multiple categories)
+- Transaction keyword search
+- Recurring transactions (full CRUD)
+- Insight tools for uncategorized/untagged transactions
+- Docker container for self-hosted HTTP deployment
+- npm package
+
+**Medium priority:**
+- Automation rules and rule groups
+- File attachments
+- Tool preset system (limit exposed tools to reduce context window usage)
+
+**Low priority:**
+- Currency management
+- Net worth summary and account chart data
+- Available budgets
+- Piggy bank deposit/withdrawal events
+- Data export (CSV per entity type)
+- System info (`get_about`)
+- Object groups
+
+**Won't implement:**
+- Destroy/purge data (too destructive for a natural-language interface)
+- User preferences
+- Cloudflare Workers deployment
+- Webhooks (better managed in the Firefly III UI)
+- HTTP API key auth (PAT and OAuth already cover authentication)
+
+## Acknowledgements
+
+Feature comparison informed by [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp).
+
 ## License
 
 MIT
