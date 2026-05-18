@@ -61,7 +61,12 @@ Go to **Profile → OAuth → OAuth Clients → Create New Client** and fill in:
 > Confidential clients require a client secret stored securely on a server. Our flow uses PKCE precisely because the MCP client (Claude) cannot securely store a secret — it runs locally on your machine. Unchecking "Confidential" creates a *public client*, which is the correct and secure choice for PKCE-based flows.
 
 > **Redirect URL note**  
-> The MCP server acts as a callback proxy. Claude uses a dynamic localhost port for its OAuth callback, but Firefly III requires an exact URI match. The server registers `http://127.0.0.1:3000/oauth/callback` (its own stable URL) with Firefly III, then forwards the authorization code to Claude's actual callback automatically. This means you only need to register one fixed URL and never update it.
+> Claude uses a random port for its OAuth callback (e.g. `http://localhost:61234/callback`), but Firefly III requires an exact URI match. The MCP server acts as a full OAuth proxy:
+> 1. It intercepts Claude's authorization request, substitutes `http://127.0.0.1:3000/oauth/callback` as the redirect URI, and forwards to Firefly III.
+> 2. Firefly III redirects back to `http://127.0.0.1:3000/oauth/callback`, which forwards to Claude's real dynamic-port callback.
+> 3. The same substitution is applied to the token exchange request.
+>
+> This means you register one fixed URL once and never touch it again.
 
 Save the client and copy the **Client ID** (you do not need the secret).
 
@@ -101,6 +106,8 @@ claude mcp add --transport http fireflyiii http://127.0.0.1:3000
 ```
 
 The `type: "http"` field is required — without it Claude Code assumes a stdio server and fails with `command: expected string`.
+
+The URL has no `/mcp` path — Claude Code uses the base URL as-is for all MCP protocol requests. The server accepts MCP messages at any path after the Bearer guard.
 
 On first connection Claude opens a browser window to authorize with Firefly III. After that, tokens are managed automatically (including refresh).
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as http from 'node:http';
 import { createOAuthHandler, requestContext } from '../http.js';
 
@@ -72,8 +72,9 @@ describe('createOAuthHandler — metadata endpoint', () => {
     expect(res.statusCode).toBe(200);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
     expect(parsed['issuer']).toBe('https://firefly.example.com');
-    expect(parsed['authorization_endpoint']).toBe('https://firefly.example.com/oauth/authorize');
-    expect(parsed['token_endpoint']).toBe('https://firefly.example.com/oauth/token');
+    // Both OAuth endpoints are served by our proxy so we can substitute redirect_uri transparently.
+    expect(parsed['authorization_endpoint']).toBe('http://127.0.0.1:3000/oauth/authorize');
+    expect(parsed['token_endpoint']).toBe('http://127.0.0.1:3000/oauth/token');
     expect(parsed['registration_endpoint']).toBe('http://127.0.0.1:3000/oauth/register');
     expect(parsed['response_types_supported']).toEqual(['code']);
     expect(parsed['grant_types_supported']).toEqual(['authorization_code', 'refresh_token']);
@@ -96,6 +97,81 @@ describe('createOAuthHandler — metadata endpoint', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('createOAuthHandler — authorize proxy', () => {
+  it('302s to Firefly III with stable redirect_uri substituted', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq(
+      'GET',
+      '/oauth/authorize?response_type=code&client_id=client-id-123&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc&code_challenge=xyz&code_challenge_method=S256',
+      { host: '127.0.0.1:3000' }
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(302);
+    const location = res.writtenHeaders['Location'] as string;
+    const locationUrl = new URL(location);
+    expect(`${locationUrl.origin}${locationUrl.pathname}`).toBe('https://firefly.example.com/oauth/authorize');
+    expect(locationUrl.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:3000/oauth/callback');
+    expect(locationUrl.searchParams.get('response_type')).toBe('code');
+    expect(locationUrl.searchParams.get('code_challenge')).toBe('xyz');
+    expect(locationUrl.searchParams.get('state')).toBe('abc');
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('does not require Authorization header', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(302);
+  });
+
+  it('callback works after authorize proxy stores the client redirect URI', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    // Step 1: authorize proxy stores Claude's real redirect URI
+    const authReq = mockReq(
+      'GET',
+      '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc',
+      { host: '127.0.0.1:3000' }
+    );
+    await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
+
+    // Step 2: Firefly III redirects to our stable callback
+    const callbackReq = mockReq('GET', '/oauth/callback?code=authcode&state=abc', { host: '127.0.0.1:3000' });
+    const callbackRes = mockRes();
+    await handler(callbackReq as http.IncomingMessage, callbackRes as unknown as http.ServerResponse);
+
+    expect(callbackRes.statusCode).toBe(302);
+    const location = callbackRes.writtenHeaders['Location'] as string;
+    expect(location).toContain('http://localhost:9999/callback');
+    expect(location).toContain('code=authcode');
+    expect(location).toContain('state=abc');
+    expect(mcpHandler).not.toHaveBeenCalled();
   });
 });
 
@@ -158,6 +234,90 @@ describe('createOAuthHandler — registration endpoint', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(201);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+});
+
+describe('createOAuthHandler — token proxy', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('proxies POST /oauth/token to Firefly III substituting redirect_uri', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify({ access_token: 'at123', token_type: 'Bearer' })),
+      headers: { get: (_: string) => 'application/json' },
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const body = 'grant_type=authorization_code&code=abc123&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&code_verifier=verifier123';
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [fetchUrl, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(fetchUrl).toBe('https://firefly.example.com/oauth/token');
+    const sentParams = new URLSearchParams(fetchInit.body as string);
+    expect(sentParams.get('redirect_uri')).toBe('http://127.0.0.1:3000/oauth/callback');
+    expect(sentParams.get('code')).toBe('abc123');
+    expect(sentParams.get('code_verifier')).toBe('verifier123');
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('does not require Authorization header for token endpoint', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve('{}'),
+      headers: { get: () => 'application/json' },
+    }));
+
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('forwards Firefly III error responses unchanged', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      status: 401,
+      text: () => Promise.resolve(JSON.stringify({ error: 'invalid_client' })),
+      headers: { get: () => 'application/json' },
+    }));
+
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(401);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 });

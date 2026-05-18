@@ -9,20 +9,32 @@ interface RequestContext {
 
 export const requestContext = new AsyncLocalStorage<RequestContext>();
 
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
+
 export function createOAuthHandler(
   fireflyUrl: string,
   oauthClientId: string,
   mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
 ): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
+  // Stores Claude's dynamic callback URL across the authorize → callback → token flow.
   let pendingClientRedirectUri: string | null = null;
 
   return async (req, res) => {
+    const host = req.headers['host'] ?? '127.0.0.1:3000';
+
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
-      const host = req.headers['host'] ?? '127.0.0.1:3000';
       const metadata = {
         issuer: fireflyUrl,
-        authorization_endpoint: `${fireflyUrl}/oauth/authorize`,
-        token_endpoint: `${fireflyUrl}/oauth/token`,
+        // Point both endpoints at our proxy so we can substitute redirect_uri transparently.
+        authorization_endpoint: `http://${host}/oauth/authorize`,
+        token_endpoint: `http://${host}/oauth/token`,
         registration_endpoint: `http://${host}/oauth/register`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
@@ -34,17 +46,33 @@ export function createOAuthHandler(
       return;
     }
 
+    // Authorization proxy — no auth required.
+    // Claude sends its dynamic redirect_uri here. We store it, substitute our stable callback URL,
+    // then 302 the browser to Firefly III's real authorize endpoint.
+    // Firefly III does exact URI matching, so substituting here is the only way to make it work
+    // without updating the registered URI on every new Claude session.
+    if (req.method === 'GET' && req.url?.startsWith('/oauth/authorize')) {
+      const incomingUrl = new URL(req.url, `http://${host}`);
+      const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
+      if (clientRedirectUri) {
+        pendingClientRedirectUri = clientRedirectUri;
+      }
+      const fireflyAuthUrl = new URL(`${fireflyUrl}/oauth/authorize`);
+      incomingUrl.searchParams.forEach((value, key) => {
+        fireflyAuthUrl.searchParams.set(
+          key,
+          key === 'redirect_uri' ? `http://${host}/oauth/callback` : value
+        );
+      });
+      res.writeHead(302, { Location: fireflyAuthUrl.toString() });
+      res.end();
+      return;
+    }
+
     // Dynamic client registration stub (RFC 7591) — no auth required.
     // Firefly III does not support dynamic registration, so we handle it here.
-    // Always returns the pre-configured client_id; echoes back redirect_uris from the request.
     if (req.method === 'POST' && req.url === '/oauth/register') {
-      const body = await new Promise<string>((resolve, reject) => {
-        let data = '';
-        req.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-        req.on('end', () => resolve(data));
-        req.on('error', reject);
-      });
-      const host = req.headers['host'] ?? '127.0.0.1:3000';
+      const body = await readBody(req);
       let redirectUris: string[] = [];
       try {
         const parsed = JSON.parse(body) as Record<string, unknown>;
@@ -54,12 +82,9 @@ export function createOAuthHandler(
       } catch {
         // no body or invalid JSON — return empty redirect_uris
       }
-      // Store Claude's real redirect URI and tell it to use our stable proxy instead.
-      // Firefly III does exact URI matching, so Claude's dynamic-port callback would never match.
       if (redirectUris[0]) {
         pendingClientRedirectUri = redirectUris[0];
       }
-      const stableCallbackUri = `http://${host}/oauth/callback`;
       const registration = {
         client_id: oauthClientId,
         client_id_issued_at: Math.floor(Date.now() / 1000),
@@ -67,17 +92,39 @@ export function createOAuthHandler(
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        redirect_uris: redirectUris.length > 0 ? [stableCallbackUri] : [],
+        redirect_uris: redirectUris.length > 0 ? [`http://${host}/oauth/callback`] : [],
       };
       res.writeHead(201, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(registration));
       return;
     }
 
-    // Callback proxy: Firefly III redirects here after authorization.
-    // We forward the code + state to Claude's real (dynamic-port) callback URL.
+    // Token proxy — no auth required.
+    // Claude sends its dynamic redirect_uri in the token exchange, but Firefly III validates that
+    // it matches the one used in the authorization request (our stable callback URL). Substitute here.
+    if (req.method === 'POST' && req.url === '/oauth/token') {
+      const body = await readBody(req);
+      const params = new URLSearchParams(body);
+      if (params.get('redirect_uri')) {
+        params.set('redirect_uri', `http://${host}/oauth/callback`);
+      }
+      const tokenResponse = await fetch(`${fireflyUrl}/oauth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+      const responseBody = await tokenResponse.text();
+      const contentType = tokenResponse.headers.get('Content-Type') ?? 'application/json';
+      res.writeHead(tokenResponse.status, { 'Content-Type': contentType });
+      res.end(responseBody);
+      return;
+    }
+
+    // Callback proxy — no auth required.
+    // Firefly III redirects here after authorization. We forward code+state to Claude's actual
+    // dynamic-port callback so Claude can complete the token exchange.
     if (req.method === 'GET' && req.url?.startsWith('/oauth/callback')) {
-      const incomingUrl = new URL(req.url, `http://${req.headers['host'] ?? 'localhost'}`);
+      const incomingUrl = new URL(req.url, `http://${host}`);
       if (!pendingClientRedirectUri) {
         res.writeHead(400, { 'Content-Type': 'text/plain' });
         res.end('No pending OAuth flow. Start authorization from your MCP client.');
