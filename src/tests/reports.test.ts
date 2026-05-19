@@ -6,6 +6,7 @@ import {
   fetchSummary,
   fetchInsightExpenses,
   fetchInsightIncome,
+  fetchInsightNoX,
   createTag,
   updateTag,
   deleteTag,
@@ -177,5 +178,35 @@ describe('deleteTag', () => {
     const result = await deleteTag(mockClient, '6');
     expect(mockClient.delete).toHaveBeenCalledWith('/tags/6');
     expect(result).toEqual({ deleted: true, id: '6' });
+  });
+});
+
+describe('fetchInsightNoX', () => {
+  const endpoints = [
+    '/insight/expense/no-bill',
+    '/insight/expense/no-budget',
+    '/insight/expense/no-category',
+    '/insight/expense/no-tag',
+    '/insight/income/no-category',
+    '/insight/income/no-tag',
+    '/insight/transfer/no-category',
+    '/insight/transfer/no-tag',
+  ];
+
+  for (const endpoint of endpoints) {
+    it(`calls ${endpoint} with start and end`, async () => {
+      mockClient.get = vi.fn().mockResolvedValueOnce(insightFixture);
+      await fetchInsightNoX(mockClient, endpoint, '2026-01-01', '2026-01-31');
+      expect(mockClient.get).toHaveBeenCalledWith(endpoint, {
+        start: '2026-01-01',
+        end: '2026-01-31',
+      });
+    });
+  }
+
+  it('returns the raw result from the API', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(insightFixture);
+    const result = await fetchInsightNoX(mockClient, '/insight/expense/no-bill', '2026-01-01', '2026-01-31');
+    expect(result).toEqual(insightFixture);
   });
 });
