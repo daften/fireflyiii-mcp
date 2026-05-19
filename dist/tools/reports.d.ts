@@ -14,7 +14,8 @@ export declare function fetchTagTransactions(client: FireflyClient, tag: string,
 export declare function fetchSummary(client: FireflyClient, start: string, end: string, currencyCode?: string): Promise<CleanSummaryItem[]>;
 export declare function fetchInsightExpenses(client: FireflyClient, start: string, end: string): Promise<unknown>;
 export declare function fetchInsightIncome(client: FireflyClient, start: string, end: string): Promise<unknown>;
-export declare function fetchInsightNoX(client: FireflyClient, endpoint: string, start: string, end: string): Promise<unknown>;
+type InsightNoXEndpoint = '/insight/expense/no-bill' | '/insight/expense/no-budget' | '/insight/expense/no-category' | '/insight/expense/no-tag' | '/insight/income/no-category' | '/insight/income/no-tag' | '/insight/transfer/no-category' | '/insight/transfer/no-tag';
+export declare function fetchInsightNoX(client: FireflyClient, endpoint: InsightNoXEndpoint, start: string, end: string): Promise<unknown>;
 export declare function createTag(client: FireflyClient, params: {
     tag: string;
     date?: string;
@@ -30,4 +31,5 @@ export declare function deleteTag(client: FireflyClient, id: string): Promise<{
     id: string;
 }>;
 export declare function registerReportTools(server: McpServer, client: FireflyClient): void;
+export {};
 //# sourceMappingURL=reports.d.ts.map

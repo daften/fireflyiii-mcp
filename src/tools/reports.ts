@@ -52,9 +52,19 @@ export async function fetchInsightIncome(
   return client.get('/insight/income/category', { start, end });
 }
 
+type InsightNoXEndpoint =
+  | '/insight/expense/no-bill'
+  | '/insight/expense/no-budget'
+  | '/insight/expense/no-category'
+  | '/insight/expense/no-tag'
+  | '/insight/income/no-category'
+  | '/insight/income/no-tag'
+  | '/insight/transfer/no-category'
+  | '/insight/transfer/no-tag';
+
 export async function fetchInsightNoX(
   client: FireflyClient,
-  endpoint: string,
+  endpoint: InsightNoXEndpoint,
   start: string,
   end: string
 ): Promise<unknown> {
