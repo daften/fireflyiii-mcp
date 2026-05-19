@@ -470,3 +470,98 @@ describe('createOAuthHandler — Bearer guard', () => {
     expect(requestContext.getStore()).toBeUndefined();
   });
 });
+
+describe('createOAuthHandler — MCP_BASE_URL override', () => {
+  afterEach(() => {
+    delete process.env['MCP_BASE_URL'];
+    vi.restoreAllMocks();
+  });
+
+  it('uses MCP_BASE_URL for OAuth metadata endpoints when set', async () => {
+    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-authorization-server', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed['authorization_endpoint']).toBe('https://mcp.example.com/oauth/authorize');
+    expect(parsed['token_endpoint']).toBe('https://mcp.example.com/oauth/token');
+    expect(parsed['registration_endpoint']).toBe('https://mcp.example.com/oauth/register');
+  });
+
+  it('uses MCP_BASE_URL for stable redirect_uri in authorize proxy', async () => {
+    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq(
+      'GET',
+      '/oauth/authorize?response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback',
+      { host: '127.0.0.1:3000' }
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const location = res.writtenHeaders['Location'] as string;
+    const locationUrl = new URL(location);
+    expect(locationUrl.searchParams.get('redirect_uri')).toBe('https://mcp.example.com/oauth/callback');
+  });
+
+  it('strips trailing slash from MCP_BASE_URL', async () => {
+    process.env['MCP_BASE_URL'] = 'https://mcp.example.com/';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-authorization-server', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed['authorization_endpoint']).toBe('https://mcp.example.com/oauth/authorize');
+  });
+
+  it('uses MCP_BASE_URL for redirect_uri in token proxy', async () => {
+    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve('{}'),
+      headers: { get: () => 'application/json' },
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const body = 'grant_type=authorization_code&code=abc&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback';
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const sentParams = new URLSearchParams(fetchInit.body as string);
+    expect(sentParams.get('redirect_uri')).toBe('https://mcp.example.com/oauth/callback');
+  });
+});
