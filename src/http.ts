@@ -27,15 +27,17 @@ export function createOAuthHandler(
   let pendingClientRedirectUri: string | null = null;
 
   return async (req, res) => {
-    const host = req.headers['host'] ?? '127.0.0.1:3000';
+    const baseUrl =
+      process.env['MCP_BASE_URL']?.replace(/\/$/, '') ??
+      `http://${req.headers['host'] ?? '127.0.0.1:3000'}`;
 
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
       const metadata = {
         issuer: fireflyUrl,
         // Point both endpoints at our proxy so we can substitute redirect_uri transparently.
-        authorization_endpoint: `http://${host}/oauth/authorize`,
-        token_endpoint: `http://${host}/oauth/token`,
-        registration_endpoint: `http://${host}/oauth/register`,
+        authorization_endpoint: `${baseUrl}/oauth/authorize`,
+        token_endpoint: `${baseUrl}/oauth/token`,
+        registration_endpoint: `${baseUrl}/oauth/register`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],
@@ -52,7 +54,7 @@ export function createOAuthHandler(
     // Firefly III does exact URI matching, so substituting here is the only way to make it work
     // without updating the registered URI on every new Claude session.
     if (req.method === 'GET' && req.url?.startsWith('/oauth/authorize')) {
-      const incomingUrl = new URL(req.url, `http://${host}`);
+      const incomingUrl = new URL(req.url, baseUrl);
       const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
       if (clientRedirectUri) {
         pendingClientRedirectUri = clientRedirectUri;
@@ -61,7 +63,7 @@ export function createOAuthHandler(
       incomingUrl.searchParams.forEach((value, key) => {
         fireflyAuthUrl.searchParams.set(
           key,
-          key === 'redirect_uri' ? `http://${host}/oauth/callback` : value
+          key === 'redirect_uri' ? `${baseUrl}/oauth/callback` : value
         );
       });
       res.writeHead(302, { Location: fireflyAuthUrl.toString() });
@@ -92,7 +94,7 @@ export function createOAuthHandler(
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        redirect_uris: redirectUris.length > 0 ? [`http://${host}/oauth/callback`] : [],
+        redirect_uris: redirectUris.length > 0 ? [`${baseUrl}/oauth/callback`] : [],
       };
       res.writeHead(201, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(registration));
@@ -106,7 +108,7 @@ export function createOAuthHandler(
       const body = await readBody(req);
       const params = new URLSearchParams(body);
       if (params.get('redirect_uri')) {
-        params.set('redirect_uri', `http://${host}/oauth/callback`);
+        params.set('redirect_uri', `${baseUrl}/oauth/callback`);
       }
       const tokenResponse = await fetch(`${fireflyUrl}/oauth/token`, {
         method: 'POST',
@@ -124,7 +126,7 @@ export function createOAuthHandler(
     // Firefly III redirects here after authorization. We forward code+state to Claude's actual
     // dynamic-port callback so Claude can complete the token exchange.
     if (req.method === 'GET' && req.url?.startsWith('/oauth/callback')) {
-      const incomingUrl = new URL(req.url, `http://${host}`);
+      const incomingUrl = new URL(req.url, baseUrl);
       if (!pendingClientRedirectUri) {
         res.writeHead(400, { 'Content-Type': 'text/plain' });
         res.end('No pending OAuth flow. Start authorization from your MCP client.');
