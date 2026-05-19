@@ -194,6 +194,14 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_summary` | Basic balance summary (total assets, net worth) |
 | `get_insight_expenses` | Expense insights grouped by category for a date range |
 | `get_insight_income` | Income insights grouped by category for a date range |
+| `get_insight_expenses_no_bill` | Expense totals for transactions with no bill attached |
+| `get_insight_expenses_no_budget` | Expense totals for transactions with no budget attached |
+| `get_insight_expenses_no_category` | Expense totals for transactions with no category attached |
+| `get_insight_expenses_no_tag` | Expense totals for transactions with no tag attached |
+| `get_insight_income_no_category` | Income totals for transactions with no category attached |
+| `get_insight_income_no_tag` | Income totals for transactions with no tag attached |
+| `get_insight_transfer_no_category` | Transfer totals for transactions with no category attached |
+| `get_insight_transfer_no_tag` | Transfer totals for transactions with no tag attached |
 
 ## Development
 
@@ -211,7 +219,7 @@ npm run build             # Compile TypeScript to dist/
 - ~~Split transactions (one receipt, multiple categories)~~ ✓ done — `create_split_transaction`
 - ~~Transaction keyword search~~ ✓ done — `search_transactions`
 - ~~Recurring transactions (full CRUD)~~ ✓ done — `get_recurring`, `get_recurrence`, `create_recurring`, `update_recurring`, `delete_recurring`
-- Insight tools for uncategorized/untagged transactions
+- ~~Insight tools for uncategorized/untagged/unbilled/unbudgeted transactions~~ ✓ done — `get_insight_expenses_no_bill`, `get_insight_expenses_no_budget`, `get_insight_expenses_no_category`, `get_insight_expenses_no_tag`, `get_insight_income_no_category`, `get_insight_income_no_tag`, `get_insight_transfer_no_category`, `get_insight_transfer_no_tag`
 - Docker container for self-hosted HTTP deployment
 - npm package
 
