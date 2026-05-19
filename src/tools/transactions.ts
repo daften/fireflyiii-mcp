@@ -120,6 +120,47 @@ export async function searchTransactions(
   return unwrapList(response);
 }
 
+export async function createSplitTransaction(
+  client: FireflyClient,
+  params: {
+    type: 'withdrawal' | 'deposit' | 'transfer';
+    date: string;
+    source_id?: string;
+    destination_id?: string;
+    currency_code?: string;
+    group_title?: string;
+    splits: Array<{
+      amount: string;
+      description: string;
+      category_name?: string;
+      budget_id?: string;
+      tags?: string[];
+      notes?: string;
+    }>;
+  }
+): Promise<UnwrappedSingle> {
+  const transactions = params.splits.map(split => {
+    const item: Record<string, unknown> = {
+      type: params.type,
+      date: params.date,
+      amount: split.amount,
+      description: split.description,
+    };
+    if (params.source_id !== undefined) item.source_id = params.source_id;
+    if (params.destination_id !== undefined) item.destination_id = params.destination_id;
+    if (params.currency_code !== undefined) item.currency_code = params.currency_code;
+    if (split.category_name !== undefined) item.category_name = split.category_name;
+    if (split.budget_id !== undefined) item.budget_id = split.budget_id;
+    if (split.tags !== undefined) item.tags = split.tags;
+    if (split.notes !== undefined) item.notes = split.notes;
+    return item;
+  });
+  const body: Record<string, unknown> = { apply_rules: true, fire_webhooks: true, transactions };
+  if (params.group_title !== undefined) body.group_title = params.group_title;
+  const response = await client.post<JsonApiSingleResponse>('/transactions', body);
+  return unwrapSingle(response);
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
@@ -275,6 +316,39 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     async ({ query, page, limit }) => {
       try {
         const result = await searchTransactions(client, { query, page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'create_split_transaction',
+    {
+      title: 'Create Split Transaction',
+      description: 'Create a split transaction in Firefly III — one receipt divided across multiple categories, budgets, or descriptions. All splits share the same type, date, and accounts. Use get_accounts to find source and destination account IDs.',
+      inputSchema: {
+        type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type (shared across all splits)'),
+        date: z.string().describe('Transaction date (YYYY-MM-DD, shared across all splits)'),
+        source_id: z.string().optional().describe('Source account ID (required for withdrawals and transfers)'),
+        destination_id: z.string().optional().describe('Destination account ID (required for deposits and transfers)'),
+        currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD). Defaults to account currency.'),
+        group_title: z.string().optional().describe('Optional label for the transaction group'),
+        splits: z.array(z.object({
+          amount: z.string().describe('Amount as a positive number string, e.g. "42.50"'),
+          description: z.string().describe('Description for this split'),
+          category_name: z.string().optional().describe('Category name'),
+          budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
+          tags: z.array(z.string()).optional().describe('Tags'),
+          notes: z.string().optional().describe('Notes'),
+        })).min(2).describe('At least 2 splits required'),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async ({ type, date, source_id, destination_id, currency_code, group_title, splits }) => {
+      try {
+        const result = await createSplitTransaction(client, { type, date, source_id, destination_id, currency_code, group_title, splits });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };

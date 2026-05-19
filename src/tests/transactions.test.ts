@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction, searchTransactions } from '../tools/transactions.js';
+import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction, searchTransactions, createSplitTransaction } from '../tools/transactions.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -168,5 +168,57 @@ describe('searchTransactions', () => {
     const result = await searchTransactions(mockClient, { query: 'groceries' });
     expect(result.data[0]).toEqual({ description: 'Groceries', amount: '-45.00', date: '2026-01-15', id: '101' });
     expect(result.pagination).toEqual({ page: 1, totalPages: 3, total: 120 });
+  });
+});
+
+describe('createSplitTransaction', () => {
+  it('posts to /transactions with shared fields copied into each split', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createSplitTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2026-05-01',
+      source_id: '1',
+      splits: [
+        { amount: '30.00', description: 'Groceries', category_name: 'Food' },
+        { amount: '12.50', description: 'Cleaning supplies', category_name: 'Household' },
+      ],
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/transactions', {
+      apply_rules: true,
+      fire_webhooks: true,
+      transactions: [
+        { type: 'withdrawal', date: '2026-05-01', source_id: '1', amount: '30.00', description: 'Groceries', category_name: 'Food' },
+        { type: 'withdrawal', date: '2026-05-01', source_id: '1', amount: '12.50', description: 'Cleaning supplies', category_name: 'Household' },
+      ],
+    });
+  });
+
+  it('includes group_title when provided', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createSplitTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2026-05-01',
+      group_title: 'Supermarket run',
+      splits: [
+        { amount: '30.00', description: 'Groceries' },
+        { amount: '12.50', description: 'Cleaning supplies' },
+      ],
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/transactions', expect.objectContaining({
+      group_title: 'Supermarket run',
+    }));
+  });
+
+  it('returns unwrapped single', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    const result = await createSplitTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2026-05-01',
+      splits: [
+        { amount: '30.00', description: 'Groceries' },
+        { amount: '12.50', description: 'Cleaning supplies' },
+      ],
+    });
+    expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
   });
 });
