@@ -52,6 +52,15 @@ export async function fetchInsightIncome(
   return client.get('/insight/income/category', { start, end });
 }
 
+export async function fetchInsightNoX(
+  client: FireflyClient,
+  endpoint: string,
+  start: string,
+  end: string
+): Promise<unknown> {
+  return client.get(endpoint, { start, end });
+}
+
 export async function createTag(
   client: FireflyClient,
   params: { tag: string; date?: string; description?: string }
