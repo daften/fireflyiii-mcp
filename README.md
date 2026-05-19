@@ -117,20 +117,80 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 
 ## Available Tools
 
+### Accounts
 | Tool | Description |
 |------|-------------|
 | `get_accounts` | List all accounts, filterable by type |
 | `get_account` | Get a single account by ID with current balance |
+| `create_account` | Create a new account |
+| `update_account` | Update an existing account |
+| `delete_account` | Delete an account. This action cannot be undone. |
+
+### Transactions
+| Tool | Description |
+|------|-------------|
 | `get_transactions` | List transactions with filters (account, date, type) |
 | `get_transaction` | Get a single transaction by ID with all splits |
+| `search_transactions` | Keyword search across transactions |
+| `create_transaction` | Create a new transaction |
+| `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets) |
+| `update_transaction` | Update an existing transaction |
+| `delete_transaction` | Delete a transaction. This action cannot be undone. |
+
+### Budgets
+| Tool | Description |
+|------|-------------|
 | `get_budgets` | List all budgets with spent/available amounts |
 | `get_budget_limits` | Get budget limits for a specific budget and period |
+| `create_budget` | Create a new budget |
+| `update_budget` | Update an existing budget |
+| `delete_budget` | Delete a budget. This action cannot be undone. |
+| `create_budget_limit` | Create a budget limit for a specific period |
+| `update_budget_limit` | Update an existing budget limit |
+| `delete_budget_limit` | Delete a budget limit. This action cannot be undone. |
+
+### Categories
+| Tool | Description |
+|------|-------------|
 | `get_categories` | List all categories |
 | `get_category_transactions` | Get transactions for a specific category |
+| `create_category` | Create a new category |
+| `update_category` | Update an existing category |
+| `delete_category` | Delete a category. This action cannot be undone. |
+
+### Bills
+| Tool | Description |
+|------|-------------|
 | `get_bills` | List all bills with next expected match date |
+| `create_bill` | Create a new bill |
+| `update_bill` | Update an existing bill |
+| `delete_bill` | Delete a bill. This action cannot be undone. |
+
+### Piggy Banks
+| Tool | Description |
+|------|-------------|
 | `get_piggy_banks` | List all piggy banks with current/target amounts |
+| `create_piggy_bank` | Create a new piggy bank |
+| `update_piggy_bank` | Update an existing piggy bank |
+| `delete_piggy_bank` | Delete a piggy bank. This action cannot be undone. |
+
+### Recurring Transactions
+| Tool | Description |
+|------|-------------|
+| `get_recurring` | List all recurring transaction rules |
+| `get_recurrence` | Get a single recurring transaction rule by ID |
+| `create_recurring` | Create a new recurring transaction rule |
+| `update_recurring` | Update an existing recurring transaction rule |
+| `delete_recurring` | Delete a recurring transaction rule. This action cannot be undone. |
+
+### Tags & Reports
+| Tool | Description |
+|------|-------------|
 | `get_tags` | List all tags |
 | `get_tag_transactions` | Get transactions for a specific tag |
+| `create_tag` | Create a new tag |
+| `update_tag` | Update an existing tag |
+| `delete_tag` | Delete a tag. This action cannot be undone. |
 | `get_summary` | Basic balance summary (total assets, net worth) |
 | `get_insight_expenses` | Expense insights grouped by category for a date range |
 | `get_insight_income` | Income insights grouped by category for a date range |
@@ -148,9 +208,9 @@ npm run build             # Compile TypeScript to dist/
 ## Roadmap
 
 **High priority:**
-- Split transactions (one receipt, multiple categories)
-- Transaction keyword search
-- Recurring transactions (full CRUD)
+- ~~Split transactions (one receipt, multiple categories)~~ ✓ done — `create_split_transaction`
+- ~~Transaction keyword search~~ ✓ done — `search_transactions`
+- ~~Recurring transactions (full CRUD)~~ ✓ done — `get_recurring`, `get_recurrence`, `create_recurring`, `update_recurring`, `delete_recurring`
 - Insight tools for uncategorized/untagged transactions
 - Docker container for self-hosted HTTP deployment
 - npm package
@@ -179,6 +239,7 @@ npm run build             # Compile TypeScript to dist/
 ## Resources
 
 - [Firefly III API Documentation](https://api-docs.firefly-iii.org/) — interactive Swagger UI for all API versions
+- [Firefly III OpenAPI YAML](https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml) — machine-readable spec; fetch with `curl -s "https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml" -A "Mozilla/5.0"` (direct browser access blocked by bot protection)
 - [Firefly III Docs](https://docs.firefly-iii.org/)
 - [MCP Documentation](https://modelcontextprotocol.io/)
 
