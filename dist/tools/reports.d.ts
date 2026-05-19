@@ -14,6 +14,7 @@ export declare function fetchTagTransactions(client: FireflyClient, tag: string,
 export declare function fetchSummary(client: FireflyClient, start: string, end: string, currencyCode?: string): Promise<CleanSummaryItem[]>;
 export declare function fetchInsightExpenses(client: FireflyClient, start: string, end: string): Promise<unknown>;
 export declare function fetchInsightIncome(client: FireflyClient, start: string, end: string): Promise<unknown>;
+export declare function fetchInsightNoX(client: FireflyClient, endpoint: string, start: string, end: string): Promise<unknown>;
 export declare function createTag(client: FireflyClient, params: {
     tag: string;
     date?: string;
