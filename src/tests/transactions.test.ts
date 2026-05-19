@@ -219,6 +219,23 @@ describe('createSplitTransaction', () => {
         { amount: '12.50', description: 'Cleaning supplies' },
       ],
     });
+    // amount comes from the mock fixture, not a computed sum
     expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
+  });
+
+  it('omits undefined shared optional fields from each split', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createSplitTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2026-05-01',
+      splits: [
+        { amount: '30.00', description: 'Groceries' },
+        { amount: '12.50', description: 'Cleaning supplies' },
+      ],
+    });
+    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(body.transactions[0]).not.toHaveProperty('source_id');
+    expect(body.transactions[0]).not.toHaveProperty('destination_id');
+    expect(body.transactions[0]).not.toHaveProperty('currency_code');
   });
 });
