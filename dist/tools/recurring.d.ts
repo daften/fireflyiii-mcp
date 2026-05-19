@@ -1,0 +1,62 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { type FireflyClient } from '../client.js';
+import { type UnwrappedList, type UnwrappedSingle } from '../transform.js';
+export declare function fetchRecurrences(client: FireflyClient, params: {
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
+export declare function fetchRecurrence(client: FireflyClient, id: string): Promise<UnwrappedSingle>;
+export declare function createRecurrence(client: FireflyClient, params: {
+    type: 'withdrawal' | 'deposit' | 'transfer';
+    title: string;
+    description?: string;
+    notes?: string;
+    first_date: string;
+    repeat_until?: string | null;
+    nr_of_repetitions?: number;
+    apply_rules?: boolean;
+    active?: boolean;
+    repeat_type: 'daily' | 'weekly' | 'monthly' | 'ndom' | 'yearly';
+    repeat_moment: string;
+    skip?: number;
+    weekend?: number;
+    amount: string;
+    transaction_description: string;
+    source_id: string;
+    destination_id: string;
+    category_id?: string;
+    budget_id?: string;
+    currency_code?: string;
+    tags?: string[];
+    transaction_notes?: string;
+}): Promise<UnwrappedSingle>;
+export declare function updateRecurrence(client: FireflyClient, id: string, params: {
+    type?: 'withdrawal' | 'deposit' | 'transfer';
+    title?: string;
+    description?: string;
+    notes?: string;
+    first_date?: string;
+    repeat_until?: string | null;
+    nr_of_repetitions?: number;
+    apply_rules?: boolean;
+    active?: boolean;
+    repeat_type?: 'daily' | 'weekly' | 'monthly' | 'ndom' | 'yearly';
+    repeat_moment?: string;
+    skip?: number;
+    weekend?: number;
+    amount?: string;
+    transaction_description?: string;
+    source_id?: string;
+    destination_id?: string;
+    category_id?: string;
+    budget_id?: string;
+    currency_code?: string;
+    tags?: string[];
+    transaction_notes?: string;
+}): Promise<UnwrappedSingle>;
+export declare function deleteRecurrence(client: FireflyClient, id: string): Promise<{
+    deleted: true;
+    id: string;
+}>;
+export declare function registerRecurringTools(server: McpServer, client: FireflyClient): void;
+//# sourceMappingURL=recurring.d.ts.map

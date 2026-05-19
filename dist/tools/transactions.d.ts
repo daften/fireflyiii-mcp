@@ -40,5 +40,26 @@ export declare function deleteTransaction(client: FireflyClient, id: string): Pr
     deleted: true;
     id: string;
 }>;
+export declare function searchTransactions(client: FireflyClient, params: {
+    query: string;
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
+export declare function createSplitTransaction(client: FireflyClient, params: {
+    type: 'withdrawal' | 'deposit' | 'transfer';
+    date: string;
+    source_id?: string;
+    destination_id?: string;
+    currency_code?: string;
+    group_title?: string;
+    splits: Array<{
+        amount: string;
+        description: string;
+        category_name?: string;
+        budget_id?: string;
+        tags?: string[];
+        notes?: string;
+    }>;
+}): Promise<UnwrappedSingle>;
 export declare function registerTransactionTools(server: McpServer, client: FireflyClient): void;
 //# sourceMappingURL=transactions.d.ts.map
