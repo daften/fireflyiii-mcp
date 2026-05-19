@@ -256,4 +256,172 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
     }
   });
+
+  server.registerTool(
+    'get_insight_expenses_no_bill',
+    {
+      title: 'Get Expense Insights — No Bill',
+      description: 'Get expense totals for transactions that have no bill attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/expense/no-bill', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_expenses_no_budget',
+    {
+      title: 'Get Expense Insights — No Budget',
+      description: 'Get expense totals for transactions that have no budget attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/expense/no-budget', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_expenses_no_category',
+    {
+      title: 'Get Expense Insights — No Category',
+      description: 'Get expense totals for transactions that have no category attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/expense/no-category', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_expenses_no_tag',
+    {
+      title: 'Get Expense Insights — No Tag',
+      description: 'Get expense totals for transactions that have no tag attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/expense/no-tag', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_income_no_category',
+    {
+      title: 'Get Income Insights — No Category',
+      description: 'Get income totals for transactions that have no category attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/income/no-category', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_income_no_tag',
+    {
+      title: 'Get Income Insights — No Tag',
+      description: 'Get income totals for transactions that have no tag attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/income/no-tag', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_transfer_no_category',
+    {
+      title: 'Get Transfer Insights — No Category',
+      description: 'Get transfer totals for transactions that have no category attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/transfer/no-category', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_insight_transfer_no_tag',
+    {
+      title: 'Get Transfer Insights — No Tag',
+      description: 'Get transfer totals for transactions that have no tag attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
+      inputSchema: {
+        start: z.string().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().describe('End date (YYYY-MM-DD)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end }) => {
+      try {
+        const result = await fetchInsightNoX(client, '/insight/transfer/no-tag', start, end);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
 }
