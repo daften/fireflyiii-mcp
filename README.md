@@ -1,52 +1,30 @@
 # Firefly III MCP Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that connects Claude Code to your [Firefly III](https://www.firefly-iii.org) personal finance instance. Ask Claude questions about your finances in natural language.
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that connects Claude to your [Firefly III](https://www.firefly-iii.org) personal finance instance. Ask Claude questions about your finances in natural language.
 
-## Prerequisites
+Choose your setup method:
 
-- Node.js 18+
-- A running Firefly III instance
-- A Firefly III Personal Access Token (Profile → OAuth → Personal Access Tokens)
+| Method | Transport | Best for |
+|--------|-----------|----------|
+| [npm — stdio](#option-1-npm-package--stdio-simplest) | stdio | Simplest setup, Claude on the same machine |
+| [npm — HTTP](#option-2-npm-package--http-oauth) | HTTP + OAuth | Claude.ai or when you prefer OAuth over a PAT |
+| [Docker — HTTP](#option-3-docker--http-self-hosted) | HTTP + OAuth | Self-hosted on a server or home lab |
+| [Git checkout](#option-4-git-checkout-development) | stdio or HTTP | Contributing or local development |
 
-## Install from npm
+---
 
-```bash
-npx @daften/fireflyiii-mcp --transport http
-```
+## Option 1: npm package — stdio (simplest)
 
-Or install globally:
+**Requires:** Node.js 18+, a Firefly III Personal Access Token (Profile → OAuth → Personal Access Tokens).
 
-```bash
-npm install -g @daften/fireflyiii-mcp
-fireflyiii-mcp --transport http
-```
-
-## Installation
-
-```bash
-npm install
-npm run build
-```
-
-## Configuration
-
-Copy `.env.example` to `.env` and fill in your values:
-
-```bash
-FIREFLY_URL=https://your-firefly-instance.example.com
-FIREFLY_TOKEN=your-personal-access-token-here
-```
-
-## Claude Code Integration
-
-Add to your Claude Code MCP configuration (`.claude/mcp.json` or Claude Desktop config):
+Add to your Claude MCP config (`.claude/mcp.json` or Claude Desktop `claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "fireflyiii": {
-      "command": "node",
-      "args": ["/absolute/path/to/firefly-iii-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@daften/fireflyiii-mcp"],
       "env": {
         "FIREFLY_URL": "https://your-firefly-instance.example.com",
         "FIREFLY_TOKEN": "your-personal-access-token-here"
@@ -56,13 +34,19 @@ Add to your Claude Code MCP configuration (`.claude/mcp.json` or Claude Desktop 
 }
 ```
 
-## HTTP Transport with OAuth
+Claude downloads and starts the server automatically on first use. No separate install step needed.
 
-The HTTP transport uses OAuth (Authorization Code + PKCE) instead of a Personal Access Token. The MCP client (e.g. Claude Desktop) handles the OAuth flow automatically — no manual token management needed.
+---
+
+## Option 2: npm package — HTTP (OAuth)
+
+HTTP mode uses OAuth (Authorization Code + PKCE) instead of a Personal Access Token. The MCP client handles the OAuth flow automatically on first connection.
+
+**Requires:** Node.js 18+.
 
 ### Step 1: Register an OAuth client in Firefly III
 
-Go to **Profile → OAuth → OAuth Clients → Create New Client** and fill in:
+Go to **Profile → OAuth → OAuth Clients → Create New Client**:
 
 | Field | Value |
 |-------|-------|
@@ -70,38 +54,31 @@ Go to **Profile → OAuth → OAuth Clients → Create New Client** and fill in:
 | **Redirect URL** | `http://127.0.0.1:3000/oauth/callback` |
 | **Confidential** | **Uncheck this box** |
 
+Save and copy the **Client ID** (you do not need the secret).
+
 > **Why uncheck Confidential?**  
-> Confidential clients require a client secret stored securely on a server. Our flow uses PKCE precisely because the MCP client (Claude) cannot securely store a secret — it runs locally on your machine. Unchecking "Confidential" creates a *public client*, which is the correct and secure choice for PKCE-based flows.
+> Confidential clients require a secret stored securely on a server. PKCE-based flows use a code verifier instead, which is safe for clients (like Claude) that cannot securely store a secret. Unchecking "Confidential" creates a *public client* — the correct choice here.
 
-> **Redirect URL note**  
-> Claude uses a random port for its OAuth callback (e.g. `http://localhost:61234/callback`), but Firefly III requires an exact URI match. The MCP server acts as a full OAuth proxy:
-> 1. It intercepts Claude's authorization request, substitutes `http://127.0.0.1:3000/oauth/callback` as the redirect URI, and forwards to Firefly III.
-> 2. Firefly III redirects back to `http://127.0.0.1:3000/oauth/callback`, which forwards to Claude's real dynamic-port callback.
-> 3. The same substitution is applied to the token exchange request.
->
-> This means you register one fixed URL once and never touch it again.
+> **Why this specific redirect URL?**  
+> Claude uses a random port for its OAuth callback (e.g. `http://localhost:61234/callback`), but Firefly III requires an exact URI match. This server acts as an OAuth proxy: it intercepts the request, substitutes its own stable callback URL (`http://127.0.0.1:3000/oauth/callback`), and forwards the authorization code back to Claude's real callback. Register this URL once and never touch it again.
 
-Save the client and copy the **Client ID** (you do not need the secret).
-
-### Step 2: Configure `.env` for HTTP mode
+### Step 2: Start the server
 
 ```bash
-FIREFLY_URL=https://your-firefly-instance.example.com
-FIREFLY_OAUTH_CLIENT_ID=your-client-id-here
-# FIREFLY_TOKEN is not used in HTTP mode
+FIREFLY_URL=https://your-firefly-instance.example.com \
+FIREFLY_OAUTH_CLIENT_ID=your-client-id \
+npx @daften/fireflyiii-mcp --transport http
 ```
 
-### Step 3: Start the server in HTTP mode
+To use a different port: add `--port 4000`. Or install globally and omit `npx`:
 
 ```bash
-npm run dev -- --transport http
-# or on a specific port:
-npm run dev -- --transport http --port 4000
+npm install -g @daften/fireflyiii-mcp
+FIREFLY_URL=... FIREFLY_OAUTH_CLIENT_ID=... fireflyiii-mcp --transport http
 ```
 
-### Step 4: Point Claude at the server
+### Step 3: Connect Claude
 
-Add to your MCP config (`.mcp.json` or `~/.claude.json`):
 ```json
 {
   "mcpServers": {
@@ -114,26 +91,33 @@ Add to your MCP config (`.mcp.json` or `~/.claude.json`):
 ```
 
 Or via the CLI:
+
 ```bash
 claude mcp add --transport http fireflyiii http://127.0.0.1:3000
 ```
 
-The `type: "http"` field is required — without it Claude Code assumes a stdio server and fails with `command: expected string`.
+The `type: "http"` field is required — without it Claude Code assumes stdio and fails. On first connection Claude opens a browser to authorize with Firefly III; tokens are managed automatically after that.
 
-The URL has no `/mcp` path — Claude Code uses the base URL as-is for all MCP protocol requests. The server accepts MCP messages at any path after the Bearer guard.
+---
 
-On first connection Claude opens a browser window to authorize with Firefly III. After that, tokens are managed automatically (including refresh).
+## Option 3: Docker — HTTP (self-hosted)
 
-### OAuth discovery
+Docker runs in HTTP mode only. Suitable for hosting on a server or home lab where Claude connects over the network.
 
-The server exposes `GET /.well-known/oauth-authorization-server` (no auth required) which returns RFC 8414 metadata pointing to your Firefly III instance. MCP clients use this to discover the authorization and token endpoints automatically — no manual OAuth configuration needed in Claude.
+### Step 1: Register an OAuth client in Firefly III
 
-## Docker
+Same as Option 2, Step 1, but use your container's public URL as the redirect URI:
 
-### Pull and run
+| Field | Value |
+|-------|-------|
+| **Redirect URL** | `https://mcp.example.com/oauth/callback` |
+| **Confidential** | **Uncheck** |
+
+Replace `https://mcp.example.com` with your actual `MCP_BASE_URL`.
+
+### Step 2: Run the container
 
 ```bash
-docker pull ghcr.io/daften/fireflyiii-mcp:latest
 docker run \
   -e FIREFLY_URL=https://your-firefly-instance.example.com \
   -e FIREFLY_OAUTH_CLIENT_ID=your-client-id \
@@ -142,34 +126,97 @@ docker run \
   ghcr.io/daften/fireflyiii-mcp:latest
 ```
 
-`MCP_BASE_URL` must be the **externally reachable URL** of your container — this is what the MCP client uses to reach the server and what gets registered as the OAuth redirect URI. If omitted, the server falls back to the `Host` request header (fine for local dev, unreliable behind a reverse proxy).
+`MCP_BASE_URL` is the externally reachable URL of your container — used to build OAuth redirect URIs. If omitted the server falls back to the `Host` request header, which is unreliable behind a reverse proxy.
 
-### docker-compose
-
-Copy `docker-compose.yml` from the repo, set your env vars, and run:
+Or with docker-compose (copy `docker-compose.yml` from the repo):
 
 ```bash
-FIREFLY_URL=https://firefly.example.com \
+FIREFLY_URL=https://your-firefly-instance.example.com \
 FIREFLY_OAUTH_CLIENT_ID=your-client-id \
 MCP_BASE_URL=https://mcp.example.com \
 docker compose up -d
 ```
 
-### Register the OAuth redirect URI in Firefly III
+To build the image locally instead of pulling from the registry, uncomment `build: .` in `docker-compose.yml`.
 
-When running in Docker, register `${MCP_BASE_URL}/oauth/callback` as the redirect URI in Firefly III (Profile → OAuth → OAuth Clients). For example: `https://mcp.example.com/oauth/callback`.
+### Step 3: Connect Claude
 
-### Build locally
+```json
+{
+  "mcpServers": {
+    "fireflyiii": {
+      "type": "http",
+      "url": "https://mcp.example.com"
+    }
+  }
+}
+```
+
+---
+
+## Option 4: Git checkout (development)
+
+### Setup
 
 ```bash
-docker build -t fireflyiii-mcp .
-docker run \
-  -e FIREFLY_URL=... \
-  -e FIREFLY_OAUTH_CLIENT_ID=... \
-  -e MCP_BASE_URL=http://localhost:3000 \
-  -p 3000:3000 \
-  fireflyiii-mcp
+git clone https://github.com/daften/fireflyiii-mcp.git
+cd fireflyiii-mcp
+npm install
+npm run build
 ```
+
+### stdio mode
+
+Create `.env` from `.env.example`:
+
+```bash
+FIREFLY_URL=https://your-firefly-instance.example.com
+FIREFLY_TOKEN=your-personal-access-token-here
+```
+
+Add to your Claude MCP config:
+
+```json
+{
+  "mcpServers": {
+    "fireflyiii": {
+      "command": "node",
+      "args": ["/absolute/path/to/fireflyiii-mcp/dist/index.js"],
+      "env": {
+        "FIREFLY_URL": "https://your-firefly-instance.example.com",
+        "FIREFLY_TOKEN": "your-personal-access-token-here"
+      }
+    }
+  }
+}
+```
+
+Use `npm run dev` instead of `node dist/index.js` during development to skip the build step.
+
+### HTTP mode
+
+Register an OAuth client in Firefly III as described in Option 2, Step 1, then add to `.env`:
+
+```bash
+FIREFLY_URL=https://your-firefly-instance.example.com
+FIREFLY_OAUTH_CLIENT_ID=your-client-id-here
+```
+
+Start the server:
+
+```bash
+npm run dev -- --transport http
+# or after building:
+node dist/index.js --transport http
+```
+
+Connect Claude as in Option 2, Step 3.
+
+---
+
+## OAuth discovery
+
+The server exposes `GET /.well-known/oauth-authorization-server` (no auth required) which returns RFC 8414 metadata. MCP clients use this to discover OAuth endpoints automatically — no manual OAuth configuration needed in the client.
 
 ## Available Tools
 
