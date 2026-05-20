@@ -393,8 +393,8 @@ Gaps identified by comparing against [fabianonetto/mcp-server-firefly-iii](https
 
 ### Medium Priority
 
-- [ ] **Automation rules & rule groups** — new `src/tools/rules.ts` and `src/tests/rules.test.ts`; CRUD for rules and rule groups; include `trigger_rule_group` (POST `/rule-groups/{id}/trigger`) to manually run a group against existing transactions. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [ ] **File attachments** — new `src/tools/attachments.ts` and `src/tests/attachments.test.ts`; `get_attachments`, `get_attachment`, `create_attachment`, `delete_attachment`, `upload_attachment` (base64-encoded content POST to `/attachments/{id}/upload`). *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [x] **Automation rules & rule groups** — new `src/tools/rules.ts` and `src/tests/rules.test.ts`; CRUD for rules and rule groups; include `trigger_rule_group` (POST `/rule-groups/{id}/trigger`) to manually run a group against existing transactions. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
+- [x] **File attachments** — new `src/tools/attachments.ts` and `src/tests/attachments.test.ts`; `get_attachments`, `get_attachment`, `create_attachment`, `delete_attachment`, `upload_attachment` (base64-encoded content POST to `/attachments/{id}/upload`). *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
 - [ ] **Tool preset/filter system** — update `src/tools/index.ts` to accept an optional preset name; define named presets (`default`, `full`, `budget`, `reporting`, `automation`) that limit which tool files are registered; expose via `--preset` CLI flag in `src/index.ts`; reduces context window usage as tool count grows toward 60+. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
 
 ### Low Priority
