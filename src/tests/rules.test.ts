@@ -244,10 +244,10 @@ describe('triggerRuleGroup', () => {
     expect(result).toEqual({ triggered: true, id: '1' });
   });
 
-  it('passes undefined params when no filters provided', async () => {
+  it('passes empty query when no filters provided', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
     await triggerRuleGroup(mockClient, '2', {});
-    expect(mockClient.post).toHaveBeenCalledWith('/rule-groups/2/trigger', undefined, undefined);
+    expect(mockClient.post).toHaveBeenCalledWith('/rule-groups/2/trigger', undefined, {});
   });
 
   it('passes accounts array when provided', async () => {
@@ -273,10 +273,16 @@ describe('triggerRule', () => {
     expect(result).toEqual({ triggered: true, id: '10' });
   });
 
-  it('passes undefined params when no filters provided', async () => {
+  it('passes empty query when no filters provided', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
     await triggerRule(mockClient, '10', {});
-    expect(mockClient.post).toHaveBeenCalledWith('/rules/10/trigger', undefined, undefined);
+    expect(mockClient.post).toHaveBeenCalledWith('/rules/10/trigger', undefined, {});
+  });
+
+  it('passes accounts array when provided', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    await triggerRule(mockClient, '10', { accounts: [3, 4] });
+    expect(mockClient.post).toHaveBeenCalledWith('/rules/10/trigger', undefined, { 'accounts[]': [3, 4] });
   });
 });
 
