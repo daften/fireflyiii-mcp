@@ -8,6 +8,19 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that c
 - A running Firefly III instance
 - A Firefly III Personal Access Token (Profile → OAuth → Personal Access Tokens)
 
+## Install from npm
+
+```bash
+npx @daften/fireflyiii-mcp --transport http
+```
+
+Or install globally:
+
+```bash
+npm install -g @daften/fireflyiii-mcp
+fireflyiii-mcp --transport http
+```
+
 ## Installation
 
 ```bash
@@ -115,6 +128,49 @@ On first connection Claude opens a browser window to authorize with Firefly III.
 
 The server exposes `GET /.well-known/oauth-authorization-server` (no auth required) which returns RFC 8414 metadata pointing to your Firefly III instance. MCP clients use this to discover the authorization and token endpoints automatically — no manual OAuth configuration needed in Claude.
 
+## Docker
+
+### Pull and run
+
+```bash
+docker pull ghcr.io/daften/fireflyiii-mcp:latest
+docker run \
+  -e FIREFLY_URL=https://your-firefly-instance.example.com \
+  -e FIREFLY_OAUTH_CLIENT_ID=your-client-id \
+  -e MCP_BASE_URL=https://mcp.example.com \
+  -p 3000:3000 \
+  ghcr.io/daften/fireflyiii-mcp:latest
+```
+
+`MCP_BASE_URL` must be the **externally reachable URL** of your container — this is what the MCP client uses to reach the server and what gets registered as the OAuth redirect URI. If omitted, the server falls back to the `Host` request header (fine for local dev, unreliable behind a reverse proxy).
+
+### docker-compose
+
+Copy `docker-compose.yml` from the repo, set your env vars, and run:
+
+```bash
+FIREFLY_URL=https://firefly.example.com \
+FIREFLY_OAUTH_CLIENT_ID=your-client-id \
+MCP_BASE_URL=https://mcp.example.com \
+docker compose up -d
+```
+
+### Register the OAuth redirect URI in Firefly III
+
+When running in Docker, register `${MCP_BASE_URL}/oauth/callback` as the redirect URI in Firefly III (Profile → OAuth → OAuth Clients). For example: `https://mcp.example.com/oauth/callback`.
+
+### Build locally
+
+```bash
+docker build -t fireflyiii-mcp .
+docker run \
+  -e FIREFLY_URL=... \
+  -e FIREFLY_OAUTH_CLIENT_ID=... \
+  -e MCP_BASE_URL=http://localhost:3000 \
+  -p 3000:3000 \
+  fireflyiii-mcp
+```
+
 ## Available Tools
 
 ### Accounts
@@ -220,8 +276,8 @@ npm run build             # Compile TypeScript to dist/
 - ~~Transaction keyword search~~ ✓ done — `search_transactions`
 - ~~Recurring transactions (full CRUD)~~ ✓ done — `get_recurring`, `get_recurrence`, `create_recurring`, `update_recurring`, `delete_recurring`
 - ~~Insight tools for uncategorized/untagged/unbilled/unbudgeted transactions~~ ✓ done — `get_insight_expenses_no_bill`, `get_insight_expenses_no_budget`, `get_insight_expenses_no_category`, `get_insight_expenses_no_tag`, `get_insight_income_no_category`, `get_insight_income_no_tag`, `get_insight_transfer_no_category`, `get_insight_transfer_no_tag`
-- Docker container for self-hosted HTTP deployment
-- npm package
+- ~~Docker container for self-hosted HTTP deployment~~ ✓ done — `Dockerfile`, `docker-compose.yml`, `ghcr.io/daften/fireflyiii-mcp`
+- ~~npm package~~ ✓ done — `@daften/fireflyiii-mcp`
 
 **Medium priority:**
 - Automation rules and rule groups
