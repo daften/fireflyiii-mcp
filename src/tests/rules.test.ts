@@ -318,6 +318,15 @@ describe('testRule', () => {
     expect(result.data[0]).toMatchObject({ id: '99' });
   });
 
+  it('passes search_limit and triggered_limit', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(transactionListFixture);
+    await testRule(mockClient, '10', { search_limit: 100, triggered_limit: 5 });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      '/rules/10/test',
+      { search_limit: 100, triggered_limit: 5 }
+    );
+  });
+
   it('returns empty list when no transactions match', async () => {
     const empty = { data: [], meta: { pagination: { current_page: 1, total_pages: 0, total: 0 } } };
     mockClient.get = vi.fn().mockResolvedValueOnce(empty);

@@ -173,12 +173,14 @@ export async function testRuleGroup(
 export async function testRule(
   client: FireflyClient,
   id: string,
-  params: { start?: string; end?: string; accounts?: number[] }
+  params: { start?: string; end?: string; accounts?: number[]; search_limit?: number; triggered_limit?: number }
 ): Promise<UnwrappedList> {
   const query: QueryParams = {};
   if (params.start) query['start'] = params.start;
   if (params.end) query['end'] = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
+  if (params.search_limit !== undefined) query['search_limit'] = params.search_limit;
+  if (params.triggered_limit !== undefined) query['triggered_limit'] = params.triggered_limit;
   const response = await client.get<JsonApiListResponse>(`/rules/${id}/test`, query);
   return unwrapList(response);
 }
