@@ -127,5 +127,61 @@ export async function deleteRule(
   return { deleted: true, id };
 }
 
+// ---- Trigger and test operations ----
+
+export async function triggerRuleGroup(
+  client: FireflyClient,
+  id: string,
+  params: { start?: string; end?: string; accounts?: number[] }
+): Promise<{ triggered: true; id: string }> {
+  const query: QueryParams = {};
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  if (params.accounts?.length) query['accounts[]'] = params.accounts;
+  await client.post<void>(`/rule-groups/${id}/trigger`, undefined, Object.keys(query).length ? query : undefined);
+  return { triggered: true, id };
+}
+
+export async function triggerRule(
+  client: FireflyClient,
+  id: string,
+  params: { start?: string; end?: string; accounts?: number[] }
+): Promise<{ triggered: true; id: string }> {
+  const query: QueryParams = {};
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  if (params.accounts?.length) query['accounts[]'] = params.accounts;
+  await client.post<void>(`/rules/${id}/trigger`, undefined, Object.keys(query).length ? query : undefined);
+  return { triggered: true, id };
+}
+
+export async function testRuleGroup(
+  client: FireflyClient,
+  id: string,
+  params: { start?: string; end?: string; accounts?: number[]; search_limit?: number; triggered_limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = {};
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  if (params.accounts?.length) query['accounts[]'] = params.accounts;
+  if (params.search_limit !== undefined) query['search_limit'] = params.search_limit;
+  if (params.triggered_limit !== undefined) query['triggered_limit'] = params.triggered_limit;
+  const response = await client.get<JsonApiListResponse>(`/rule-groups/${id}/test`, query);
+  return unwrapList(response);
+}
+
+export async function testRule(
+  client: FireflyClient,
+  id: string,
+  params: { start?: string; end?: string; accounts?: number[] }
+): Promise<UnwrappedList> {
+  const query: QueryParams = {};
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  if (params.accounts?.length) query['accounts[]'] = params.accounts;
+  const response = await client.get<JsonApiListResponse>(`/rules/${id}/test`, query);
+  return unwrapList(response);
+}
+
 // registerRuleTools added in Task 4
 export function registerRuleTools(_server: McpServer, _client: FireflyClient): void { void z; void formatError; }

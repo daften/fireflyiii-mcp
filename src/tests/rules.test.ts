@@ -3,6 +3,7 @@ import type { FireflyClient } from '../client.js';
 import {
   fetchRuleGroups, fetchRuleGroup, createRuleGroup, updateRuleGroup, deleteRuleGroup,
   fetchRules, fetchRule, createRule, updateRule, deleteRule,
+  triggerRuleGroup, triggerRule, testRuleGroup, testRule,
 } from '../tools/rules.js';
 
 const mockClient = {
@@ -216,5 +217,112 @@ describe('deleteRule', () => {
     const result = await deleteRule(mockClient, '10');
     expect(mockClient.delete).toHaveBeenCalledWith('/rules/10');
     expect(result).toEqual({ deleted: true, id: '10' });
+  });
+});
+
+const transactionListFixture = {
+  data: [
+    {
+      id: '99',
+      type: 'transactions',
+      attributes: { description: 'Supermarket', amount: '45.00', type: 'withdrawal' },
+      links: {},
+    },
+  ],
+  meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+};
+
+describe('triggerRuleGroup', () => {
+  it('posts to /rule-groups/:id/trigger with date filters', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await triggerRuleGroup(mockClient, '1', { start: '2026-01-01', end: '2026-12-31' });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      '/rule-groups/1/trigger',
+      undefined,
+      { start: '2026-01-01', end: '2026-12-31' }
+    );
+    expect(result).toEqual({ triggered: true, id: '1' });
+  });
+
+  it('passes undefined params when no filters provided', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    await triggerRuleGroup(mockClient, '2', {});
+    expect(mockClient.post).toHaveBeenCalledWith('/rule-groups/2/trigger', undefined, undefined);
+  });
+
+  it('passes accounts array when provided', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    await triggerRuleGroup(mockClient, '3', { accounts: [1, 2] });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      '/rule-groups/3/trigger',
+      undefined,
+      { 'accounts[]': [1, 2] }
+    );
+  });
+});
+
+describe('triggerRule', () => {
+  it('posts to /rules/:id/trigger with date filters', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await triggerRule(mockClient, '10', { start: '2026-01-01', end: '2026-06-30' });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      '/rules/10/trigger',
+      undefined,
+      { start: '2026-01-01', end: '2026-06-30' }
+    );
+    expect(result).toEqual({ triggered: true, id: '10' });
+  });
+
+  it('passes undefined params when no filters provided', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    await triggerRule(mockClient, '10', {});
+    expect(mockClient.post).toHaveBeenCalledWith('/rules/10/trigger', undefined, undefined);
+  });
+});
+
+describe('testRuleGroup', () => {
+  it('gets /rule-groups/:id/test with date filters and returns transaction list', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(transactionListFixture);
+    const result = await testRuleGroup(mockClient, '1', { start: '2026-01-01', end: '2026-12-31' });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      '/rule-groups/1/test',
+      { start: '2026-01-01', end: '2026-12-31' }
+    );
+    expect(result.data[0]).toMatchObject({ description: 'Supermarket', id: '99' });
+  });
+
+  it('passes accounts array with correct key', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(transactionListFixture);
+    await testRuleGroup(mockClient, '1', { accounts: [5, 6] });
+    expect(mockClient.get).toHaveBeenCalledWith('/rule-groups/1/test', { 'accounts[]': [5, 6] });
+  });
+
+  it('passes search_limit and triggered_limit', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(transactionListFixture);
+    await testRuleGroup(mockClient, '1', { search_limit: 200, triggered_limit: 10 });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      '/rule-groups/1/test',
+      { search_limit: 200, triggered_limit: 10 }
+    );
+  });
+});
+
+describe('testRule', () => {
+  it('gets /rules/:id/test and returns transaction list', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(transactionListFixture);
+    const result = await testRule(mockClient, '10', { start: '2026-01-01', end: '2026-12-31' });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      '/rules/10/test',
+      { start: '2026-01-01', end: '2026-12-31' }
+    );
+    expect(result.data[0]).toMatchObject({ id: '99' });
+  });
+
+  it('returns empty list when no transactions match', async () => {
+    const empty = { data: [], meta: { pagination: { current_page: 1, total_pages: 0, total: 0 } } };
+    mockClient.get = vi.fn().mockResolvedValueOnce(empty);
+    const result = await testRule(mockClient, '10', {});
+    expect(mockClient.get).toHaveBeenCalledWith('/rules/10/test', {});
+    expect(result.data).toHaveLength(0);
   });
 });
