@@ -286,6 +286,34 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `update_recurring` | Update an existing recurring transaction rule |
 | `delete_recurring` | Delete a recurring transaction rule. This action cannot be undone. |
 
+### Automation Rules
+| Tool | Description |
+|------|-------------|
+| `get_rule_groups` | List all rule groups |
+| `get_rule_group` | Get a single rule group by ID |
+| `create_rule_group` | Create a new rule group |
+| `update_rule_group` | Update an existing rule group |
+| `delete_rule_group` | Delete a rule group and all its rules. This action cannot be undone. |
+| `get_rules` | List all automation rules |
+| `get_rule` | Get a single rule by ID |
+| `create_rule` | Create a new automation rule with trigger conditions and actions |
+| `update_rule` | Update an existing automation rule |
+| `delete_rule` | Delete an automation rule. This action cannot be undone. |
+| `trigger_rule_group` | Manually run all rules in a group against existing transactions |
+| `trigger_rule` | Manually run a single rule against existing transactions |
+| `test_rule_group` | Dry-run a rule group and return matching transactions (no changes applied) |
+| `test_rule` | Dry-run a single rule and return matching transactions (no changes applied) |
+
+### Attachments
+| Tool | Description |
+|------|-------------|
+| `get_attachments` | List all file attachments |
+| `get_attachment` | Get a single attachment by ID |
+| `create_attachment` | Create attachment metadata (step 1 of 2 — use `upload_attachment` to send file content) |
+| `update_attachment` | Update attachment metadata |
+| `delete_attachment` | Delete an attachment and its file data. This action cannot be undone. |
+| `upload_attachment` | Upload base64-encoded file content for an existing attachment record (step 2 of 2) |
+
 ### Tags & Reports
 | Tool | Description |
 |------|-------------|
@@ -327,8 +355,8 @@ npm run build             # Compile TypeScript to dist/
 - ~~npm package~~ ✓ done — `@daften/fireflyiii-mcp`
 
 **Medium priority:**
-- Automation rules and rule groups
-- File attachments
+- ~~Automation rules and rule groups~~ ✓ done — `get_rule_groups`, `get_rule_group`, `create_rule_group`, `update_rule_group`, `delete_rule_group`, `get_rules`, `get_rule`, `create_rule`, `update_rule`, `delete_rule`, `trigger_rule_group`, `trigger_rule`, `test_rule_group`, `test_rule`
+- ~~File attachments~~ ✓ done — `get_attachments`, `get_attachment`, `create_attachment`, `update_attachment`, `delete_attachment`, `upload_attachment`
 - Tool preset system (limit exposed tools to reduce context window usage)
 
 **Low priority:**
