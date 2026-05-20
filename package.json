@@ -1,18 +1,40 @@
 {
-  "name": "firefly-iii-mcp",
+  "name": "@daften/fireflyiii-mcp",
   "version": "0.1.0",
   "description": "MCP server for Firefly III personal finance manager",
   "type": "module",
   "bin": {
-    "firefly-iii-mcp": "dist/index.js"
+    "fireflyiii-mcp": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
+    "prepublishOnly": "npm run build",
     "dev": "dotenv -e .env -- tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daften/fireflyiii-mcp.git"
+  },
+  "keywords": [
+    "firefly-iii",
+    "mcp",
+    "finance",
+    "model-context-protocol",
+    "claude"
+  ],
+  "homepage": "https://github.com/daften/fireflyiii-mcp",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.22.0"
