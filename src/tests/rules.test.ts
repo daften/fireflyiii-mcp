@@ -79,6 +79,12 @@ describe('updateRuleGroup', () => {
     await updateRuleGroup(mockClient, '1', { title: 'Renamed group' });
     expect(mockClient.put).toHaveBeenCalledWith('/rule-groups/1', { title: 'Renamed group' });
   });
+
+  it('returns unwrapped single', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(ruleGroupSingleFixture);
+    const result = await updateRuleGroup(mockClient, '1', { title: 'Renamed group' });
+    expect(result).toEqual({ title: 'Default group', active: true, description: null, id: '1' });
+  });
 });
 
 describe('deleteRuleGroup', () => {
