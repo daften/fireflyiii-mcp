@@ -122,7 +122,7 @@ export class FireflyClient {
         Authorization: `Bearer ${this.getToken()}`,
         'Content-Type': 'application/octet-stream',
       },
-      body,
+      body: body as BodyInit,
     });
   }
 }

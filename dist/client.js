@@ -52,21 +52,29 @@ export class FireflyClient {
     getToken() {
         return typeof this.tokenResolver === 'function' ? this.tokenResolver() : this.tokenResolver;
     }
-    async request(method, url, body) {
+    buildUrl(path, params) {
+        const url = new URL(`${this.baseUrl}/api/v1${path}`);
+        if (params) {
+            for (const [key, value] of Object.entries(params)) {
+                if (value === undefined)
+                    continue;
+                if (Array.isArray(value)) {
+                    for (const v of value)
+                        url.searchParams.append(key, String(v));
+                }
+                else {
+                    url.searchParams.set(key, String(value));
+                }
+            }
+        }
+        return url.toString();
+    }
+    async rawFetch(url, init) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), this.timeoutMs);
         let response;
         try {
-            response = await fetch(url, {
-                method,
-                signal: controller.signal,
-                headers: {
-                    Authorization: `Bearer ${this.getToken()}`,
-                    Accept: 'application/json',
-                    ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-                },
-                ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-            });
+            response = await fetch(url, { ...init, signal: controller.signal });
         }
         catch (err) {
             if (err instanceof Error && err.name === 'AbortError') {
@@ -81,28 +89,43 @@ export class FireflyClient {
             const responseBody = await response.text().catch(() => '');
             throw new FireflyError(response.status, url, responseBody);
         }
+        return response;
+    }
+    async request(method, url, body) {
+        const response = await this.rawFetch(url, {
+            method,
+            headers: {
+                Authorization: `Bearer ${this.getToken()}`,
+                Accept: 'application/json',
+                ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+            },
+            ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        });
         if (response.status === 204)
             return undefined;
         return response.json();
     }
     async get(path, params) {
-        const url = new URL(`${this.baseUrl}/api/v1${path}`);
-        if (params) {
-            for (const [key, value] of Object.entries(params)) {
-                if (value !== undefined)
-                    url.searchParams.set(key, String(value));
-            }
-        }
-        return this.request('GET', url.toString());
+        return this.request('GET', this.buildUrl(path, params));
     }
-    async post(path, body) {
-        return this.request('POST', `${this.baseUrl}/api/v1${path}`, body);
+    async post(path, body, params) {
+        return this.request('POST', this.buildUrl(path, params), body);
     }
     async put(path, body) {
-        return this.request('PUT', `${this.baseUrl}/api/v1${path}`, body);
+        return this.request('PUT', this.buildUrl(path), body);
     }
     async delete(path) {
-        await this.request('DELETE', `${this.baseUrl}/api/v1${path}`);
+        await this.request('DELETE', this.buildUrl(path));
+    }
+    async postBinary(path, body) {
+        await this.rawFetch(this.buildUrl(path), {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${this.getToken()}`,
+                'Content-Type': 'application/octet-stream',
+            },
+            body: body,
+        });
     }
 }
 //# sourceMappingURL=client.js.map
