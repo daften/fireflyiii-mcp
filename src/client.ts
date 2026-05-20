@@ -49,6 +49,21 @@ export class FireflyClient {
     return typeof this.tokenResolver === 'function' ? this.tokenResolver() : this.tokenResolver;
   }
 
+  private buildUrl(path: string, params?: QueryParams): string {
+    const url = new URL(`${this.baseUrl}/api/v1${path}`);
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined) continue;
+        if (Array.isArray(value)) {
+          for (const v of value) url.searchParams.append(key, String(v));
+        } else {
+          url.searchParams.set(key, String(value));
+        }
+      }
+    }
+    return url.toString();
+  }
+
   private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -81,17 +96,11 @@ export class FireflyClient {
   }
 
   async get<T = unknown>(path: string, params?: QueryParams): Promise<T> {
-    const url = new URL(`${this.baseUrl}/api/v1${path}`);
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined) url.searchParams.set(key, String(value));
-      }
-    }
-    return this.request<T>('GET', url.toString());
+    return this.request<T>('GET', this.buildUrl(path, params));
   }
 
-  async post<T = unknown>(path: string, body: unknown): Promise<T> {
-    return this.request<T>('POST', `${this.baseUrl}/api/v1${path}`, body);
+  async post<T = unknown>(path: string, body: unknown, params?: QueryParams): Promise<T> {
+    return this.request<T>('POST', this.buildUrl(path, params), body);
   }
 
   async put<T = unknown>(path: string, body: unknown): Promise<T> {
@@ -100,5 +109,34 @@ export class FireflyClient {
 
   async delete(path: string): Promise<void> {
     await this.request<void>('DELETE', `${this.baseUrl}/api/v1${path}`);
+  }
+
+  async postBinary(path: string, body: Uint8Array): Promise<void> {
+    const url = `${this.baseUrl}/api/v1${path}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${this.getToken()}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: body as BodyInit,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error(`Request to ${url} timed out after ${this.timeoutMs}ms.`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!response.ok) {
+      const responseBody = await response.text().catch(() => '');
+      throw new FireflyError(response.status, url, responseBody);
+    }
   }
 }

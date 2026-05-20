@@ -1,1 +1,1 @@
-export type QueryParams = Record<string, string | number | undefined>;
+export type QueryParams = Record<string, string | number | number[] | undefined>;

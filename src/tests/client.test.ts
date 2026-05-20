@@ -112,6 +112,27 @@ describe('FireflyClient', () => {
     expect((firstCall.headers as Record<string, string>)['Authorization']).toBe('Bearer token-1');
     expect((secondCall.headers as Record<string, string>)['Authorization']).toBe('Bearer token-2');
   });
+
+  it('appends repeated query params for number[] values in get()', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: [] }), { status: 200 })
+    );
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    await client.get('/rule-groups/1/test', { 'accounts[]': [1, 2, 3] });
+    const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('accounts%5B%5D=1');
+    expect(calledUrl).toContain('accounts%5B%5D=2');
+    expect(calledUrl).toContain('accounts%5B%5D=3');
+  });
+
+  it('post() appends query params to URL when provided', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    await client.post('/rule-groups/1/trigger', undefined, { start: '2026-01-01', end: '2026-12-31' });
+    const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('start=2026-01-01');
+    expect(calledUrl).toContain('end=2026-12-31');
+  });
 });
 
 describe('formatError', () => {
@@ -210,6 +231,28 @@ describe('FireflyClient write methods', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
     const client = new FireflyClient('https://firefly.example.com', 'token');
     await expect(client.delete('/accounts/999')).rejects.toThrow(FireflyError);
+  });
+
+  it('postBinary() sends POST with octet-stream Content-Type and returns undefined on 204', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    const data = new Uint8Array([1, 2, 3]);
+    const result = await client.postBinary('/attachments/1/upload', data);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://firefly.example.com/api/v1/attachments/1/upload',
+      expect.objectContaining({
+        method: 'POST',
+        body: data,
+        headers: expect.objectContaining({ 'Content-Type': 'application/octet-stream' }),
+      })
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it('postBinary() throws FireflyError on non-2xx response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    await expect(client.postBinary('/attachments/999/upload', new Uint8Array([]))).rejects.toThrow(FireflyError);
   });
 });
 
