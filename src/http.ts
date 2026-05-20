@@ -28,7 +28,7 @@ export function createOAuthHandler(
 
   return async (req, res) => {
     const baseUrl =
-      process.env['MCP_BASE_URL']?.replace(/\/$/, '') ??
+      (process.env['MCP_BASE_URL']?.replace(/\/$/, '') || null) ??
       `http://${req.headers['host'] ?? '127.0.0.1:3000'}`;
 
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
