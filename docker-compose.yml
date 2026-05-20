@@ -1,0 +1,11 @@
+services:
+  fireflyiii-mcp:
+    image: ghcr.io/daften/fireflyiii-mcp:latest
+    # build: .  # Uncomment to build locally instead of pulling from registry
+    ports:
+      - "3000:3000"
+    environment:
+      FIREFLY_URL: ${FIREFLY_URL}
+      FIREFLY_OAUTH_CLIENT_ID: ${FIREFLY_OAUTH_CLIENT_ID}
+      MCP_BASE_URL: ${MCP_BASE_URL}
+    restart: unless-stopped
