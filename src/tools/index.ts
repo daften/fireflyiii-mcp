@@ -9,6 +9,7 @@ import { registerPiggyBankTools } from './piggy-banks.js';
 import { registerReportTools } from './reports.js';
 import { registerRecurringTools } from './recurring.js';
 import { registerRuleTools } from './rules.js';
+import { registerAttachmentTools } from './attachments.js';
 
 export function registerAllTools(server: McpServer, client: FireflyClient): void {
   registerAccountTools(server, client);
@@ -20,4 +21,5 @@ export function registerAllTools(server: McpServer, client: FireflyClient): void
   registerReportTools(server, client);
   registerRecurringTools(server, client);
   registerRuleTools(server, client);
+  registerAttachmentTools(server, client);
 }
