@@ -125,4 +125,15 @@ export class FireflyClient {
       body: body as BodyInit,
     });
   }
+
+  async getText(path: string, params?: QueryParams): Promise<string> {
+    const response = await this.rawFetch(this.buildUrl(path, params), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.getToken()}`,
+        Accept: '*/*',
+      },
+    });
+    return response.text();
+  }
 }

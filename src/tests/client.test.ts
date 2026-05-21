@@ -254,6 +254,19 @@ describe('FireflyClient write methods', () => {
     const client = new FireflyClient('https://firefly.example.com', 'token');
     await expect(client.postBinary('/attachments/999/upload', new Uint8Array([]))).rejects.toThrow(FireflyError);
   });
+
+  it('getText returns raw response text', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response('id,name\n1,Checking', { status: 200 })
+    );
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    const result = await client.getText('/data/export/accounts', { type: 'csv' });
+    expect(result).toBe('id,name\n1,Checking');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://firefly.example.com/api/v1/data/export/accounts?type=csv',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
 });
 
 describe('formatError — updated cases', () => {
