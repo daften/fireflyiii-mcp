@@ -111,6 +111,26 @@ export async function fetchNetWorth(
   return client.get('/summary/net-worth', query);
 }
 
+export async function fetchChart(
+  client: FireflyClient,
+  endpoint: string,
+  start: string,
+  end: string
+): Promise<unknown> {
+  return client.get(endpoint, { start, end });
+}
+
+export async function fetchExchangeRate(
+  client: FireflyClient,
+  from: string,
+  to: string,
+  date?: string
+): Promise<unknown> {
+  const query: QueryParams = {};
+  if (date) query['date'] = date;
+  return client.get(`/exchange-rates/by-currencies/${encodeURIComponent(from)}/${encodeURIComponent(to)}`, query);
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
@@ -483,6 +503,74 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
     async ({ start, end, currency_code }) => {
       try {
         const result = await fetchNetWorth(client, start, end, currency_code);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  const CHART_ENDPOINTS: Record<string, { title: string; description: string; endpoint: string }> = {
+    get_account_overview_chart: {
+      title: 'Get Account Overview Chart',
+      description: 'Get chart data showing account balances over a date range.',
+      endpoint: '/chart/account/overview',
+    },
+    get_balance_chart: {
+      title: 'Get Balance Chart',
+      description: 'Get chart data showing balance changes over a date range.',
+      endpoint: '/chart/balance/balance',
+    },
+    get_budget_chart: {
+      title: 'Get Budget Chart',
+      description: 'Get chart data showing budget usage over a date range.',
+      endpoint: '/chart/budget/overview',
+    },
+    get_category_chart: {
+      title: 'Get Category Chart',
+      description: 'Get chart data showing spending by category over a date range.',
+      endpoint: '/chart/category/overview',
+    },
+  };
+
+  for (const [name, { title, description, endpoint }] of Object.entries(CHART_ENDPOINTS)) {
+    server.registerTool(
+      name,
+      {
+        title,
+        description: `${description} Both start and end dates (YYYY-MM-DD) are required.`,
+        inputSchema: {
+          start: z.string().describe('Start date (YYYY-MM-DD)'),
+          end: z.string().describe('End date (YYYY-MM-DD)'),
+        },
+        annotations: READ_ANNOTATIONS,
+      },
+      async ({ start, end }) => {
+        try {
+          const result = await fetchChart(client, endpoint, start, end);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        } catch (err) {
+          return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+        }
+      }
+    );
+  }
+
+  server.registerTool(
+    'get_exchange_rate',
+    {
+      title: 'Get Exchange Rate',
+      description: 'Get the exchange rate between two currencies. Optionally specify a date (YYYY-MM-DD) for historical rates.',
+      inputSchema: {
+        from: z.string().describe('Source currency code (e.g. EUR)'),
+        to: z.string().describe('Target currency code (e.g. USD)'),
+        date: z.string().optional().describe('Date for historical rate (YYYY-MM-DD). Defaults to today.'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ from, to, date }) => {
+      try {
+        const result = await fetchExchangeRate(client, from, to, date);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
