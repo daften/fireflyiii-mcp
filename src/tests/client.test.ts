@@ -267,6 +267,17 @@ describe('FireflyClient write methods', () => {
       expect.objectContaining({ method: 'GET' })
     );
   });
+
+  it('serializes string[] params as repeated query params', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response('csv data', { status: 200 })
+    );
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    await client.getText('/data/export/transactions', { 'columns[]': ['id', 'name'] });
+    const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('columns%5B%5D=id');
+    expect(calledUrl).toContain('columns%5B%5D=name');
+  });
 });
 
 describe('formatError — updated cases', () => {

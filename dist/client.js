@@ -127,5 +127,15 @@ export class FireflyClient {
             body: body,
         });
     }
+    async getText(path, params) {
+        const response = await this.rawFetch(this.buildUrl(path, params), {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${this.getToken()}`,
+                Accept: '*/*',
+            },
+        });
+        return response.text();
+    }
 }
 //# sourceMappingURL=client.js.map

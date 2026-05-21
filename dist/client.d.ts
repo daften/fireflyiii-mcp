@@ -20,5 +20,6 @@ export declare class FireflyClient {
     put<T = unknown>(path: string, body: unknown): Promise<T>;
     delete(path: string): Promise<void>;
     postBinary(path: string, body: Uint8Array): Promise<void>;
+    getText(path: string, params?: QueryParams): Promise<string>;
 }
 //# sourceMappingURL=client.d.ts.map
