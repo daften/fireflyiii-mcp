@@ -62,6 +62,29 @@ export async function deleteAccount(
   return { deleted: true, id };
 }
 
+export async function fetchAccountTransactions(
+  client: FireflyClient,
+  id: string,
+  params: { start?: string; end?: string; type?: string; page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { page: params.page, limit: params.limit };
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  if (params.type) query['type'] = params.type;
+  const response = await client.get<JsonApiListResponse>(`/accounts/${id}/transactions`, query);
+  return unwrapList(response);
+}
+
+export async function searchAccounts(
+  client: FireflyClient,
+  params: { query: string; field?: string; page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { query: params.query, page: params.page, limit: params.limit };
+  if (params.field) query['field'] = params.field;
+  const response = await client.get<JsonApiListResponse>('/search/accounts', query);
+  return unwrapList(response);
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
@@ -187,6 +210,54 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     async ({ id }) => {
       try {
         const result = await deleteAccount(client, id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_account_transactions',
+    {
+      title: 'Get Account Transactions',
+      description: 'Get all transactions for a specific account. Use get_accounts to find valid account IDs.',
+      inputSchema: {
+        id: z.string().describe('Account ID'),
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        type: z.enum(['all', 'withdrawal', 'deposit', 'transfer', 'opening_balance', 'reconciliation', 'special', 'default']).optional().describe('Filter by transaction type'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ id, start, end, type, page, limit }) => {
+      try {
+        const result = await fetchAccountTransactions(client, id, { start, end, type, page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'search_accounts',
+    {
+      title: 'Search Accounts',
+      description: 'Search for accounts by name, IBAN, account number, or ID.',
+      inputSchema: {
+        query: z.string().describe('Search query'),
+        field: z.enum(['all', 'id', 'name', 'iban', 'number', 'account_number']).optional().default('all').describe('Field to search in'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ query, field, page, limit }) => {
+      try {
+        const result = await searchAccounts(client, { query, field, page, limit });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };

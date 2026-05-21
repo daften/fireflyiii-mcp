@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchAccounts, fetchAccount, createAccount, updateAccount, deleteAccount } from '../tools/accounts.js';
+import { fetchAccounts, fetchAccount, createAccount, updateAccount, deleteAccount, fetchAccountTransactions, searchAccounts } from '../tools/accounts.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -113,5 +113,39 @@ describe('deleteAccount', () => {
     mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
     const result = await deleteAccount(mockClient, '10');
     expect(result).toEqual({ deleted: true, id: '10' });
+  });
+});
+
+describe('fetchAccountTransactions', () => {
+  it('calls /accounts/:id/transactions with params', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await fetchAccountTransactions(mockClient, '1', { start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/accounts/1/transactions', {
+      start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50,
+    });
+  });
+  it('omits undefined optional params', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await fetchAccountTransactions(mockClient, '1', { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/accounts/1/transactions', { page: 1, limit: 50 });
+  });
+  it('returns unwrapped list', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    const result = await fetchAccountTransactions(mockClient, '1', { page: 1, limit: 50 });
+    expect(result.data[0]).toHaveProperty('id');
+    expect(result.pagination).toBeDefined();
+  });
+});
+
+describe('searchAccounts', () => {
+  it('calls /search/accounts with query', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await searchAccounts(mockClient, { query: 'Checking', page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/search/accounts', { query: 'Checking', page: 1, limit: 50 });
+  });
+  it('includes field when provided', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await searchAccounts(mockClient, { query: 'NL01ABNA', field: 'iban', page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/search/accounts', { query: 'NL01ABNA', field: 'iban', page: 1, limit: 50 });
   });
 });

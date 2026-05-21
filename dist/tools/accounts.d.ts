@@ -31,5 +31,18 @@ export declare function deleteAccount(client: FireflyClient, id: string): Promis
     deleted: true;
     id: string;
 }>;
+export declare function fetchAccountTransactions(client: FireflyClient, id: string, params: {
+    start?: string;
+    end?: string;
+    type?: string;
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
+export declare function searchAccounts(client: FireflyClient, params: {
+    query: string;
+    field?: string;
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
 export declare function registerAccountTools(server: McpServer, client: FireflyClient): void;
 //# sourceMappingURL=accounts.d.ts.map

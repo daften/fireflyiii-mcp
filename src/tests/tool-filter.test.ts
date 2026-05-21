@@ -18,21 +18,25 @@ describe('registerAllTools — no options', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient);
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_transactions');
     expect(registered).toContain('get_piggy_banks');
     expect(registered).toContain('get_tags');
     expect(registered).toContain('get_rule_groups');
     expect(registered).toContain('get_recurring');
     expect(registered).toContain('get_attachments');
-    expect(registered.length).toBe(95);
+    expect(registered.length).toBe(97);
   });
 });
 
 describe('registerAllTools — presets', () => {
-  it('minimal preset registers only accounts and transactions (12 tools)', () => {
+  it('minimal preset registers only accounts and transactions (14 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'minimal' });
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_transactions');
     expect(registered).not.toContain('get_budgets');
     expect(registered).not.toContain('get_categories');
@@ -42,13 +46,15 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(12);
+    expect(registered.length).toBe(14);
   });
 
-  it('default preset registers accounts, transactions, budgets, categories, bills (29 tools)', () => {
+  it('default preset registers accounts, transactions, budgets, categories, bills (31 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'default' });
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_transactions');
     expect(registered).toContain('get_budgets');
     expect(registered).toContain('get_categories');
@@ -58,26 +64,30 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(29);
+    expect(registered.length).toBe(31);
   });
 
-  it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (33 tools)', () => {
+  it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (35 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'budgeting' });
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_budgets');
     expect(registered).toContain('get_piggy_banks');
     expect(registered).not.toContain('get_tags');
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(33);
+    expect(registered.length).toBe(35);
   });
 
-  it('insights preset registers accounts, transactions, categories, reports (40 tools)', () => {
+  it('insights preset registers accounts, transactions, categories, reports (56 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'insights' });
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_transactions');
     expect(registered).toContain('get_categories');
     expect(registered).toContain('get_tags');
@@ -87,13 +97,15 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(54);
+    expect(registered.length).toBe(56);
   });
 
-  it('automation preset registers accounts, transactions, rules, recurring (31 tools)', () => {
+  it('automation preset registers accounts, transactions, rules, recurring (33 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'automation' });
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_transactions');
     expect(registered).toContain('get_rule_groups');
     expect(registered).toContain('get_recurring');
@@ -101,13 +113,13 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_piggy_banks');
     expect(registered).not.toContain('get_tags');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(31);
+    expect(registered.length).toBe(33);
   });
 
-  it('full preset registers all 95 tools', () => {
+  it('full preset registers all 97 tools', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'full' });
-    expect(registered.length).toBe(95);
+    expect(registered.length).toBe(97);
   });
 });
 
@@ -116,10 +128,12 @@ describe('registerAllTools — groups', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { groups: ['accounts', 'piggy-banks'] });
     expect(registered).toContain('get_accounts');
+    expect(registered).toContain('get_account_transactions');
+    expect(registered).toContain('search_accounts');
     expect(registered).toContain('get_piggy_banks');
     expect(registered).not.toContain('get_transactions');
     expect(registered).not.toContain('get_budgets');
-    expect(registered.length).toBe(9);
+    expect(registered.length).toBe(11);
   });
 
   it('single group registers only that group', () => {
