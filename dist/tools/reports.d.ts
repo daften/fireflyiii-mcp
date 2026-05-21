@@ -34,6 +34,7 @@ export declare function fetchAbout(client: FireflyClient): Promise<unknown>;
 export declare function fetchNetWorth(client: FireflyClient, start: string, end: string, currencyCode?: string): Promise<unknown>;
 export declare function fetchChart(client: FireflyClient, endpoint: string, start: string, end: string): Promise<unknown>;
 export declare function fetchExchangeRate(client: FireflyClient, from: string, to: string, date?: string): Promise<unknown>;
+export declare function fetchInsightGrouped(client: FireflyClient, endpoint: string, start: string, end: string, filters?: Record<string, string[]>): Promise<unknown>;
 export declare function registerReportTools(server: McpServer, client: FireflyClient): void;
 export {};
 //# sourceMappingURL=reports.d.ts.map

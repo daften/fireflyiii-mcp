@@ -24,7 +24,7 @@ describe('registerAllTools — no options', () => {
     expect(registered).toContain('get_rule_groups');
     expect(registered).toContain('get_recurring');
     expect(registered).toContain('get_attachments');
-    expect(registered.length).toBe(81);
+    expect(registered.length).toBe(95);
   });
 });
 
@@ -87,7 +87,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(40);
+    expect(registered.length).toBe(54);
   });
 
   it('automation preset registers accounts, transactions, rules, recurring (31 tools)', () => {
@@ -104,10 +104,10 @@ describe('registerAllTools — presets', () => {
     expect(registered.length).toBe(31);
   });
 
-  it('full preset registers all 81 tools', () => {
+  it('full preset registers all 95 tools', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'full' });
-    expect(registered.length).toBe(81);
+    expect(registered.length).toBe(95);
   });
 });
 

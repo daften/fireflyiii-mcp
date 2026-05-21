@@ -7,6 +7,7 @@ import {
   fetchInsightExpenses,
   fetchInsightIncome,
   fetchInsightNoX,
+  fetchInsightGrouped,
   createTag,
   updateTag,
   deleteTag,
@@ -261,5 +262,25 @@ describe('fetchExchangeRate', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce({});
     await fetchExchangeRate(mockClient, 'EUR', 'USD', '2026-01-01');
     expect(mockClient.get).toHaveBeenCalledWith('/exchange-rates/by-currencies/EUR/USD', { date: '2026-01-01' });
+  });
+});
+
+describe('fetchInsightGrouped', () => {
+  it('calls endpoint with start/end', async () => {
+    const fixture = [{ name: 'Groceries', difference: '-200' }];
+    mockClient.get = vi.fn().mockResolvedValueOnce(fixture);
+    const result = await fetchInsightGrouped(mockClient, '/insight/expense/bill', '2026-01-01', '2026-01-31');
+    expect(mockClient.get).toHaveBeenCalledWith('/insight/expense/bill', { start: '2026-01-01', end: '2026-01-31' });
+    expect(result).toEqual(fixture);
+  });
+
+  it('passes filter arrays as query params', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce([]);
+    await fetchInsightGrouped(mockClient, '/insight/expense/bill', '2026-01-01', '2026-01-31', { 'bills[]': ['1', '2'] });
+    expect(mockClient.get).toHaveBeenCalledWith('/insight/expense/bill', {
+      start: '2026-01-01',
+      end: '2026-01-31',
+      'bills[]': ['1', '2'],
+    });
   });
 });

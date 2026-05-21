@@ -60,6 +60,10 @@ export async function fetchExchangeRate(client, from, to, date) {
         query['date'] = date;
     return client.get(`/exchange-rates/by-currencies/${encodeURIComponent(from)}/${encodeURIComponent(to)}`, query);
 }
+export async function fetchInsightGrouped(client, endpoint, start, end, filters) {
+    const query = { start, end, ...filters };
+    return client.get(endpoint, query);
+}
 const READ_ANNOTATIONS = {
     readOnlyHint: true,
     openWorldHint: true,
@@ -436,5 +440,50 @@ export function registerReportTools(server, client) {
             return { content: [{ type: 'text', text: formatError(err) }], isError: true };
         }
     });
+    const INSIGHT_GROUPED_TOOLS = [
+        { name: 'get_insight_expenses_by_bill', title: 'Get Expense Insights by Bill', description: 'Get expense totals grouped by bill for a date range.', endpoint: '/insight/expense/bill', filterKey: 'bills[]', filterDesc: 'Filter to specific bill IDs' },
+        { name: 'get_insight_expenses_by_budget', title: 'Get Expense Insights by Budget', description: 'Get expense totals grouped by budget for a date range.', endpoint: '/insight/expense/budget', filterKey: 'budgets[]', filterDesc: 'Filter to specific budget IDs' },
+        { name: 'get_insight_expenses_by_tag', title: 'Get Expense Insights by Tag', description: 'Get expense totals grouped by tag for a date range.', endpoint: '/insight/expense/tag', filterKey: 'tags[]', filterDesc: 'Filter to specific tag IDs' },
+        { name: 'get_insight_expenses_by_asset', title: 'Get Expense Insights by Asset Account', description: 'Get expense totals grouped by asset account for a date range.', endpoint: '/insight/expense/asset', filterKey: 'assets[]', filterDesc: 'Filter to specific asset account IDs' },
+        { name: 'get_insight_expenses_by_expense_account', title: 'Get Expense Insights by Expense Account', description: 'Get expense totals grouped by expense account for a date range.', endpoint: '/insight/expense/expense', filterKey: 'accounts[]', filterDesc: 'Filter to specific expense account IDs' },
+        { name: 'get_insight_expenses_total', title: 'Get Total Expenses', description: 'Get total expense amount for a date range, grouped by currency.', endpoint: '/insight/expense/total' },
+        { name: 'get_insight_income_by_revenue', title: 'Get Income Insights by Revenue Account', description: 'Get income totals grouped by revenue account for a date range.', endpoint: '/insight/income/revenue', filterKey: 'revenue[]', filterDesc: 'Filter to specific revenue account IDs' },
+        { name: 'get_insight_income_by_tag', title: 'Get Income Insights by Tag', description: 'Get income totals grouped by tag for a date range.', endpoint: '/insight/income/tag', filterKey: 'tags[]', filterDesc: 'Filter to specific tag IDs' },
+        { name: 'get_insight_income_by_asset', title: 'Get Income Insights by Asset Account', description: 'Get income totals grouped by asset account for a date range.', endpoint: '/insight/income/asset', filterKey: 'assets[]', filterDesc: 'Filter to specific asset account IDs' },
+        { name: 'get_insight_income_total', title: 'Get Total Income', description: 'Get total income amount for a date range, grouped by currency.', endpoint: '/insight/income/total' },
+        { name: 'get_insight_transfers_by_category', title: 'Get Transfer Insights by Category', description: 'Get transfer totals grouped by category for a date range.', endpoint: '/insight/transfer/category', filterKey: 'categories[]', filterDesc: 'Filter to specific category IDs' },
+        { name: 'get_insight_transfers_by_tag', title: 'Get Transfer Insights by Tag', description: 'Get transfer totals grouped by tag for a date range.', endpoint: '/insight/transfer/tag', filterKey: 'tags[]', filterDesc: 'Filter to specific tag IDs' },
+        { name: 'get_insight_transfers_by_asset', title: 'Get Transfer Insights by Asset Account', description: 'Get transfer totals grouped by asset account for a date range.', endpoint: '/insight/transfer/asset', filterKey: 'assets[]', filterDesc: 'Filter to specific asset account IDs' },
+        { name: 'get_insight_transfers_total', title: 'Get Total Transfers', description: 'Get total transfer amount for a date range, grouped by currency.', endpoint: '/insight/transfer/total' },
+    ];
+    for (const { name, title, description, endpoint, filterKey, filterDesc } of INSIGHT_GROUPED_TOOLS) {
+        const inputSchema = {
+            start: z.string().describe('Start date (YYYY-MM-DD)'),
+            end: z.string().describe('End date (YYYY-MM-DD)'),
+        };
+        if (filterKey) {
+            inputSchema[filterKey] = z.array(z.string()).optional().describe(filterDesc);
+        }
+        server.registerTool(name, {
+            title,
+            description: `${description} Both start and end dates (YYYY-MM-DD) are required.`,
+            inputSchema,
+            annotations: READ_ANNOTATIONS,
+        }, async (params) => {
+            try {
+                const { start, end, ...rest } = params;
+                const filters = {};
+                for (const [k, v] of Object.entries(rest)) {
+                    if (Array.isArray(v))
+                        filters[k] = v;
+                }
+                const result = await fetchInsightGrouped(client, endpoint, start, end, Object.keys(filters).length ? filters : undefined);
+                return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+            }
+            catch (err) {
+                return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+            }
+        });
+    }
 }
 //# sourceMappingURL=reports.js.map
