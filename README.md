@@ -334,6 +334,51 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_insight_transfer_no_category` | Transfer totals for transactions with no category attached |
 | `get_insight_transfer_no_tag` | Transfer totals for transactions with no tag attached |
 
+## Filtering Tools
+
+With 74 tools across 10 groups, loading everything can consume significant context window space. Three flags let you control exactly which tools are registered:
+
+### `--preset <name>`
+
+Load a named subset of tool groups:
+
+| Preset | Groups included | Tools |
+|--------|----------------|-------|
+| `minimal` | accounts, transactions | 12 |
+| `default` | accounts, transactions, budgets, categories, bills | 29 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 33 |
+| `insights` | accounts, transactions, categories, reports | 33 |
+| `automation` | accounts, transactions, rules, recurring | 31 |
+| `full` | all 10 groups | 74 |
+
+```bash
+node dist/index.js --preset default
+npx @daften/fireflyiii-mcp --preset budgeting
+```
+
+### `--groups <list>`
+
+Comma-separated list of specific groups to load. Cannot be combined with `--preset`.
+
+Valid group names: `accounts`, `transactions`, `budgets`, `categories`, `bills`, `piggy-banks`, `reports`, `rules`, `recurring`, `attachments`
+
+```bash
+node dist/index.js --groups accounts,transactions,reports
+```
+
+### `--read-only`
+
+Filter any selection down to read-only tools (`get_*`, `search_*`, `test_*`). All create, update, delete, trigger, and upload tools are excluded. Can be combined with `--preset` or `--groups`.
+
+```bash
+node dist/index.js --preset default --read-only
+node dist/index.js --groups rules --read-only
+```
+
+Without any filter flags the server registers all 74 tools (equivalent to `--preset full`).
+
+---
+
 ## Development
 
 ```bash
@@ -357,7 +402,7 @@ npm run build             # Compile TypeScript to dist/
 **Medium priority:**
 - ~~Automation rules and rule groups~~ ✓ done — `get_rule_groups`, `get_rule_group`, `create_rule_group`, `update_rule_group`, `delete_rule_group`, `get_rules`, `get_rule`, `create_rule`, `update_rule`, `delete_rule`, `trigger_rule_group`, `trigger_rule`, `test_rule_group`, `test_rule`
 - ~~File attachments~~ ✓ done — `get_attachments`, `get_attachment`, `create_attachment`, `update_attachment`, `delete_attachment`, `upload_attachment`
-- Tool preset system (limit exposed tools to reduce context window usage)
+- ~~Tool preset/filter system~~ ✓ done — `--preset`, `--groups`, `--read-only` CLI flags
 
 **Low priority:**
 - Currency management

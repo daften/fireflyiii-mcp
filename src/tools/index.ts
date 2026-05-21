@@ -11,15 +11,80 @@ import { registerRecurringTools } from './recurring.js';
 import { registerRuleTools } from './rules.js';
 import { registerAttachmentTools } from './attachments.js';
 
-export function registerAllTools(server: McpServer, client: FireflyClient): void {
-  registerAccountTools(server, client);
-  registerTransactionTools(server, client);
-  registerBudgetTools(server, client);
-  registerCategoryTools(server, client);
-  registerBillTools(server, client);
-  registerPiggyBankTools(server, client);
-  registerReportTools(server, client);
-  registerRecurringTools(server, client);
-  registerRuleTools(server, client);
-  registerAttachmentTools(server, client);
+export const TOOL_GROUPS = [
+  'accounts',
+  'transactions',
+  'budgets',
+  'categories',
+  'bills',
+  'piggy-banks',
+  'reports',
+  'rules',
+  'recurring',
+  'attachments',
+] as const;
+
+export type ToolGroup = typeof TOOL_GROUPS[number];
+
+export const PRESETS: Record<string, ToolGroup[]> = {
+  minimal:    ['accounts', 'transactions'],
+  default:    ['accounts', 'transactions', 'budgets', 'categories', 'bills'],
+  budgeting:  ['accounts', 'transactions', 'budgets', 'categories', 'bills', 'piggy-banks'],
+  insights:   ['accounts', 'transactions', 'categories', 'reports'],
+  automation: ['accounts', 'transactions', 'rules', 'recurring'],
+  full:       [...TOOL_GROUPS],
+};
+
+export type PresetName = keyof typeof PRESETS;
+
+export interface ToolFilterOptions {
+  preset?: PresetName;
+  groups?: ToolGroup[];
+  readOnly?: boolean;
+}
+
+function isReadOnlyTool(name: string): boolean {
+  return name.startsWith('get_') || name.startsWith('search_') || name.startsWith('test_');
+}
+
+function makeReadOnlyProxy(server: McpServer): McpServer {
+  return new Proxy(server, {
+    get(target, prop) {
+      if (prop === 'registerTool') {
+        return (name: string, config: unknown, handler: unknown) => {
+          if (isReadOnlyTool(name)) {
+            (target.registerTool as (n: string, c: unknown, h: unknown) => void)(name, config, handler);
+          }
+        };
+      }
+      return (target as unknown as Record<string | symbol, unknown>)[prop];
+    },
+  });
+}
+
+export function registerAllTools(
+  server: McpServer,
+  client: FireflyClient,
+  options: ToolFilterOptions = {}
+): void {
+  const { preset, groups, readOnly = false } = options;
+
+  const activeGroups: Set<ToolGroup> = preset
+    ? new Set(PRESETS[preset])
+    : groups
+    ? new Set(groups)
+    : new Set(TOOL_GROUPS);
+
+  const s = readOnly ? makeReadOnlyProxy(server) : server;
+
+  if (activeGroups.has('accounts'))    registerAccountTools(s, client);
+  if (activeGroups.has('transactions')) registerTransactionTools(s, client);
+  if (activeGroups.has('budgets'))     registerBudgetTools(s, client);
+  if (activeGroups.has('categories'))  registerCategoryTools(s, client);
+  if (activeGroups.has('bills'))       registerBillTools(s, client);
+  if (activeGroups.has('piggy-banks')) registerPiggyBankTools(s, client);
+  if (activeGroups.has('reports'))     registerReportTools(s, client);
+  if (activeGroups.has('rules'))       registerRuleTools(s, client);
+  if (activeGroups.has('recurring'))   registerRecurringTools(s, client);
+  if (activeGroups.has('attachments')) registerAttachmentTools(s, client);
 }
