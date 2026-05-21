@@ -26,7 +26,7 @@ describe('registerAllTools — no options', () => {
     expect(registered).toContain('get_rule_groups');
     expect(registered).toContain('get_recurring');
     expect(registered).toContain('get_attachments');
-    expect(registered.length).toBe(97);
+    expect(registered.length).toBe(101);
   });
 });
 
@@ -49,7 +49,7 @@ describe('registerAllTools — presets', () => {
     expect(registered.length).toBe(14);
   });
 
-  it('default preset registers accounts, transactions, budgets, categories, bills (31 tools)', () => {
+  it('default preset registers accounts, transactions, budgets, categories, bills (35 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'default' });
     expect(registered).toContain('get_accounts');
@@ -64,10 +64,10 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(31);
+    expect(registered.length).toBe(35);
   });
 
-  it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (35 tools)', () => {
+  it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (39 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'budgeting' });
     expect(registered).toContain('get_accounts');
@@ -79,7 +79,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(35);
+    expect(registered.length).toBe(39);
   });
 
   it('insights preset registers accounts, transactions, categories, reports (56 tools)', () => {
@@ -116,10 +116,10 @@ describe('registerAllTools — presets', () => {
     expect(registered.length).toBe(33);
   });
 
-  it('full preset registers all 97 tools', () => {
+  it('full preset registers all 101 tools', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'full' });
-    expect(registered.length).toBe(97);
+    expect(registered.length).toBe(101);
   });
 });
 

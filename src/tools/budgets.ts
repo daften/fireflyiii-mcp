@@ -102,6 +102,45 @@ export async function deleteBudgetLimit(
   return { deleted: true, id };
 }
 
+export async function fetchAvailableBudgets(
+  client: FireflyClient,
+  params: { page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const response = await client.get<JsonApiListResponse>('/available-budgets', { page: params.page, limit: params.limit });
+  return unwrapList(response);
+}
+
+export async function fetchAvailableBudget(
+  client: FireflyClient,
+  id: string
+): Promise<UnwrappedSingle> {
+  const response = await client.get<JsonApiSingleResponse>(`/available-budgets/${id}`);
+  return unwrapSingle(response);
+}
+
+export async function fetchBudgetTransactions(
+  client: FireflyClient,
+  id: string,
+  params: { start?: string; end?: string; page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { page: params.page, limit: params.limit };
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  const response = await client.get<JsonApiListResponse>(`/budgets/${id}/transactions`, query);
+  return unwrapList(response);
+}
+
+export async function fetchTransactionsWithoutBudget(
+  client: FireflyClient,
+  params: { start?: string; end?: string; page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { page: params.page, limit: params.limit };
+  if (params.start) query['start'] = params.start;
+  if (params.end) query['end'] = params.end;
+  const response = await client.get<JsonApiListResponse>('/budgets/transactions-without-budget', query);
+  return unwrapList(response);
+}
+
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   openWorldHint: true,
@@ -268,4 +307,92 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
     }
   });
+
+  server.registerTool(
+    'get_available_budgets',
+    {
+      title: 'Get Available Budgets',
+      description: 'Get all available budget amounts configured in Firefly III (the total money available to budget per period).',
+      inputSchema: {
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ page, limit }) => {
+      try {
+        const result = await fetchAvailableBudgets(client, { page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_available_budget',
+    {
+      title: 'Get Available Budget',
+      description: 'Get a single available budget amount by ID. Use get_available_budgets to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Available budget ID'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ id }) => {
+      try {
+        const result = await fetchAvailableBudget(client, id);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_budget_transactions',
+    {
+      title: 'Get Budget Transactions',
+      description: 'Get all transactions linked to a specific budget. Use get_budgets to find valid budget IDs.',
+      inputSchema: {
+        id: z.string().describe('Budget ID'),
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ id, start, end, page, limit }) => {
+      try {
+        const result = await fetchBudgetTransactions(client, id, { start, end, page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'get_transactions_without_budget',
+    {
+      title: 'Get Transactions Without Budget',
+      description: 'Get all transactions that have no budget assigned. Useful for finding unbudgeted spending.',
+      inputSchema: {
+        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ start, end, page, limit }) => {
+      try {
+        const result = await fetchTransactionsWithoutBudget(client, { start, end, page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
 }

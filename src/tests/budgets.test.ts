@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchBudgets, fetchBudgetLimits, createBudget, updateBudget, deleteBudget, createBudgetLimit, updateBudgetLimit, deleteBudgetLimit } from '../tools/budgets.js';
+import { fetchBudgets, fetchBudgetLimits, createBudget, updateBudget, deleteBudget, createBudgetLimit, updateBudgetLimit, deleteBudgetLimit, fetchAvailableBudgets, fetchAvailableBudget, fetchBudgetTransactions, fetchTransactionsWithoutBudget } from '../tools/budgets.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -118,5 +118,55 @@ describe('deleteBudgetLimit', () => {
     const result = await deleteBudgetLimit(mockClient, '7');
     expect(mockClient.delete).toHaveBeenCalledWith('/budget-limits/7');
     expect(result).toEqual({ deleted: true, id: '7' });
+  });
+});
+
+const availableBudgetListFixture = {
+  data: [{ id: '1', type: 'available_budgets', attributes: { amount: '500.00', currency_code: 'EUR', start: '2026-01-01', end: '2026-01-31' }, links: {} }],
+  meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+};
+const availableBudgetSingleFixture = {
+  data: { id: '1', type: 'available_budgets', attributes: { amount: '500.00', currency_code: 'EUR' }, links: {} },
+};
+
+describe('fetchAvailableBudgets', () => {
+  it('calls /available-budgets with pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
+    await fetchAvailableBudgets(mockClient, { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/available-budgets', { page: 1, limit: 50 });
+  });
+  it('returns flat items with pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
+    const result = await fetchAvailableBudgets(mockClient, { page: 1, limit: 50 });
+    expect(result.data[0]).toEqual({ amount: '500.00', currency_code: 'EUR', start: '2026-01-01', end: '2026-01-31', id: '1' });
+  });
+});
+
+describe('fetchAvailableBudget', () => {
+  it('calls /available-budgets/:id', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetSingleFixture);
+    await fetchAvailableBudget(mockClient, '1');
+    expect(mockClient.get).toHaveBeenCalledWith('/available-budgets/1');
+  });
+});
+
+describe('fetchBudgetTransactions', () => {
+  it('calls /budgets/:id/transactions with pagination', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
+    await fetchBudgetTransactions(mockClient, '3', { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/budgets/3/transactions', { page: 1, limit: 50 });
+  });
+  it('includes start/end when provided', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
+    await fetchBudgetTransactions(mockClient, '3', { start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/budgets/3/transactions', { start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
+  });
+});
+
+describe('fetchTransactionsWithoutBudget', () => {
+  it('calls /budgets/transactions-without-budget', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
+    await fetchTransactionsWithoutBudget(mockClient, { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/budgets/transactions-without-budget', { page: 1, limit: 50 });
   });
 });

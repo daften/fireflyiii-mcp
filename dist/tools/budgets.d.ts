@@ -44,5 +44,22 @@ export declare function deleteBudgetLimit(client: FireflyClient, id: string): Pr
     deleted: true;
     id: string;
 }>;
+export declare function fetchAvailableBudgets(client: FireflyClient, params: {
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
+export declare function fetchAvailableBudget(client: FireflyClient, id: string): Promise<UnwrappedSingle>;
+export declare function fetchBudgetTransactions(client: FireflyClient, id: string, params: {
+    start?: string;
+    end?: string;
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
+export declare function fetchTransactionsWithoutBudget(client: FireflyClient, params: {
+    start?: string;
+    end?: string;
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
 export declare function registerBudgetTools(server: McpServer, client: FireflyClient): void;
 //# sourceMappingURL=budgets.d.ts.map
