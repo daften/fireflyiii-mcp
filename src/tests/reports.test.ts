@@ -10,6 +10,8 @@ import {
   createTag,
   updateTag,
   deleteTag,
+  fetchAbout,
+  fetchNetWorth,
 } from '../tools/reports.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
@@ -208,5 +210,30 @@ describe('fetchInsightNoX', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(insightFixture);
     const result = await fetchInsightNoX(mockClient, '/insight/expense/no-bill', '2026-01-01', '2026-01-31');
     expect(result).toEqual(insightFixture);
+  });
+});
+
+describe('fetchAbout', () => {
+  it('calls /about and returns response', async () => {
+    const fixture = { data: { version: '6.1.0', os: 'Linux' } };
+    mockClient.get = vi.fn().mockResolvedValueOnce(fixture);
+    const result = await fetchAbout(mockClient);
+    expect(mockClient.get).toHaveBeenCalledWith('/about');
+    expect(result).toEqual(fixture);
+  });
+});
+
+describe('fetchNetWorth', () => {
+  it('calls /summary/net-worth with params', async () => {
+    const fixture = [{ key: 'net-worth-in-EUR', value: { monetary_value: '5000' } }];
+    mockClient.get = vi.fn().mockResolvedValueOnce(fixture);
+    const result = await fetchNetWorth(mockClient, '2026-01-01', '2026-01-31');
+    expect(mockClient.get).toHaveBeenCalledWith('/summary/net-worth', { start: '2026-01-01', end: '2026-01-31' });
+    expect(result).toEqual(fixture);
+  });
+  it('includes currency_code when provided', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce([]);
+    await fetchNetWorth(mockClient, '2026-01-01', '2026-01-31', 'EUR');
+    expect(mockClient.get).toHaveBeenCalledWith('/summary/net-worth', { start: '2026-01-01', end: '2026-01-31', currency_code: 'EUR' });
   });
 });

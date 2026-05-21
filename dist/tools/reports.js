@@ -42,6 +42,15 @@ export async function deleteTag(client, id) {
     await client.delete(`/tags/${id}`);
     return { deleted: true, id };
 }
+export async function fetchAbout(client) {
+    return client.get('/about');
+}
+export async function fetchNetWorth(client, start, end, currencyCode) {
+    const query = { start, end };
+    if (currencyCode)
+        query['currency_code'] = currencyCode;
+    return client.get('/summary/net-worth', query);
+}
 const READ_ANNOTATIONS = {
     readOnlyHint: true,
     openWorldHint: true,
@@ -321,6 +330,38 @@ export function registerReportTools(server, client) {
     }, async ({ start, end }) => {
         try {
             const result = await fetchInsightNoX(client, '/insight/transfer/no-tag', start, end);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('get_about', {
+        title: 'Get Server Info',
+        description: 'Get Firefly III server version, PHP version, and OS info. Useful for diagnostics.',
+        inputSchema: {},
+        annotations: READ_ANNOTATIONS,
+    }, async () => {
+        try {
+            const result = await fetchAbout(client);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('get_net_worth_summary', {
+        title: 'Get Net Worth Summary',
+        description: 'Get net worth over a date range, broken down by currency. Both start and end dates (YYYY-MM-DD) are required.',
+        inputSchema: {
+            start: z.string().describe('Start date (YYYY-MM-DD)'),
+            end: z.string().describe('End date (YYYY-MM-DD)'),
+            currency_code: z.string().optional().describe('Filter by currency code (e.g. EUR, USD)'),
+        },
+        annotations: READ_ANNOTATIONS,
+    }, async ({ start, end, currency_code }) => {
+        try {
+            const result = await fetchNetWorth(client, start, end, currency_code);
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
         catch (err) {
