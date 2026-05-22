@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { type FireflyClient } from '../client.js';
+import type { FireflyClient } from '../client.js';
 import { type UnwrappedList, type UnwrappedSingle } from '../transform.js';
 export declare function fetchBills(client: FireflyClient, params: {
     start?: string;

@@ -1,8 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import type { FireflyClient } from '../client.js';
 import type { QueryParams } from '../types.js';
 import { unwrapList, unwrapSingle, type JsonApiListResponse, type JsonApiSingleResponse, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 
 export async function fetchPiggyBanks(
   client: FireflyClient,
@@ -79,60 +81,32 @@ export async function deletePiggyBankEvent(
   return { deleted: true, id: eventId };
 }
 
-const READ_ANNOTATIONS = {
-  readOnlyHint: true,
-  openWorldHint: true,
-  idempotentHint: true,
-} as const;
-
-const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
-
 export function registerPiggyBankTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool(
-    'get_piggy_banks',
-    {
-      title: 'Get Piggy Banks',
-      description: 'Get all piggy banks (savings goals) from Firefly III, including current saved amount and target amount.',
-      inputSchema: {
-        page: z.number().int().positive().optional().default(1).describe('Page number'),
-        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'get_piggy_banks', {
+    title: 'Get Piggy Banks',
+    description: 'Get all piggy banks (savings goals) from Firefly III, including current saved amount and target amount.',
+    inputSchema: {
+      page: z.number().int().positive().optional().default(1).describe('Page number'),
+      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
-    async ({ page, limit }) => {
-      try {
-        const result = await fetchPiggyBanks(client, { page, limit });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ page, limit }) => fetchPiggyBanks(client, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('create_piggy_bank', {
+  defineTool(server, 'create_piggy_bank', {
     title: 'Create Piggy Bank',
     description: 'Create a new savings goal (piggy bank) in Firefly III. Requires an asset account ID to link to.',
     inputSchema: {
       name: z.string().describe('Piggy bank name'),
       account_id: z.string().describe('Asset account ID to link to — use get_accounts to find valid IDs'),
       target_amount: z.string().optional().describe('Savings goal amount as a number string'),
-      start_date: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-      target_date: z.string().optional().describe('Target completion date (YYYY-MM-DD)'),
+      start_date: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+      target_date: dateSchema.optional().describe('Target completion date (YYYY-MM-DD)'),
       notes: z.string().optional().describe('Notes'),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async (params) => {
-    try {
-      const result = await createPiggyBank(client, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, (params) => createPiggyBank(client, params as Parameters<typeof createPiggyBank>[1]));
 
-  server.registerTool('update_piggy_bank', {
+  defineTool(server, 'update_piggy_bank', {
     title: 'Update Piggy Bank',
     description: 'Update an existing piggy bank in Firefly III. Only fields provided will be changed. Use get_piggy_banks to find valid IDs.',
     inputSchema: {
@@ -140,96 +114,49 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       name: z.string().optional().describe('Piggy bank name'),
       account_id: z.string().optional().describe('Asset account ID to link to'),
       target_amount: z.string().optional().describe('Savings goal amount as a number string'),
-      start_date: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-      target_date: z.string().optional().describe('Target completion date (YYYY-MM-DD)'),
+      start_date: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+      target_date: dateSchema.optional().describe('Target completion date (YYYY-MM-DD)'),
       notes: z.string().optional().describe('Notes'),
     },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ id, ...params }) => {
-    try {
-      const result = await updatePiggyBank(client, id, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id, ...params }) => updatePiggyBank(client, id as string, params as Parameters<typeof updatePiggyBank>[2]));
 
-  server.registerTool('delete_piggy_bank', {
+  defineTool(server, 'delete_piggy_bank', {
     title: 'Delete Piggy Bank',
     description: 'Permanently delete a piggy bank (savings goal) from Firefly III. **This action cannot be undone.** Use get_piggy_banks to confirm the ID before deleting.',
     inputSchema: { id: z.string().describe('Piggy bank ID — use get_piggy_banks to find valid IDs') },
     annotations: DELETE_ANNOTATIONS,
-  }, async ({ id }) => {
-    try {
-      const result = await deletePiggyBank(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id }) => deletePiggyBank(client, id as string));
 
-  server.registerTool(
-    'get_piggy_bank_events',
-    {
-      title: 'Get Piggy Bank Events',
-      description: 'Get all deposit/withdrawal events for a specific piggy bank. Use get_piggy_banks to find valid IDs.',
-      inputSchema: {
-        id: z.string().describe('Piggy bank ID'),
-        page: z.number().int().positive().optional().default(1).describe('Page number'),
-        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'get_piggy_bank_events', {
+    title: 'Get Piggy Bank Events',
+    description: 'Get all deposit/withdrawal events for a specific piggy bank. Use get_piggy_banks to find valid IDs.',
+    inputSchema: {
+      id: z.string().describe('Piggy bank ID'),
+      page: z.number().int().positive().optional().default(1).describe('Page number'),
+      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
-    async ({ id, page, limit }) => {
-      try {
-        const result = await fetchPiggyBankEvents(client, id, { page, limit });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ id, page, limit }) => fetchPiggyBankEvents(client, id as string, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool(
-    'create_piggy_bank_event',
-    {
-      title: 'Create Piggy Bank Event',
-      description: 'Add a deposit or withdrawal event to a piggy bank. Use a positive amount for a deposit and a negative amount for a withdrawal.',
-      inputSchema: {
-        id: z.string().describe('Piggy bank ID'),
-        amount: z.string().describe('Amount as a number string. Positive for deposit, negative for withdrawal.'),
-        date: z.string().describe('Event date (YYYY-MM-DD)'),
-      },
-      annotations: WRITE_ANNOTATIONS,
+  defineTool(server, 'create_piggy_bank_event', {
+    title: 'Create Piggy Bank Event',
+    description: 'Add a deposit or withdrawal event to a piggy bank. Use a positive amount for a deposit and a negative amount for a withdrawal.',
+    inputSchema: {
+      id: z.string().describe('Piggy bank ID'),
+      amount: z.string().describe('Amount as a number string. Positive for deposit, negative for withdrawal.'),
+      date: z.string().describe('Event date (YYYY-MM-DD)'),
     },
-    async ({ id, amount, date }) => {
-      try {
-        const result = await createPiggyBankEvent(client, id, { amount, date });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: WRITE_ANNOTATIONS,
+  }, ({ id, amount, date }) => createPiggyBankEvent(client, id as string, { amount: amount as string, date: date as string }));
 
-  server.registerTool(
-    'delete_piggy_bank_event',
-    {
-      title: 'Delete Piggy Bank Event',
-      description: 'Permanently delete a deposit/withdrawal event from a piggy bank. **This action cannot be undone.** Use get_piggy_bank_events to confirm the event ID.',
-      inputSchema: {
-        id: z.string().describe('Piggy bank ID'),
-        event_id: z.string().describe('Event ID — use get_piggy_bank_events to find valid IDs'),
-      },
-      annotations: DELETE_ANNOTATIONS,
+  defineTool(server, 'delete_piggy_bank_event', {
+    title: 'Delete Piggy Bank Event',
+    description: 'Permanently delete a deposit/withdrawal event from a piggy bank. **This action cannot be undone.** Use get_piggy_bank_events to confirm the event ID.',
+    inputSchema: {
+      id: z.string().describe('Piggy bank ID'),
+      event_id: z.string().describe('Event ID — use get_piggy_bank_events to find valid IDs'),
     },
-    async ({ id, event_id }) => {
-      try {
-        const result = await deletePiggyBankEvent(client, id, event_id);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: DELETE_ANNOTATIONS,
+  }, ({ id, event_id }) => deletePiggyBankEvent(client, id as string, event_id as string));
 }

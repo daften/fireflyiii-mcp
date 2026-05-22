@@ -1,8 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import type { FireflyClient } from '../client.js';
 import type { QueryParams } from '../types.js';
 import { unwrapList, unwrapSingle, type JsonApiListResponse, type JsonApiSingleResponse, type UnwrappedList, type UnwrappedSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 
 export async function fetchBills(
   client: FireflyClient,
@@ -72,65 +74,38 @@ export async function fetchBillTransactions(
   return unwrapList(response);
 }
 
-const READ_ANNOTATIONS = {
-  readOnlyHint: true,
-  openWorldHint: true,
-  idempotentHint: true,
-} as const;
-
-const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
-
 export function registerBillTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool(
-    'get_bills',
-    {
-      title: 'Get Bills',
-      description: 'Get all recurring bills from Firefly III, including the next expected match date and payment status. Optionally filter by date range (YYYY-MM-DD).',
-      inputSchema: {
-        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
-        page: z.number().int().positive().optional().default(1).describe('Page number'),
-        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'get_bills', {
+    title: 'Get Bills',
+    description: 'Get all recurring bills from Firefly III, including the next expected match date and payment status. Optionally filter by date range (YYYY-MM-DD).',
+    inputSchema: {
+      start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+      end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
+      page: z.number().int().positive().optional().default(1).describe('Page number'),
+      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
-    async ({ start, end, page, limit }) => {
-      try {
-        const result = await fetchBills(client, { start, end, page, limit });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ start, end, page, limit }) =>
+    fetchBills(client, { start: start as string | undefined, end: end as string | undefined, page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('create_bill', {
+  defineTool(server, 'create_bill', {
     title: 'Create Bill',
     description: 'Create a new recurring bill in Firefly III.',
     inputSchema: {
       name: z.string().describe('Bill name'),
       amount_min: z.string().describe('Minimum expected amount as a number string'),
       amount_max: z.string().describe('Maximum expected amount as a number string'),
-      date: z.string().describe('First expected payment date (YYYY-MM-DD)'),
+      date: dateSchema.describe('Bill start date (YYYY-MM-DD)'),
       repeat_freq: z.enum(['weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).describe('Repeat frequency'),
       currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
-      end_date: z.string().optional().describe('End date for the bill (YYYY-MM-DD)'),
+      end_date: dateSchema.optional().describe('End date for the bill (YYYY-MM-DD)'),
       active: z.boolean().optional().describe('Whether the bill is active'),
       notes: z.string().optional().describe('Notes'),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async (params) => {
-    try {
-      const result = await createBill(client, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, (params) => createBill(client, params as Parameters<typeof createBill>[1]));
 
-  server.registerTool('update_bill', {
+  defineTool(server, 'update_bill', {
     title: 'Update Bill',
     description: 'Update an existing bill in Firefly III. Only fields provided will be changed. Use get_bills to find valid bill IDs.',
     inputSchema: {
@@ -138,58 +113,34 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       name: z.string().optional().describe('Bill name'),
       amount_min: z.string().optional().describe('Minimum expected amount as a number string'),
       amount_max: z.string().optional().describe('Maximum expected amount as a number string'),
-      date: z.string().optional().describe('First expected payment date (YYYY-MM-DD)'),
+      date: dateSchema.optional().describe('First expected payment date (YYYY-MM-DD)'),
       repeat_freq: z.enum(['weekly', 'monthly', 'quarterly', 'half-year', 'yearly']).optional().describe('Repeat frequency'),
       currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
-      end_date: z.string().optional().describe('End date (YYYY-MM-DD)'),
+      end_date: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
       active: z.boolean().optional().describe('Whether the bill is active'),
       notes: z.string().optional().describe('Notes'),
     },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ id, ...params }) => {
-    try {
-      const result = await updateBill(client, id, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id, ...params }) => updateBill(client, id as string, params as Parameters<typeof updateBill>[2]));
 
-  server.registerTool('delete_bill', {
+  defineTool(server, 'delete_bill', {
     title: 'Delete Bill',
     description: 'Permanently delete a bill from Firefly III. **This action cannot be undone.** Use get_bills to confirm the ID before deleting.',
     inputSchema: { id: z.string().describe('Bill ID — use get_bills to find valid IDs') },
     annotations: DELETE_ANNOTATIONS,
-  }, async ({ id }) => {
-    try {
-      const result = await deleteBill(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id }) => deleteBill(client, id as string));
 
-  server.registerTool(
-    'get_bill_transactions',
-    {
-      title: 'Get Bill Transactions',
-      description: 'Get all transactions linked to a specific bill. Use get_bills to find valid bill IDs.',
-      inputSchema: {
-        id: z.string().describe('Bill ID'),
-        start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-        end: z.string().optional().describe('End date (YYYY-MM-DD)'),
-        page: z.number().int().positive().optional().default(1).describe('Page number'),
-        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'get_bill_transactions', {
+    title: 'Get Bill Transactions',
+    description: 'Get all transactions linked to a specific bill. Use get_bills to find valid bill IDs.',
+    inputSchema: {
+      id: z.string().describe('Bill ID'),
+      start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+      end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
+      page: z.number().int().positive().optional().default(1).describe('Page number'),
+      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
-    async ({ id, start, end, page, limit }) => {
-      try {
-        const result = await fetchBillTransactions(client, id, { start, end, page, limit });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ id, start, end, page, limit }) =>
+    fetchBillTransactions(client, id as string, { start: start as string | undefined, end: end as string | undefined, page: page as number | undefined, limit: limit as number | undefined }));
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function fetchCategories(client, params) {
     const response = await client.get('/categories', { page: params.page, limit: params.limit });
     return unwrapList(response);
@@ -26,16 +27,8 @@ export async function deleteCategory(client, id) {
     await client.delete(`/categories/${id}`);
     return { deleted: true, id };
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerCategoryTools(server, client) {
-    server.registerTool('get_categories', {
+    defineTool(server, 'get_categories', {
         title: 'Get Categories',
         description: 'Get all spending categories defined in Firefly III. Use get_category_transactions to list transactions for a specific category.',
         inputSchema: {
@@ -43,36 +36,20 @@ export function registerCategoryTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ page, limit }) => {
-        try {
-            const result = await fetchCategories(client, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_category_transactions', {
+    }, ({ page, limit }) => fetchCategories(client, { page: page, limit: limit }));
+    defineTool(server, 'get_category_transactions', {
         title: 'Get Category Transactions',
         description: 'Get all transactions belonging to a specific Firefly III category. Optionally filter by date range (YYYY-MM-DD). Use get_categories to find valid category IDs.',
         inputSchema: {
             categoryId: z.string().describe('Category ID — use get_categories to find valid IDs'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ categoryId, start, end, page, limit }) => {
-        try {
-            const result = await fetchCategoryTransactions(client, categoryId, { start, end, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_category', {
+    }, ({ categoryId, start, end, page, limit }) => fetchCategoryTransactions(client, categoryId, { start: start, end: end, page: page, limit: limit }));
+    defineTool(server, 'create_category', {
         title: 'Create Category',
         description: 'Create a new spending category in Firefly III.',
         inputSchema: {
@@ -80,16 +57,8 @@ export function registerCategoryTools(server, client) {
             notes: z.string().optional().describe('Notes'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await createCategory(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_category', {
+    }, (params) => createCategory(client, params));
+    defineTool(server, 'update_category', {
         title: 'Update Category',
         description: 'Update an existing category in Firefly III. Only fields provided will be changed. Use get_categories to find valid category IDs.',
         inputSchema: {
@@ -98,28 +67,12 @@ export function registerCategoryTools(server, client) {
             notes: z.string().optional().describe('Notes'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateCategory(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_category', {
+    }, ({ id, ...params }) => updateCategory(client, id, params));
+    defineTool(server, 'delete_category', {
         title: 'Delete Category',
         description: 'Permanently delete a category from Firefly III. **This action cannot be undone.** Transactions in this category will become uncategorised. Use get_categories to confirm the ID.',
         inputSchema: { id: z.string().describe('Category ID — use get_categories to find valid IDs') },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteCategory(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, ({ id }) => deleteCategory(client, id));
 }
 //# sourceMappingURL=categories.js.map
