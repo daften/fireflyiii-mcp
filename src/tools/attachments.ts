@@ -1,11 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import { type FireflyClient } from '../client.js';
 import {
   unwrapList, unwrapSingle,
   type JsonApiListResponse, type JsonApiSingleResponse,
   type UnwrappedList, type UnwrappedSingle,
 } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool } from './_helpers.js';
 
 // ---- Attachment fetch + CRUD ----
 
@@ -60,158 +62,89 @@ export async function downloadAttachment(client: FireflyClient, id: string): Pro
   return client.getText(`/attachments/${id}/download`);
 }
 
-const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true, idempotentHint: true } as const;
-const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
-
 export function registerAttachmentTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool(
-    'get_attachments',
-    {
-      title: 'Get Attachments',
-      description: 'Get all file attachments from Firefly III.',
-      inputSchema: {
-        page: z.number().int().positive().optional().default(1).describe('Page number'),
-        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'get_attachments', {
+    title: 'Get Attachments',
+    description: 'Get all file attachments from Firefly III.',
+    inputSchema: {
+      page: z.number().int().positive().optional().default(1).describe('Page number'),
+      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
-    async ({ page, limit }) => {
-      try {
-        const result = await fetchAttachments(client, { page, limit });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ page, limit }) => fetchAttachments(client, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool(
-    'get_attachment',
-    {
-      title: 'Get Attachment',
-      description: 'Get a single file attachment by its numeric ID. Use get_attachments to find valid IDs.',
-      inputSchema: {
-        id: z.string().describe('Attachment ID'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'get_attachment', {
+    title: 'Get Attachment',
+    description: 'Get a single file attachment by its numeric ID. Use get_attachments to find valid IDs.',
+    inputSchema: {
+      id: z.string().describe('Attachment ID'),
     },
-    async ({ id }) => {
-      try {
-        const result = await fetchAttachment(client, id);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ id }) => fetchAttachment(client, id as string));
 
-  server.registerTool(
-    'create_attachment',
-    {
-      title: 'Create Attachment',
-      description: 'Create attachment metadata in Firefly III. This creates the metadata record only — use upload_attachment to send the actual file content. The returned ID is needed for the upload step.',
-      inputSchema: {
-        filename: z.string().describe('Filename including extension, e.g. receipt.pdf'),
-        attachable_type: z.enum(['Account', 'Budget', 'Bill', 'TransactionJournal', 'PiggyBank', 'Tag']).describe('Type of object this attachment belongs to'),
-        attachable_id: z.string().describe('ID of the object this attachment belongs to'),
-        title: z.string().optional().describe('Human-readable title'),
-        notes: z.string().optional().describe('Notes'),
-      },
-      annotations: WRITE_ANNOTATIONS,
+  defineTool(server, 'create_attachment', {
+    title: 'Create Attachment',
+    description: 'Create attachment metadata in Firefly III. This creates the metadata record only — use upload_attachment to send the actual file content. The returned ID is needed for the upload step.',
+    inputSchema: {
+      filename: z.string().describe('Filename including extension, e.g. receipt.pdf'),
+      attachable_type: z.enum(['Account', 'Budget', 'Bill', 'TransactionJournal', 'PiggyBank', 'Tag']).describe('Type of object this attachment belongs to'),
+      attachable_id: z.string().describe('ID of the object this attachment belongs to'),
+      title: z.string().optional().describe('Human-readable title'),
+      notes: z.string().optional().describe('Notes'),
     },
-    async ({ filename, attachable_type, attachable_id, title, notes }) => {
-      try {
-        const result = await createAttachment(client, { filename, attachable_type, attachable_id, title, notes });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: WRITE_ANNOTATIONS,
+  }, ({ filename, attachable_type, attachable_id, title, notes }) =>
+    createAttachment(client, {
+      filename: filename as string,
+      attachable_type: attachable_type as string,
+      attachable_id: attachable_id as string,
+      title: title as string | undefined,
+      notes: notes as string | undefined,
+    }));
 
-  server.registerTool(
-    'update_attachment',
-    {
-      title: 'Update Attachment',
-      description: 'Update attachment metadata. Only fields provided will be changed. Use get_attachment to confirm the ID before updating.',
-      inputSchema: {
-        id: z.string().describe('Attachment ID — use get_attachments to find valid IDs'),
-        filename: z.string().optional().describe('Filename including extension'),
-        title: z.string().optional().describe('Human-readable title'),
-        notes: z.string().optional().describe('Notes'),
-      },
-      annotations: UPDATE_ANNOTATIONS,
+  defineTool(server, 'update_attachment', {
+    title: 'Update Attachment',
+    description: 'Update attachment metadata. Only fields provided will be changed. Use get_attachment to confirm the ID before updating.',
+    inputSchema: {
+      id: z.string().describe('Attachment ID — use get_attachments to find valid IDs'),
+      filename: z.string().optional().describe('Filename including extension'),
+      title: z.string().optional().describe('Human-readable title'),
+      notes: z.string().optional().describe('Notes'),
     },
-    async ({ id, filename, title, notes }) => {
-      try {
-        const result = await updateAttachment(client, id, { filename, title, notes });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: UPDATE_ANNOTATIONS,
+  }, ({ id, filename, title, notes }) =>
+    updateAttachment(client, id as string, {
+      filename: filename as string | undefined,
+      title: title as string | undefined,
+      notes: notes as string | undefined,
+    }));
 
-  server.registerTool(
-    'delete_attachment',
-    {
-      title: 'Delete Attachment',
-      description: 'Permanently delete an attachment and its file data from Firefly III. **This action cannot be undone.** Use get_attachment to confirm before deleting.',
-      inputSchema: {
-        id: z.string().describe('Attachment ID — use get_attachments to find valid IDs'),
-      },
-      annotations: DELETE_ANNOTATIONS,
+  defineTool(server, 'delete_attachment', {
+    title: 'Delete Attachment',
+    description: 'Permanently delete an attachment and its file data from Firefly III. **This action cannot be undone.** Use get_attachment to confirm before deleting.',
+    inputSchema: {
+      id: z.string().describe('Attachment ID — use get_attachments to find valid IDs'),
     },
-    async ({ id }) => {
-      try {
-        const result = await deleteAttachment(client, id);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: DELETE_ANNOTATIONS,
+  }, ({ id }) => deleteAttachment(client, id as string));
 
-  server.registerTool(
-    'upload_attachment',
-    {
-      title: 'Upload Attachment File',
-      description: 'Upload the binary content for an existing attachment record. Call create_attachment first to get the attachment ID, then call this tool with the base64-encoded file content. The two-step workflow: (1) create_attachment → get ID, (2) upload_attachment with that ID and content_base64.',
-      inputSchema: {
-        id: z.string().describe('Attachment ID from create_attachment'),
-        content_base64: z.string().describe('File content encoded as base64'),
-      },
-      annotations: { openWorldHint: true },
+  defineTool(server, 'upload_attachment', {
+    title: 'Upload Attachment File',
+    description: 'Upload the binary content for an existing attachment record. Call create_attachment first to get the attachment ID, then call this tool with the base64-encoded file content. The two-step workflow: (1) create_attachment → get ID, (2) upload_attachment with that ID and content_base64.',
+    inputSchema: {
+      id: z.string().describe('Attachment ID from create_attachment'),
+      content_base64: z.string().describe('File content encoded as base64'),
     },
-    async ({ id, content_base64 }) => {
-      try {
-        const result = await uploadAttachment(client, id, Buffer.from(content_base64, 'base64'));
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: WRITE_ANNOTATIONS,
+  }, ({ id, content_base64 }) =>
+    uploadAttachment(client, id as string, Buffer.from(content_base64 as string, 'base64')));
 
-  server.registerTool(
-    'download_attachment',
-    {
-      title: 'Download Attachment',
-      description: 'Download the raw content of an attachment as text. Useful for reading receipts or notes. Use get_attachments to find valid IDs.',
-      inputSchema: {
-        id: z.string().describe('Attachment ID'),
-      },
-      annotations: READ_ANNOTATIONS,
+  defineTool(server, 'download_attachment', {
+    title: 'Download Attachment',
+    description: 'Download the raw content of an attachment as text. Useful for reading receipts or notes. Use get_attachments to find valid IDs.',
+    inputSchema: {
+      id: z.string().describe('Attachment ID'),
     },
-    async ({ id }) => {
-      try {
-        const text = await downloadAttachment(client, id);
-        return { content: [{ type: 'text' as const, text }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
-  );
+    annotations: READ_ANNOTATIONS,
+  }, ({ id }) => downloadAttachment(client, id as string));
 }
