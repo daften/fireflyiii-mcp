@@ -193,6 +193,10 @@ export function createOAuthHandler(
   };
 }
 
+export function classifyHost(host: string): 'loopback' | 'non-loopback' {
+  return ['127.0.0.1', '::1', 'localhost'].includes(host) ? 'loopback' : 'non-loopback';
+}
+
 async function tryListen(httpServer: http.Server, host: string, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     httpServer.once('error', reject);
@@ -211,6 +215,22 @@ export async function startHttpServer(
   oauthClientId: string,
   fireflyUrl: string
 ): Promise<void> {
+  if (!process.env['MCP_BASE_URL']?.trim()) {
+    if (classifyHost(host) === 'non-loopback') {
+      process.stderr.write(
+        `Error: MCP_BASE_URL must be set when binding to a non-loopback interface (--host ${host}).\n` +
+        `Without it, the Host header controls OAuth callback URLs — an attacker can forge it.\n` +
+        `Set MCP_BASE_URL to the public URL of this server, e.g.:\n` +
+        `  MCP_BASE_URL=https://mcp.example.com\n`
+      );
+      process.exit(1);
+    } else {
+      process.stderr.write(
+        `Warning: MCP_BASE_URL is not set. OAuth URLs use the Host header — safe for local use only.\n`
+      );
+    }
+  }
+
   // Stateless HTTP transport requires a fresh transport + server per request.
   // The WebStandardStreamableHTTPServerTransport throws if reused across requests.
   const oauthHandler = createOAuthHandler(fireflyUrl, oauthClientId, async (req, res) => {

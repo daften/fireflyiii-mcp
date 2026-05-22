@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as http from 'node:http';
-import { createOAuthHandler, requestContext } from '../http.js';
+import { createOAuthHandler, requestContext, classifyHost } from '../http.js';
 
 type MockRequest = {
   method: string;
@@ -739,5 +739,31 @@ describe('createOAuthHandler — MCP_BASE_URL override', () => {
     const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
     const sentParams = new URLSearchParams(fetchInit.body as string);
     expect(sentParams.get('redirect_uri')).toBe('https://mcp.example.com/oauth/callback');
+  });
+});
+
+describe('classifyHost', () => {
+  it('classifies 127.0.0.1 as loopback', () => {
+    expect(classifyHost('127.0.0.1')).toBe('loopback');
+  });
+
+  it('classifies ::1 as loopback', () => {
+    expect(classifyHost('::1')).toBe('loopback');
+  });
+
+  it('classifies localhost as loopback', () => {
+    expect(classifyHost('localhost')).toBe('loopback');
+  });
+
+  it('classifies 0.0.0.0 as non-loopback', () => {
+    expect(classifyHost('0.0.0.0')).toBe('non-loopback');
+  });
+
+  it('classifies an arbitrary IP as non-loopback', () => {
+    expect(classifyHost('192.168.1.10')).toBe('non-loopback');
+  });
+
+  it('classifies an arbitrary hostname as non-loopback', () => {
+    expect(classifyHost('mcp.example.com')).toBe('non-loopback');
   });
 });
