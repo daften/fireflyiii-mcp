@@ -23,8 +23,15 @@ export function createOAuthHandler(
   oauthClientId: string,
   mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
 ): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
-  // Stores Claude's dynamic callback URL across the authorize → callback → token flow.
-  let pendingClientRedirectUri: string | null = null;
+  const FLOW_TTL_MS = 10 * 60 * 1000;
+  const pendingFlows = new Map<string, { redirectUri: string; createdAt: number }>();
+
+  function evictExpiredFlows(): void {
+    const now = Date.now();
+    for (const [key, entry] of pendingFlows) {
+      if (now - entry.createdAt > FLOW_TTL_MS) pendingFlows.delete(key);
+    }
+  }
 
   return async (req, res) => {
     const baseUrl =
@@ -56,8 +63,10 @@ export function createOAuthHandler(
     if (req.method === 'GET' && req.url?.startsWith('/oauth/authorize')) {
       const incomingUrl = new URL(req.url, baseUrl);
       const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
-      if (clientRedirectUri) {
-        pendingClientRedirectUri = clientRedirectUri;
+      const state = incomingUrl.searchParams.get('state');
+      if (clientRedirectUri && state) {
+        evictExpiredFlows();
+        pendingFlows.set(state, { redirectUri: clientRedirectUri, createdAt: Date.now() });
       }
       const fireflyAuthUrl = new URL(`${fireflyUrl}/oauth/authorize`);
       incomingUrl.searchParams.forEach((value, key) => {
@@ -83,9 +92,6 @@ export function createOAuthHandler(
         }
       } catch {
         // no body or invalid JSON — return empty redirect_uris
-      }
-      if (redirectUris[0]) {
-        pendingClientRedirectUri = redirectUris[0];
       }
       const registration = {
         client_id: oauthClientId,
@@ -127,14 +133,22 @@ export function createOAuthHandler(
     // dynamic-port callback so Claude can complete the token exchange.
     if (req.method === 'GET' && req.url?.startsWith('/oauth/callback')) {
       const incomingUrl = new URL(req.url, baseUrl);
-      if (!pendingClientRedirectUri) {
+      const state = incomingUrl.searchParams.get('state');
+      const entry = state ? pendingFlows.get(state) : null;
+      const isExpired = entry ? Date.now() - entry.createdAt > FLOW_TTL_MS : false;
+      if (!entry || isExpired) {
+        evictExpiredFlows();
         res.writeHead(400, { 'Content-Type': 'text/plain' });
-        res.end('No pending OAuth flow. Start authorization from your MCP client.');
+        res.end(
+          isExpired
+            ? 'OAuth flow expired. Start authorization again from your MCP client.'
+            : 'No pending OAuth flow for this state. Start authorization from your MCP client.'
+        );
         return;
       }
-      const target = new URL(pendingClientRedirectUri);
+      pendingFlows.delete(state!);
+      const target = new URL(entry.redirectUri);
       incomingUrl.searchParams.forEach((value, key) => target.searchParams.set(key, value));
-      pendingClientRedirectUri = null;
       res.writeHead(302, { Location: target.toString() });
       res.end();
       return;

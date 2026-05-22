@@ -323,7 +323,7 @@ describe('createOAuthHandler — token proxy', () => {
 });
 
 describe('createOAuthHandler — OAuth callback proxy', () => {
-  it('redirects to stored client URI with forwarded query params after registration', async () => {
+  it('redirects to stored client URI with forwarded query params after authorize', async () => {
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
@@ -331,11 +331,13 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
       mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
     );
 
-    // Step 1: register — stores client redirect URI
-    const regBody = JSON.stringify({ redirect_uris: ['http://127.0.0.1:9999/callback'] });
-    const regReq = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, regBody);
-    const regRes = mockRes();
-    await handler(regReq as http.IncomingMessage, regRes as unknown as http.ServerResponse);
+    // Step 1: authorize proxy stores Claude's real redirect URI by state
+    const authReq = mockReq(
+      'GET',
+      '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=xyz',
+      { host: '127.0.0.1:3000' }
+    );
+    await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
 
     // Step 2: Firefly III redirects to our stable callback
     const callbackReq = mockReq(
@@ -371,7 +373,7 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
-  it('clears pending redirect URI after first callback use', async () => {
+  it('clears pending state entry after first callback use', async () => {
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
@@ -379,19 +381,22 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
       mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
     );
 
-    // Register to set pending redirect URI
-    const regBody = JSON.stringify({ redirect_uris: ['http://127.0.0.1:9999/callback'] });
-    const regReq = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, regBody);
-    await handler(regReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
+    // Authorize to set pending entry for state=abc
+    const authReq = mockReq(
+      'GET',
+      '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=abc',
+      { host: '127.0.0.1:3000' }
+    );
+    await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
 
     // First callback — should succeed
-    const cb1Req = mockReq('GET', '/oauth/callback?code=abc', { host: '127.0.0.1:3000' });
+    const cb1Req = mockReq('GET', '/oauth/callback?code=code1&state=abc', { host: '127.0.0.1:3000' });
     const cb1Res = mockRes();
     await handler(cb1Req as http.IncomingMessage, cb1Res as unknown as http.ServerResponse);
     expect(cb1Res.statusCode).toBe(302);
 
-    // Second callback — pending URI is cleared, should 400
-    const cb2Req = mockReq('GET', '/oauth/callback?code=abc', { host: '127.0.0.1:3000' });
+    // Second callback with same state — entry is deleted, should 400
+    const cb2Req = mockReq('GET', '/oauth/callback?code=code2&state=abc', { host: '127.0.0.1:3000' });
     const cb2Res = mockRes();
     await handler(cb2Req as http.IncomingMessage, cb2Res as unknown as http.ServerResponse);
     expect(cb2Res.statusCode).toBe(400);
@@ -468,6 +473,95 @@ describe('createOAuthHandler — Bearer guard', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(requestContext.getStore()).toBeUndefined();
+  });
+});
+
+describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('routes two interleaved authorize→callback pairs to the correct redirect URI each time', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    // Flow A: user A starts authorize with state=stateA
+    await handler(
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A1111%2FcbA&state=stateA', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
+      mockRes() as unknown as http.ServerResponse
+    );
+
+    // Flow B: user B starts authorize with state=stateB
+    await handler(
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A2222%2FcbB&state=stateB', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
+      mockRes() as unknown as http.ServerResponse
+    );
+
+    // Flow A completes its callback
+    const resA = mockRes();
+    await handler(
+      mockReq('GET', '/oauth/callback?code=codeA&state=stateA', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
+      resA as unknown as http.ServerResponse
+    );
+    expect(resA.statusCode).toBe(302);
+    expect(resA.writtenHeaders['Location']).toContain('127.0.0.1:1111/cbA');
+    expect(resA.writtenHeaders['Location']).not.toContain('2222');
+
+    // Flow B completes its callback
+    const resB = mockRes();
+    await handler(
+      mockReq('GET', '/oauth/callback?code=codeB&state=stateB', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
+      resB as unknown as http.ServerResponse
+    );
+    expect(resB.statusCode).toBe(302);
+    expect(resB.writtenHeaders['Location']).toContain('127.0.0.1:2222/cbB');
+    expect(resB.writtenHeaders['Location']).not.toContain('1111');
+  });
+
+  it('returns 400 for callback with unknown state', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('GET', '/oauth/callback?code=x&state=unknown-state', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('rejects callback for a state entry that has exceeded the 10-minute TTL', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const startTime = 1_000_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(startTime);
+
+    // Authorize at startTime
+    await handler(
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcb&state=expiring', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
+      mockRes() as unknown as http.ServerResponse
+    );
+
+    // Advance time by 11 minutes (past the 10-minute TTL)
+    vi.spyOn(Date, 'now').mockReturnValue(startTime + 11 * 60 * 1000);
+
+    const callbackReq = mockReq('GET', '/oauth/callback?code=x&state=expiring', { host: '127.0.0.1:3000' });
+    const callbackRes = mockRes();
+    await handler(callbackReq as http.IncomingMessage, callbackRes as unknown as http.ServerResponse);
+
+    expect(callbackRes.statusCode).toBe(400);
   });
 });
 
