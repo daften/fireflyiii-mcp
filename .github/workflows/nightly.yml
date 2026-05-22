@@ -1,0 +1,27 @@
+name: Nightly Integration Tests
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.FIREFLY_INTEGRATION_URL != '' && secrets.FIREFLY_INTEGRATION_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: for i in 1 2 3; do npm ci && break || sleep 5; done
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          FIREFLY_INTEGRATION: 'true'
+          FIREFLY_URL: ${{ secrets.FIREFLY_INTEGRATION_URL }}
+          FIREFLY_TOKEN: ${{ secrets.FIREFLY_INTEGRATION_TOKEN }}
