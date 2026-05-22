@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function fetchAccounts(client, params) {
     const query = { page: params.page, limit: params.limit };
     if (params.type && params.type !== 'all')
@@ -42,54 +43,24 @@ export async function searchAccounts(client, params) {
     const response = await client.get('/search/accounts', query);
     return unwrapList(response);
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerAccountTools(server, client) {
-    server.registerTool('get_accounts', {
+    defineTool(server, 'get_accounts', {
         title: 'Get Accounts',
         description: 'Get all accounts from Firefly III. Filter by type: asset (bank/cash accounts), expense (merchants), revenue (income sources), liability (loans/debts), or all. Use get_account to fetch a single account by ID.',
         inputSchema: {
-            type: z
-                .enum(['asset', 'expense', 'revenue', 'liability', 'all'])
-                .optional()
-                .default('all')
-                .describe('Account type filter'),
+            type: z.enum(['asset', 'expense', 'revenue', 'liability', 'all']).optional().default('all').describe('Account type filter'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ type, page, limit }) => {
-        try {
-            const result = await fetchAccounts(client, { type, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_account', {
+    }, ({ type, page, limit }) => fetchAccounts(client, { type: type, page: page, limit: limit }));
+    defineTool(server, 'get_account', {
         title: 'Get Account',
         description: 'Get a single Firefly III account by its numeric ID, including the current balance. Use get_accounts to find valid account IDs.',
-        inputSchema: {
-            id: z.string().describe('Account ID'),
-        },
+        inputSchema: { id: z.string().describe('Account ID') },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await fetchAccount(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_account', {
+    }, ({ id }) => fetchAccount(client, id));
+    defineTool(server, 'create_account', {
         title: 'Create Account',
         description: 'Create a new account in Firefly III.',
         inputSchema: {
@@ -98,21 +69,13 @@ export function registerAccountTools(server, client) {
             currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
             iban: z.string().optional().describe('IBAN number'),
             opening_balance: z.string().optional().describe('Opening balance as a number string'),
-            opening_balance_date: z.string().optional().describe('Opening balance date (YYYY-MM-DD)'),
+            opening_balance_date: dateSchema.optional().describe('Opening balance date (YYYY-MM-DD)'),
             include_net_worth: z.boolean().optional().describe('Include in net worth calculations'),
             notes: z.string().optional().describe('Notes'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await createAccount(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_account', {
+    }, (params) => createAccount(client, params));
+    defineTool(server, 'update_account', {
         title: 'Update Account',
         description: 'Update an existing account in Firefly III. Only fields provided will be changed. Use get_account to confirm the ID.',
         inputSchema: {
@@ -121,59 +84,33 @@ export function registerAccountTools(server, client) {
             currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
             iban: z.string().optional().describe('IBAN number'),
             opening_balance: z.string().optional().describe('Opening balance as a number string'),
-            opening_balance_date: z.string().optional().describe('Opening balance date (YYYY-MM-DD)'),
+            opening_balance_date: dateSchema.optional().describe('Opening balance date (YYYY-MM-DD)'),
             include_net_worth: z.boolean().optional().describe('Include in net worth calculations'),
             active: z.boolean().optional().describe('Whether the account is active'),
             notes: z.string().optional().describe('Notes'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateAccount(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_account', {
+    }, ({ id, ...params }) => updateAccount(client, id, params));
+    defineTool(server, 'delete_account', {
         title: 'Delete Account',
         description: 'Permanently delete an account from Firefly III. **This action cannot be undone.** Accounts with linked transactions cannot be deleted. Use get_account to confirm before deleting.',
-        inputSchema: {
-            id: z.string().describe('Account ID — use get_accounts to find valid IDs'),
-        },
+        inputSchema: { id: z.string().describe('Account ID — use get_accounts to find valid IDs') },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteAccount(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_account_transactions', {
+    }, ({ id }) => deleteAccount(client, id));
+    defineTool(server, 'get_account_transactions', {
         title: 'Get Account Transactions',
         description: 'Get all transactions for a specific account. Use get_accounts to find valid account IDs.',
         inputSchema: {
             id: z.string().describe('Account ID'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             type: z.enum(['all', 'withdrawal', 'deposit', 'transfer', 'opening_balance', 'reconciliation', 'special', 'default']).optional().describe('Filter by transaction type'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id, start, end, type, page, limit }) => {
-        try {
-            const result = await fetchAccountTransactions(client, id, { start, end, type, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('search_accounts', {
+    }, ({ id, start, end, type, page, limit }) => fetchAccountTransactions(client, id, { start: start, end: end, type: type, page: page, limit: limit }));
+    defineTool(server, 'search_accounts', {
         title: 'Search Accounts',
         description: 'Search for accounts by name, IBAN, account number, or ID.',
         inputSchema: {
@@ -183,14 +120,6 @@ export function registerAccountTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ query, field, page, limit }) => {
-        try {
-            const result = await searchAccounts(client, { query, field, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, ({ query, field, page, limit }) => searchAccounts(client, { query: query, field: field, page: page, limit: limit }));
 }
 //# sourceMappingURL=accounts.js.map
