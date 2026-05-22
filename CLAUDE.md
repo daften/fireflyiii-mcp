@@ -107,7 +107,7 @@ fireflyiii-mcp/
 │       ├── transaction-links.test.ts
 │       ├── transactions.test.ts
 │       └── transform.test.ts
-├── dist/                        # Compiled output — committed to git (not gitignored)
+├── dist/                        # Compiled output — gitignored (not committed)
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml               # Runs tests on every PR and push to main
@@ -338,7 +338,7 @@ npm run dev -- --transport http --port 4000  # Run on a specific port
 npm run dev -- --preset default          # Load only the default tool subset
 ```
 
-**Important:** `dist/` is committed to git so the server can be used without a build step. Always run `npm run build` and commit `dist/` alongside source changes.
+**Important:** `dist/` is gitignored and not committed. Always run `npm run build` before running or deploying the server.
 
 ---
 
@@ -352,7 +352,7 @@ npm run dev -- --preset default          # Load only the default tool subset
    - Consider which presets it belongs in (`PRESETS` map in the same file).
 4. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
 5. **Update the tool table** in `README.md`.
-6. **Run `npm run build`** and commit source + dist together.
+6. **Run `npm run build`** to verify the TypeScript compiles cleanly.
 
 Example — adding `get_account` (single account by ID):
 
@@ -407,7 +407,7 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 ## Releasing a New Version
 
 1. Bump `version` in `package.json` **and** `src/server.ts` (it is hardcoded there).
-2. Run `npm run build` and commit the bump together with `dist/`.
+2. Run `npm run build` and commit the bump.
 3. Create an annotated tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry listing every change since the previous tag (Added / Changed / Deprecated / Removed / Fixed / Security — omit empty sections).
 4. Push the tag: `git push origin v<version>` — this triggers the publish workflow.
 
@@ -451,7 +451,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - Use ESM imports with `.js` extension (`import ... from '../transform.js'`) — required for Node ESM.
 - Use a single merged import from each module — avoid two `import` statements from the same path.
 - Test files are in `src/tests/` (flat, not a `unit/` subdirectory) and excluded from the build by `tsconfig.json`.
-- `dist/` is **committed to git**. Run `npm run build` and include `dist/` in commits that change source.
+- `dist/` is **gitignored** (not committed). Run `npm run build` to compile before running or deploying.
 - The MCP SDK handles serialization; just return plain objects from tool handlers.
 - Firefly III API is REST; pagination is via query params (`limit`, `page`).
 - `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.

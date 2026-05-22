@@ -1,7 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build artifacts (dist/ is committed so users can run without building)
+# Build artifacts
+dist/
 *.tsbuildinfo
 
 # Environment — never commit real secrets
