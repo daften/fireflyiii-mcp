@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function fetchBudgets(client, params) {
     const response = await client.get('/budgets', { page: params.page, limit: params.limit });
     return unwrapList(response);
@@ -64,16 +65,8 @@ export async function fetchTransactionsWithoutBudget(client, params) {
     const response = await client.get('/budgets/transactions-without-budget', query);
     return unwrapList(response);
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerBudgetTools(server, client) {
-    server.registerTool('get_budgets', {
+    defineTool(server, 'get_budgets', {
         title: 'Get Budgets',
         description: 'Get all budgets from Firefly III, including spent and available amounts for the current period. Use get_budget_limits for period-specific spending limits.',
         inputSchema: {
@@ -81,34 +74,18 @@ export function registerBudgetTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ page, limit }) => {
-        try {
-            const result = await fetchBudgets(client, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_budget_limits', {
+    }, ({ page, limit }) => fetchBudgets(client, { page: page, limit: limit }));
+    defineTool(server, 'get_budget_limits', {
         title: 'Get Budget Limits',
         description: 'Get spending limits for a specific Firefly III budget, including how much has been spent against each limit. Optionally filter by date range (YYYY-MM-DD). Use get_budgets to find valid budget IDs.',
         inputSchema: {
             budgetId: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ budgetId, start, end }) => {
-        try {
-            const result = await fetchBudgetLimits(client, budgetId, start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_budget', {
+    }, ({ budgetId, start, end }) => fetchBudgetLimits(client, budgetId, start, end));
+    defineTool(server, 'create_budget', {
         title: 'Create Budget',
         description: 'Create a new budget in Firefly III.',
         inputSchema: {
@@ -120,16 +97,8 @@ export function registerBudgetTools(server, client) {
             auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Auto-budget period'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await createBudget(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_budget', {
+    }, (params) => createBudget(client, params));
+    defineTool(server, 'update_budget', {
         title: 'Update Budget',
         description: 'Update an existing budget in Firefly III. Only fields provided will be changed. Use get_budgets to find valid budget IDs.',
         inputSchema: {
@@ -142,86 +111,46 @@ export function registerBudgetTools(server, client) {
             auto_budget_period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Auto-budget period'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateBudget(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_budget', {
+    }, ({ id, ...params }) => updateBudget(client, id, params));
+    defineTool(server, 'delete_budget', {
         title: 'Delete Budget',
         description: 'Permanently delete a budget from Firefly III. **This action cannot be undone.** Use get_budgets to confirm the ID before deleting.',
         inputSchema: { id: z.string().describe('Budget ID — use get_budgets to find valid IDs') },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteBudget(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_budget_limit', {
+    }, ({ id }) => deleteBudget(client, id));
+    defineTool(server, 'create_budget_limit', {
         title: 'Create Budget Limit',
         description: 'Create a spending limit for a budget in Firefly III for a specific date range.',
         inputSchema: {
             budget_id: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
             amount: z.string().describe('Limit amount as a number string'),
             currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
             period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Budget period'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async ({ budget_id, ...params }) => {
-        try {
-            const result = await createBudgetLimit(client, budget_id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_budget_limit', {
+    }, ({ budget_id, ...params }) => createBudgetLimit(client, budget_id, params));
+    defineTool(server, 'update_budget_limit', {
         title: 'Update Budget Limit',
         description: 'Update an existing budget limit in Firefly III. Only fields provided will be changed. Use get_budget_limits to find valid limit IDs.',
         inputSchema: {
             id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             amount: z.string().optional().describe('Limit amount as a number string'),
             currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
             period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'half_year', 'yearly']).optional().describe('Budget period'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateBudgetLimit(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_budget_limit', {
+    }, ({ id, ...params }) => updateBudgetLimit(client, id, params));
+    defineTool(server, 'delete_budget_limit', {
         title: 'Delete Budget Limit',
         description: 'Permanently delete a budget limit from Firefly III. **This action cannot be undone.** Use get_budget_limits to confirm the ID before deleting.',
         inputSchema: { id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs') },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteBudgetLimit(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_available_budgets', {
+    }, ({ id }) => deleteBudgetLimit(client, id));
+    defineTool(server, 'get_available_budgets', {
         title: 'Get Available Budgets',
         description: 'Get all available budget amounts configured in Firefly III (the total money available to budget per period).',
         inputSchema: {
@@ -229,69 +158,37 @@ export function registerBudgetTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ page, limit }) => {
-        try {
-            const result = await fetchAvailableBudgets(client, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_available_budget', {
+    }, ({ page, limit }) => fetchAvailableBudgets(client, { page: page, limit: limit }));
+    defineTool(server, 'get_available_budget', {
         title: 'Get Available Budget',
         description: 'Get a single available budget amount by ID. Use get_available_budgets to find valid IDs.',
         inputSchema: {
             id: z.string().describe('Available budget ID'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await fetchAvailableBudget(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_budget_transactions', {
+    }, ({ id }) => fetchAvailableBudget(client, id));
+    defineTool(server, 'get_budget_transactions', {
         title: 'Get Budget Transactions',
         description: 'Get all transactions linked to a specific budget. Use get_budgets to find valid budget IDs.',
         inputSchema: {
             id: z.string().describe('Budget ID'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id, start, end, page, limit }) => {
-        try {
-            const result = await fetchBudgetTransactions(client, id, { start, end, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_transactions_without_budget', {
+    }, ({ id, start, end, page, limit }) => fetchBudgetTransactions(client, id, { start, end, page, limit }));
+    defineTool(server, 'get_transactions_without_budget', {
         title: 'Get Transactions Without Budget',
         description: 'Get all transactions that have no budget assigned. Useful for finding unbudgeted spending.',
         inputSchema: {
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end, page, limit }) => {
-        try {
-            const result = await fetchTransactionsWithoutBudget(client, { start, end, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, (params) => fetchTransactionsWithoutBudget(client, params));
 }
 //# sourceMappingURL=budgets.js.map
