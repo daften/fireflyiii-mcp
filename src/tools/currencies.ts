@@ -1,11 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import { type FireflyClient } from '../client.js';
 import {
   unwrapList, unwrapSingle,
   type JsonApiListResponse, type JsonApiSingleResponse,
   type UnwrappedList, type UnwrappedSingle,
 } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool } from './_helpers.js';
 
 export async function fetchCurrencies(
   client: FireflyClient,
@@ -60,13 +62,8 @@ export async function setPrimaryCurrency(client: FireflyClient, code: string): P
   return unwrapSingle(response);
 }
 
-const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true, idempotentHint: true } as const;
-const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
-
 export function registerCurrencyTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool('get_currencies', {
+  defineTool(server, 'get_currencies', {
     title: 'Get Currencies',
     description: 'Get all currencies configured in Firefly III.',
     inputSchema: {
@@ -74,30 +71,16 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ page, limit }) => {
-    try {
-      const result = await fetchCurrencies(client, { page, limit });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ page, limit }) => fetchCurrencies(client, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('get_currency', {
+  defineTool(server, 'get_currency', {
     title: 'Get Currency',
     description: 'Get a single currency by its currency code (e.g. EUR, USD).',
     inputSchema: { code: z.string().describe('Currency code (e.g. EUR, USD)') },
     annotations: READ_ANNOTATIONS,
-  }, async ({ code }) => {
-    try {
-      const result = await fetchCurrency(client, code);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ code }) => fetchCurrency(client, code as string));
 
-  server.registerTool('create_currency', {
+  defineTool(server, 'create_currency', {
     title: 'Create Currency',
     description: 'Create a new currency in Firefly III.',
     inputSchema: {
@@ -109,16 +92,9 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       default: z.boolean().optional().describe('Whether this is the default currency'),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async (params) => {
-    try {
-      const result = await createCurrency(client, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, (params) => createCurrency(client, params as Parameters<typeof createCurrency>[1]));
 
-  server.registerTool('update_currency', {
+  defineTool(server, 'update_currency', {
     title: 'Update Currency',
     description: 'Update an existing currency. Only fields provided will be changed. Use get_currencies to find valid currency codes.',
     inputSchema: {
@@ -130,68 +106,33 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       default: z.boolean().optional().describe('Whether this is the default currency'),
     },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ code, ...params }) => {
-    try {
-      const result = await updateCurrency(client, code, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ code, ...params }) => updateCurrency(client, code as string, params as Parameters<typeof updateCurrency>[2]));
 
-  server.registerTool('delete_currency', {
+  defineTool(server, 'delete_currency', {
     title: 'Delete Currency',
     description: 'Permanently delete a currency from Firefly III. **This action cannot be undone.** Use get_currencies to confirm the code before deleting.',
     inputSchema: { code: z.string().describe('Currency code to delete (e.g. EUR)') },
     annotations: DELETE_ANNOTATIONS,
-  }, async ({ code }) => {
-    try {
-      const result = await deleteCurrency(client, code);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ code }) => deleteCurrency(client, code as string));
 
-  server.registerTool('enable_currency', {
+  defineTool(server, 'enable_currency', {
     title: 'Enable Currency',
     description: 'Enable a currency so it can be used in transactions.',
     inputSchema: { code: z.string().describe('Currency code (e.g. EUR)') },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ code }) => {
-    try {
-      const result = await enableCurrency(client, code);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ code }) => enableCurrency(client, code as string));
 
-  server.registerTool('disable_currency', {
+  defineTool(server, 'disable_currency', {
     title: 'Disable Currency',
     description: 'Disable a currency so it no longer appears in transaction forms.',
     inputSchema: { code: z.string().describe('Currency code (e.g. EUR)') },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ code }) => {
-    try {
-      const result = await disableCurrency(client, code);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ code }) => disableCurrency(client, code as string));
 
-  server.registerTool('set_primary_currency', {
+  defineTool(server, 'set_primary_currency', {
     title: 'Set Primary Currency',
     description: 'Set a currency as the primary/default currency for Firefly III.',
     inputSchema: { code: z.string().describe('Currency code to set as primary (e.g. EUR)') },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ code }) => {
-    try {
-      const result = await setPrimaryCurrency(client, code);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ code }) => setPrimaryCurrency(client, code as string));
 }

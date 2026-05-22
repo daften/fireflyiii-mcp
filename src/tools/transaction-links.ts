@@ -1,11 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import { type FireflyClient } from '../client.js';
 import {
   unwrapList, unwrapSingle,
   type JsonApiListResponse, type JsonApiSingleResponse,
   type UnwrappedList, type UnwrappedSingle,
 } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool } from './_helpers.js';
 
 export async function fetchLinkTypes(
   client: FireflyClient,
@@ -54,13 +56,8 @@ export async function deleteTransactionLink(
   return { deleted: true, id };
 }
 
-const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true, idempotentHint: true } as const;
-const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
-
 export function registerTransactionLinkTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool('get_link_types', {
+  defineTool(server, 'get_link_types', {
     title: 'Get Link Types',
     description: 'Get all available transaction link types (e.g. "Related", "Refund", "Paid"). Use these IDs when creating transaction links.',
     inputSchema: {
@@ -68,16 +65,9 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ page, limit }) => {
-    try {
-      const result = await fetchLinkTypes(client, { page, limit });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ page, limit }) => fetchLinkTypes(client, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('get_transaction_links', {
+  defineTool(server, 'get_transaction_links', {
     title: 'Get Transaction Links',
     description: 'Get all links attached to a specific transaction journal entry. Use get_transactions to find valid journal IDs.',
     inputSchema: {
@@ -86,30 +76,16 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ journal_id, page, limit }) => {
-    try {
-      const result = await fetchTransactionLinks(client, journal_id, { page, limit });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ journal_id, page, limit }) => fetchTransactionLinks(client, journal_id as string, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('get_transaction_link', {
+  defineTool(server, 'get_transaction_link', {
     title: 'Get Transaction Link',
     description: 'Get a single transaction link by ID.',
     inputSchema: { id: z.string().describe('Transaction link ID') },
     annotations: READ_ANNOTATIONS,
-  }, async ({ id }) => {
-    try {
-      const result = await fetchTransactionLink(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id }) => fetchTransactionLink(client, id as string));
 
-  server.registerTool('create_transaction_link', {
+  defineTool(server, 'create_transaction_link', {
     title: 'Create Transaction Link',
     description: 'Create a link between two transactions (e.g. mark one as a refund of another). Use get_link_types to find valid link_type_id values.',
     inputSchema: {
@@ -119,16 +95,9 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       notes: z.string().optional().describe('Notes about this link'),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async (params) => {
-    try {
-      const result = await createTransactionLink(client, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, (params) => createTransactionLink(client, params as Parameters<typeof createTransactionLink>[1]));
 
-  server.registerTool('update_transaction_link', {
+  defineTool(server, 'update_transaction_link', {
     title: 'Update Transaction Link',
     description: 'Update an existing transaction link. Only fields provided will be changed.',
     inputSchema: {
@@ -139,26 +108,12 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       notes: z.string().optional().describe('Notes about this link'),
     },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ id, ...params }) => {
-    try {
-      const result = await updateTransactionLink(client, id, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id, ...params }) => updateTransactionLink(client, id as string, params as Parameters<typeof updateTransactionLink>[2]));
 
-  server.registerTool('delete_transaction_link', {
+  defineTool(server, 'delete_transaction_link', {
     title: 'Delete Transaction Link',
     description: 'Permanently delete a link between two transactions. **This action cannot be undone.**',
     inputSchema: { id: z.string().describe('Transaction link ID') },
     annotations: DELETE_ANNOTATIONS,
-  }, async ({ id }) => {
-    try {
-      const result = await deleteTransactionLink(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id }) => deleteTransactionLink(client, id as string));
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle, } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool } from './_helpers.js';
 export async function fetchLinkTypes(client, params) {
     const response = await client.get('/link-types', { page: params.page, limit: params.limit });
     return unwrapList(response);
@@ -25,12 +26,8 @@ export async function deleteTransactionLink(client, id) {
     await client.delete(`/transaction-links/${id}`);
     return { deleted: true, id };
 }
-const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true, idempotentHint: true };
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerTransactionLinkTools(server, client) {
-    server.registerTool('get_link_types', {
+    defineTool(server, 'get_link_types', {
         title: 'Get Link Types',
         description: 'Get all available transaction link types (e.g. "Related", "Refund", "Paid"). Use these IDs when creating transaction links.',
         inputSchema: {
@@ -38,16 +35,8 @@ export function registerTransactionLinkTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ page, limit }) => {
-        try {
-            const result = await fetchLinkTypes(client, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_transaction_links', {
+    }, ({ page, limit }) => fetchLinkTypes(client, { page: page, limit: limit }));
+    defineTool(server, 'get_transaction_links', {
         title: 'Get Transaction Links',
         description: 'Get all links attached to a specific transaction journal entry. Use get_transactions to find valid journal IDs.',
         inputSchema: {
@@ -56,30 +45,14 @@ export function registerTransactionLinkTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ journal_id, page, limit }) => {
-        try {
-            const result = await fetchTransactionLinks(client, journal_id, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_transaction_link', {
+    }, ({ journal_id, page, limit }) => fetchTransactionLinks(client, journal_id, { page: page, limit: limit }));
+    defineTool(server, 'get_transaction_link', {
         title: 'Get Transaction Link',
         description: 'Get a single transaction link by ID.',
         inputSchema: { id: z.string().describe('Transaction link ID') },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await fetchTransactionLink(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_transaction_link', {
+    }, ({ id }) => fetchTransactionLink(client, id));
+    defineTool(server, 'create_transaction_link', {
         title: 'Create Transaction Link',
         description: 'Create a link between two transactions (e.g. mark one as a refund of another). Use get_link_types to find valid link_type_id values.',
         inputSchema: {
@@ -89,16 +62,8 @@ export function registerTransactionLinkTools(server, client) {
             notes: z.string().optional().describe('Notes about this link'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await createTransactionLink(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_transaction_link', {
+    }, (params) => createTransactionLink(client, params));
+    defineTool(server, 'update_transaction_link', {
         title: 'Update Transaction Link',
         description: 'Update an existing transaction link. Only fields provided will be changed.',
         inputSchema: {
@@ -109,28 +74,12 @@ export function registerTransactionLinkTools(server, client) {
             notes: z.string().optional().describe('Notes about this link'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateTransactionLink(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_transaction_link', {
+    }, ({ id, ...params }) => updateTransactionLink(client, id, params));
+    defineTool(server, 'delete_transaction_link', {
         title: 'Delete Transaction Link',
         description: 'Permanently delete a link between two transactions. **This action cannot be undone.**',
         inputSchema: { id: z.string().describe('Transaction link ID') },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteTransactionLink(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, ({ id }) => deleteTransactionLink(client, id));
 }
 //# sourceMappingURL=transaction-links.js.map

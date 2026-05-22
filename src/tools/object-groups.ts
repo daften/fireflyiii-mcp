@@ -1,11 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import { type FireflyClient } from '../client.js';
 import {
   unwrapList, unwrapSingle,
   type JsonApiListResponse, type JsonApiSingleResponse,
   type UnwrappedList, type UnwrappedSingle,
 } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool } from './_helpers.js';
 
 export async function fetchObjectGroups(
   client: FireflyClient,
@@ -63,13 +65,8 @@ export async function fetchObjectGroupPiggyBanks(
   return unwrapList(response);
 }
 
-const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true, idempotentHint: true } as const;
-const WRITE_ANNOTATIONS = { openWorldHint: true } as const;
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true } as const;
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true } as const;
-
 export function registerObjectGroupTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool('get_object_groups', {
+  defineTool(server, 'get_object_groups', {
     title: 'Get Object Groups',
     description: 'Get all object groups from Firefly III. Object groups organise accounts and piggy banks.',
     inputSchema: {
@@ -77,30 +74,16 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ page, limit }) => {
-    try {
-      const result = await fetchObjectGroups(client, { page, limit });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ page, limit }) => fetchObjectGroups(client, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('get_object_group', {
+  defineTool(server, 'get_object_group', {
     title: 'Get Object Group',
     description: 'Get a single object group by ID. Use get_object_groups to find valid IDs.',
     inputSchema: { id: z.string().describe('Object group ID') },
     annotations: READ_ANNOTATIONS,
-  }, async ({ id }) => {
-    try {
-      const result = await fetchObjectGroup(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id }) => fetchObjectGroup(client, id as string));
 
-  server.registerTool('create_object_group', {
+  defineTool(server, 'create_object_group', {
     title: 'Create Object Group',
     description: 'Create a new object group to organise accounts and piggy banks.',
     inputSchema: {
@@ -108,16 +91,9 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       order: z.number().int().positive().optional().describe('Display order'),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async (params) => {
-    try {
-      const result = await createObjectGroup(client, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, (params) => createObjectGroup(client, params as Parameters<typeof createObjectGroup>[1]));
 
-  server.registerTool('update_object_group', {
+  defineTool(server, 'update_object_group', {
     title: 'Update Object Group',
     description: 'Update an existing object group. Only fields provided will be changed. Use get_object_groups to find valid IDs.',
     inputSchema: {
@@ -126,30 +102,16 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       order: z.number().int().positive().optional().describe('Display order'),
     },
     annotations: UPDATE_ANNOTATIONS,
-  }, async ({ id, ...params }) => {
-    try {
-      const result = await updateObjectGroup(client, id, params);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id, ...params }) => updateObjectGroup(client, id as string, params as Parameters<typeof updateObjectGroup>[2]));
 
-  server.registerTool('delete_object_group', {
+  defineTool(server, 'delete_object_group', {
     title: 'Delete Object Group',
     description: 'Permanently delete an object group. **This action cannot be undone.** Use get_object_groups to confirm the ID before deleting.',
     inputSchema: { id: z.string().describe('Object group ID') },
     annotations: DELETE_ANNOTATIONS,
-  }, async ({ id }) => {
-    try {
-      const result = await deleteObjectGroup(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id }) => deleteObjectGroup(client, id as string));
 
-  server.registerTool('get_object_group_bills', {
+  defineTool(server, 'get_object_group_bills', {
     title: 'Get Object Group Bills',
     description: 'Get all bills belonging to a specific object group. Use get_object_groups to find valid IDs.',
     inputSchema: {
@@ -158,16 +120,9 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ id, page, limit }) => {
-    try {
-      const result = await fetchObjectGroupBills(client, id, { page, limit });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id, page, limit }) => fetchObjectGroupBills(client, id as string, { page: page as number | undefined, limit: limit as number | undefined }));
 
-  server.registerTool('get_object_group_piggy_banks', {
+  defineTool(server, 'get_object_group_piggy_banks', {
     title: 'Get Object Group Piggy Banks',
     description: 'Get all piggy banks belonging to a specific object group. Use get_object_groups to find valid IDs.',
     inputSchema: {
@@ -176,12 +131,5 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ id, page, limit }) => {
-    try {
-      const result = await fetchObjectGroupPiggyBanks(client, id, { page, limit });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  });
+  }, ({ id, page, limit }) => fetchObjectGroupPiggyBanks(client, id as string, { page: page as number | undefined, limit: limit as number | undefined }));
 }
