@@ -13,7 +13,7 @@ TypeScript errors: `npx tsc --noEmit`.
 
 ## dist/ rule
 
-`dist/` is committed to git so the server works via `node dist/index.js` without a build step. **Always run `npm run build` and include `dist/` in the same commit as source changes.**
+`dist/` is gitignored and not committed. **Always run `npm run build` before running or testing source changes.**
 
 ## Adding a new tool
 
@@ -23,7 +23,7 @@ TypeScript errors: `npx tsc --noEmit`.
 4. If creating a new tool file, add the group to `TOOL_GROUPS` in `src/tools/index.ts` and wire it in `registerAllTools`. Consider which presets it belongs in.
 5. Write a test in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture.
 6. Update the tool table in `README.md`.
-7. Run `npm run build` and commit source + `dist/` together.
+7. Run `npm run build` to verify the TypeScript compiles cleanly.
 
 Always verify field names, required/optional status, and enums against the Firefly III OpenAPI spec before implementing:
 
@@ -44,7 +44,7 @@ These are skipped in CI; run them manually before submitting changes to API-call
 ## Releasing a new version
 
 1. Bump `version` in `package.json` and `src/server.ts` to the new semver.
-2. Run `npm run build` and commit the version bump together with `dist/`.
+2. Run `npm run build` and commit the version bump.
 3. Create an annotated git tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry covering every change since the previous tag:
 
 ```

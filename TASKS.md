@@ -115,19 +115,11 @@ get(target, prop) {
 
 ### P3-5. Decide on `dist/` policy
 
-**Where:** Repo root `dist/` (currently committed), `.gitignore:5` (commented exclusion).
+**Resolved:** Option B was implemented — `dist/` is now gitignored and not committed.
 
-**Current:** `dist/` is committed so `node dist/index.js` works for Option 4 (git checkout) without a build step. Every PR touching tools has a noisy doubled diff.
+**Change:** Dropped `dist/` from git by adding it to `.gitignore`. Documentation in CONTRIBUTING.md, CLAUDE.md, and README.md has been updated to reflect that `npm run build` is a required step before running or testing source changes. The npm package relies on `prepublishOnly` for building during publication.
 
-**Change:** Two options — pick one.
-
-**Option A: Keep `dist/` committed, add a freshness check.** Add a CI step that runs `npm run build`, then `git diff --exit-code dist/`. PRs whose `dist/` is stale fail CI.
-
-**Option B: Drop `dist/` from git.** Add `dist/` to `.gitignore`, document `npm run build` as a required step for Option 4 in `README.md`, and rely on `prepublishOnly` for the npm package.
-
-**Recommendation:** Option B is cleaner long-term; Option A preserves the current UX.
-
-**Acceptance:** Whichever path, the README and CLAUDE.md reflect the choice, and CI prevents drift.
+**Acceptance:** README and CLAUDE.md reflect the choice, CI prevents drift, and CONTRIBUTING.md documents the new workflow.
 
 ---
 
