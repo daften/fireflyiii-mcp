@@ -471,38 +471,6 @@ npm run dev               # Run without building (uses tsx)
 npm run build             # Compile TypeScript to dist/
 ```
 
-## Roadmap
-
-**High priority:**
-- ~~Split transactions (one receipt, multiple categories)~~ ✓ done — `create_split_transaction`
-- ~~Transaction keyword search~~ ✓ done — `search_transactions`
-- ~~Recurring transactions (full CRUD)~~ ✓ done — `get_recurring`, `get_recurrence`, `create_recurring`, `update_recurring`, `delete_recurring`
-- ~~Insight tools for uncategorized/untagged/unbilled/unbudgeted transactions~~ ✓ done — `get_insight_expenses_no_bill`, `get_insight_expenses_no_budget`, `get_insight_expenses_no_category`, `get_insight_expenses_no_tag`, `get_insight_income_no_category`, `get_insight_income_no_tag`, `get_insight_transfer_no_category`, `get_insight_transfer_no_tag`
-- ~~Docker container for self-hosted HTTP deployment~~ ✓ done — `Dockerfile`, `docker-compose.yml`, `ghcr.io/daften/fireflyiii-mcp`
-- ~~npm package~~ ✓ done — `@daften/fireflyiii-mcp`
-
-**Medium priority:**
-- ~~Automation rules and rule groups~~ ✓ done — `get_rule_groups`, `get_rule_group`, `create_rule_group`, `update_rule_group`, `delete_rule_group`, `get_rules`, `get_rule`, `create_rule`, `update_rule`, `delete_rule`, `trigger_rule_group`, `trigger_rule`, `test_rule_group`, `test_rule`
-- ~~File attachments~~ ✓ done — `get_attachments`, `get_attachment`, `create_attachment`, `update_attachment`, `delete_attachment`, `upload_attachment`
-- ~~Tool preset/filter system~~ ✓ done — `--preset`, `--groups`, `--read-only` CLI flags
-
-**Low priority:**
-- ~~Currency management~~ ✓ done — `get_currencies`, `get_currency`, `create_currency`, `update_currency`, `delete_currency`, `enable_currency`, `disable_currency`, `set_primary_currency`
-- ~~Net worth summary, chart data, exchange rates, and additional insights~~ ✓ done — `get_about`, `get_net_worth_summary`, `get_account_overview_chart`, `get_balance_chart`, `get_budget_chart`, `get_category_chart`, `get_exchange_rate`, + 14 insight grouped variants
-- ~~Available budgets~~ ✓ done — `get_available_budgets`, `get_available_budget`, `get_budget_transactions`, `get_transactions_without_budget`
-- ~~Piggy bank events~~ ✓ done — `get_piggy_bank_events`, `create_piggy_bank_event`, `delete_piggy_bank_event`
-- ~~Data export (CSV per entity type)~~ ✓ done — `export_transactions`, `export_accounts`, `export_bills`, `export_budgets`, `export_categories`, `export_tags`, `export_recurring`, `export_rules`, `export_piggy_banks`
-- ~~Object groups~~ ✓ done — `get_object_groups`, `get_object_group`, `create_object_group`, `update_object_group`, `delete_object_group`, `get_object_group_bills`, `get_object_group_piggy_banks`
-- ~~Transaction links~~ ✓ done — `get_link_types`, `get_transaction_links`, `get_transaction_link`, `create_transaction_link`, `update_transaction_link`, `delete_transaction_link`
-- ~~Sub-resource tools~~ ✓ done — `get_bill_transactions`, `get_budget_transactions`, `get_account_transactions`, `get_recurrence_transactions`, `bulk_update_transactions`, `download_attachment`, `get_rule_group_rules`, `trigger_recurrence`, `search_accounts`
-
-**Won't implement:**
-- Destroy/purge data (too destructive for a natural-language interface)
-- User preferences
-- Cloudflare Workers deployment
-- Webhooks (better managed in the Firefly III UI)
-- HTTP API key auth (PAT and OAuth already cover authentication)
-
 ## Resources
 
 - [Firefly III API Documentation](https://api-docs.firefly-iii.org/) — interactive Swagger UI for all API versions

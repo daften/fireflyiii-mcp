@@ -382,42 +382,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
-## Roadmap — Feature Parity Tasks
+## Inspiration
 
-Gaps identified by comparing against [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp). Both repos are credited as inspiration throughout this list.
-
-### High Priority
-
-- [x] **Split transactions** — `create_split_transaction` in `src/tools/transactions.ts`; shared fields (type, date, source_id, destination_id, currency_code, group_title) plus a `splits` array (min 2) each with amount, description, category_name, budget_id, tags, notes. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
-- [x] **Transaction search** — `search_transactions` in `src/tools/transactions.ts`; keyword search via `GET /search/transactions?query=` with page/limit. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
-- [x] **Recurring transactions** — `src/tools/recurring.ts` and `src/tests/recurring.test.ts`; full CRUD: `get_recurring` (list), `get_recurrence` (single), `create_recurring`, `update_recurring`, `delete_recurring`; frequencies: daily/weekly/monthly/ndom/yearly; weekend handling (1–4); `repeat_until`/`nr_of_repetitions` for finite recurrences; recurring API uses `category_id` (not `category_name`), and `source_id`/`destination_id` are required. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Insight "no X" variants** — add to `src/tools/reports.ts`: tools that return expenses/income/transfers for transactions with *nothing* attached to a given field; e.g. `get_insight_expenses_no_category` returns all expenses where no category has been set — useful for finding uncategorized/untagged transactions; endpoints: `/insight/expense/no-bill`, `/insight/expense/no-budget`, `/insight/expense/no-category`, `/insight/expense/no-tag`, `/insight/income/no-category`, `/insight/income/no-tag`, `/insight/transfer/no-category`, `/insight/transfer/no-tag`. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Docker container** — `Dockerfile` (multi-stage `node:18-alpine`), `docker-compose.yml`, `.dockerignore`; HTTP mode only (`--host 0.0.0.0`); `MCP_BASE_URL` env var added to `src/http.ts` (optional — falls back to `Host` header; empty/whitespace treated as unset); image published to `ghcr.io/daften/fireflyiii-mcp` via GitHub Actions
-- [x] **npm package publishing** — published as `@daften/fireflyiii-mcp`; `package.json` has `files`, `publishConfig`, `prepublishOnly`; GitHub Actions workflow (`.github/workflows/publish.yml`) publishes to npm and pushes Docker image to ghcr.io on `v*` tag push; requires `NPM_TOKEN` secret in GitHub repo settings
-
-### Medium Priority
-
-- [x] **Automation rules & rule groups** — new `src/tools/rules.ts` and `src/tests/rules.test.ts`; CRUD for rules and rule groups; include `trigger_rule_group` (POST `/rule-groups/{id}/trigger`) to manually run a group against existing transactions. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **File attachments** — new `src/tools/attachments.ts` and `src/tests/attachments.test.ts`; `get_attachments`, `get_attachment`, `create_attachment`, `delete_attachment`, `upload_attachment` (base64-encoded content POST to `/attachments/{id}/upload`). *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Tool preset/filter system** — `--preset <name>` (minimal/default/budgeting/insights/automation/full), `--groups <comma-list>`, `--read-only` CLI flags; logic in `src/tools/index.ts` (exports `TOOL_GROUPS`, `PRESETS`, `ToolFilterOptions`, `registerAllTools`); arg parsing extracted to `src/args.ts`; `--preset` and `--groups` are mutually exclusive (error if both given); `--read-only` filters to `get_*`/`search_*`/`test_*` tools only; `TOOL_GROUPS` now covers 14 groups: accounts, transactions, budgets, categories, bills, piggy-banks, reports, rules, recurring, attachments, currencies, exports, object-groups, transaction-links. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-
-### Low Priority
-
-- [x] **Currency management** — new `src/tools/currencies.ts` and `src/tests/currencies.test.ts`; `get_currencies`, `get_currency`, `create_currency`, `update_currency` (enable/disable), `delete_currency`. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Net worth & chart data** — add to `src/tools/reports.ts`: `get_net_worth_summary` (`/summary/net-worth`) and `get_account_overview_chart` (`/chart/account/overview`); both accept start/end date params. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Available budgets** — add to `src/tools/budgets.ts`: `get_available_budgets` (`/available-budgets`) and `get_available_budget` (`/available-budgets/{id}`). *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Piggy bank events** — add to `src/tools/piggy-banks.ts`: `get_piggy_bank_events` (`/piggy-banks/{id}/events`), `create_piggy_bank_event`, `delete_piggy_bank_event`; granular deposit/withdrawal event tracking per piggy bank. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **Data export** — add to `src/tools/reports.ts` or new `src/tools/exports.ts`: per-entity CSV exports (`export_transactions`, `export_accounts`, `export_bills`, etc.) via `/data/export` endpoints. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- [x] **get_about** — add to `src/tools/reports.ts`: system info from `/about`; useful for version checking and diagnostics. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
-- [x] **Object groups** — new `src/tools/object-groups.ts` and `src/tests/object-groups.test.ts`; `get_object_groups`, `create_object_group`; used to organize accounts and piggy banks. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
-
-### Won't Do
-
-- **Destroy/purge data** — exposes Firefly III's bulk data deletion endpoints; too destructive and too easy to trigger accidentally via natural language; out of scope for a finance assistant.
-- **User preferences** — read/write of low-level system preferences; not relevant to financial queries or actions; adds complexity without user-facing value.
-- **Cloudflare Workers deployment** — adds a separate deployment target with its own toolchain (Hono, `McpAgent`); maintenance burden outweighs benefit; Docker covers the remote hosting use case. *(Seen in [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- **Webhooks** — configuring Firefly III webhooks via MCP is a meta-task (managing the system, not using it); better handled directly in the Firefly III UI. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong](https://github.com/etnperlong/firefly-iii-mcp))*
-- **HTTP API key auth** — PAT (stdio) and OAuth (HTTP) already provide authentication; an additional API key layer adds no meaningful security and complicates setup. *(Seen in [fabianonetto](https://github.com/fabianonetto/mcp-server-firefly-iii))*
+Feature coverage was informed by [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp).
 
 ---
 
