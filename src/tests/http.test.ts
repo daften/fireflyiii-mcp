@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import * as http from 'node:http';
-import { createOAuthHandler, requestContext, classifyHost } from '../http.js';
+import { createOAuthHandler, requestContext, classifyHost, startHttpServer } from '../http.js';
 
 type MockRequest = {
   method: string;
@@ -804,5 +804,116 @@ describe('classifyHost', () => {
 
   it('classifies an arbitrary hostname as non-loopback', () => {
     expect(classifyHost('mcp.example.com')).toBe('non-loopback');
+  });
+});
+
+describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
+  beforeEach(() => {
+    // Suppress the MCP_BASE_URL warning by providing a value
+    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    delete process.env['MCP_BASE_URL'];
+    vi.restoreAllMocks();
+  });
+
+  it('bumps port once on a single EADDRINUSE then resolves', async () => {
+    const eaddrinuse = Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' });
+    let callCount = 0;
+    const mockTryListen = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) throw eaddrinuse;
+      // second call resolves — simulates successful bind on port+1
+    });
+
+    const createMcpServer = vi.fn().mockReturnValue({
+      connect: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(
+      startHttpServer(
+        createMcpServer as unknown as () => import('@modelcontextprotocol/sdk/server/mcp.js').McpServer,
+        '127.0.0.1',
+        3000,
+        false,
+        'client-id',
+        'https://firefly.example.com',
+        mockTryListen
+      )
+    ).resolves.toBeUndefined();
+
+    expect(mockTryListen).toHaveBeenCalledTimes(2);
+    // First call with original port
+    expect(mockTryListen.mock.calls[0]?.[2]).toBe(3000);
+    // Second call with incremented port
+    expect(mockTryListen.mock.calls[1]?.[2]).toBe(3001);
+
+    // stdout should mention the port move
+    const stdoutCalls = (process.stdout.write as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => String(c[0]))
+      .join('');
+    expect(stdoutCalls).toMatch(/moved up|3001/);
+  });
+
+  it('calls process.exit(1) after 10 consecutive EADDRINUSE failures', async () => {
+    const eaddrinuse = Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' });
+    const mockTryListen = vi.fn().mockRejectedValue(eaddrinuse);
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: number | string | null) => {
+      throw new Error('process.exit called');
+    });
+
+    const createMcpServer = vi.fn().mockReturnValue({
+      connect: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(
+      startHttpServer(
+        createMcpServer as unknown as () => import('@modelcontextprotocol/sdk/server/mcp.js').McpServer,
+        '127.0.0.1',
+        3000,
+        false,
+        'client-id',
+        'https://firefly.example.com',
+        mockTryListen
+      )
+    ).rejects.toThrow('process.exit called');
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    // tryListen should have been called 11 times (ports 3000–3010, failing at 3010 triggers exit)
+    expect(mockTryListen).toHaveBeenCalledTimes(11);
+  });
+
+  it('calls process.exit(1) on the first EADDRINUSE when portWasExplicit = true', async () => {
+    const eaddrinuse = Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' });
+    const mockTryListen = vi.fn().mockRejectedValue(eaddrinuse);
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: number | string | null) => {
+      throw new Error('process.exit called');
+    });
+
+    const createMcpServer = vi.fn().mockReturnValue({
+      connect: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(
+      startHttpServer(
+        createMcpServer as unknown as () => import('@modelcontextprotocol/sdk/server/mcp.js').McpServer,
+        '127.0.0.1',
+        3000,
+        true,
+        'client-id',
+        'https://firefly.example.com',
+        mockTryListen
+      )
+    ).rejects.toThrow('process.exit called');
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    // Should have only tried once since the port was explicit
+    expect(mockTryListen).toHaveBeenCalledTimes(1);
   });
 });

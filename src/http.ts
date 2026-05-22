@@ -212,7 +212,7 @@ export function classifyHost(host: string): 'loopback' | 'non-loopback' {
   return ['127.0.0.1', '::1', 'localhost'].includes(host) ? 'loopback' : 'non-loopback';
 }
 
-async function tryListen(httpServer: http.Server, host: string, port: number): Promise<void> {
+export async function tryListen(httpServer: http.Server, host: string, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     httpServer.once('error', reject);
     httpServer.listen(port, host, () => {
@@ -228,7 +228,8 @@ export async function startHttpServer(
   requestedPort: number,
   portWasExplicit: boolean,
   oauthClientId: string,
-  fireflyUrl: string
+  fireflyUrl: string,
+  tryListenFn: (server: http.Server, host: string, port: number) => Promise<void> = tryListen
 ): Promise<void> {
   if (!process.env['MCP_BASE_URL']?.trim()) {
     if (classifyHost(host) === 'non-loopback') {
@@ -272,7 +273,7 @@ export async function startHttpServer(
 
   while (true) {
     try {
-      await tryListen(httpServer, host, port);
+      await tryListenFn(httpServer, host, port);
       break;
     } catch (err: unknown) {
       const nodeErr = err as NodeJS.ErrnoException;
