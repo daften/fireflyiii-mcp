@@ -2,138 +2,20 @@
 
 Derived from the 2026-05-22 repository audit. Items are grouped by priority. Each task is self-contained: file paths, current behavior, proposed change, and acceptance criteria.
 
-**Completed:** P0 (security fixes), P1 (CI/release hygiene), P2 (documentation).
+**Completed:** P0 (security fixes), P1 (CI/release hygiene), P2 (documentation), P3 (code quality).
 
 ---
 
-## P3 — Code quality & maintainability
+## P3 — Code quality & maintainability ✓ Done
 
-### P3-1. Extract a `defineTool` helper to eliminate try/catch boilerplate
+All six P3 items completed 2026-05-22.
 
-**Where:** Every file under `src/tools/`. ~140 instances of the pattern.
-
-**Current:** Every tool handler is shaped like:
-```ts
-async (params) => {
-  try {
-    const result = await fetchXxx(client, params);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-  } catch (err) {
-    return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-  }
-}
-```
-
-**Change:**
-- Add `src/tools/_helpers.ts` with:
-  ```ts
-  export function defineTool<Args, Result>(
-    server: McpServer,
-    name: string,
-    config: ToolConfig<Args>,
-    fetch: (args: Args) => Promise<Result>,
-  ): void {
-    server.registerTool(name, config, async (args) => {
-      try {
-        const result = await fetch(args as Args);
-        return {
-          content: [{
-            type: 'text' as const,
-            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-          }],
-        };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    });
-  }
-  ```
-- Migrate one tool file as a proof-of-concept (suggest `accounts.ts`), verify tests still pass, then convert the rest.
-- Handle the string-return case for `export_*` and `download_attachment` tools so they don't double-encode CSV/raw text as JSON.
-
-**Acceptance:**
-- All existing tests pass without changes.
-- LOC across `src/tools/*.ts` drops by ≥25%.
-- One new test asserting `defineTool` wraps errors into `{ isError: true }`.
-
----
-
-### P3-2. Lift annotation constants into a shared module
-
-**Where:** Every file under `src/tools/` defines the same four `as const` blocks (`READ_ANNOTATIONS`, `WRITE_ANNOTATIONS`, `UPDATE_ANNOTATIONS`, `DELETE_ANNOTATIONS`).
-
-**Change:** Move to `src/tools/_annotations.ts` and import everywhere.
-
-**Acceptance:** No tool file declares these constants locally; tests still pass.
-
----
-
-### P3-3. Fix `makeReadOnlyProxy` `this`-binding footgun
-
-**Where:** `src/tools/index.ts:58-71`.
-
-**Current:**
-```ts
-function makeReadOnlyProxy(server: McpServer): McpServer {
-  return new Proxy(server, {
-    get(target, prop) {
-      if (prop === 'registerTool') { /* ... */ }
-      return (target as unknown as Record<string | symbol, unknown>)[prop];
-    },
-  });
-}
-```
-Non-`registerTool` methods are returned unbound. If the SDK ever calls a method on the proxy that depends on `this`, it breaks.
-
-**Change:**
-```ts
-get(target, prop) {
-  if (prop === 'registerTool') { /* unchanged */ }
-  const v = (target as unknown as Record<string | symbol, unknown>)[prop];
-  return typeof v === 'function' ? (v as Function).bind(target) : v;
-}
-```
-
-**Acceptance:** Existing tests pass; add one test that calls a non-`registerTool` method on the proxy and asserts it behaves identically to calling it on the underlying server.
-
----
-
-### P3-4. Shared `dateSchema` for YYYY-MM-DD inputs
-
-**Where:** Every tool with date params (transactions, budgets, reports, exports, recurring, etc.) — search `z.string().*describe.*YYYY-MM-DD`.
-
-**Change:**
-- Add to `src/tools/_helpers.ts`:
-  ```ts
-  export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD');
-  ```
-- Replace `z.string().describe('Start date (YYYY-MM-DD)')` with `dateSchema.describe('Start date (YYYY-MM-DD)')` everywhere.
-
-**Acceptance:** Sending `"2026/01/01"` to any date param surfaces a Zod validation error before the request reaches Firefly III. Add one new test.
-
----
-
-### P3-5. Decide on `dist/` policy
-
-**Resolved:** Option B was implemented — `dist/` is now gitignored and not committed.
-
-**Change:** Dropped `dist/` from git by adding it to `.gitignore`. Documentation in CONTRIBUTING.md, CLAUDE.md, and README.md has been updated to reflect that `npm run build` is a required step before running or testing source changes. The npm package relies on `prepublishOnly` for building during publication.
-
-**Acceptance:** README and CLAUDE.md reflect the choice, CI prevents drift, and CONTRIBUTING.md documents the new workflow.
-
----
-
-### P3-6. Generate or downgrade rule trigger/action enums
-
-**Where:** `src/tools/rules.ts:208-228`.
-
-**Current:** Two hand-maintained `z.enum([...])` lists for rule trigger and action types. Firefly III evolves these; the list will go stale silently.
-
-**Change:** Either
-- Replace both with `z.string().describe('Common values: ...')` (lose IDE autocompletion, gain forward-compat), OR
-- Add a script (`scripts/sync-rule-enums.ts`) that fetches the OpenAPI YAML and regenerates the enums into a generated file. Document running it in CONTRIBUTING.md.
-
-**Acceptance:** Either approach documented; tests pass.
+- **P3-1:** `defineTool` helper extracted to `src/tools/_helpers.ts`; all 14 tool files migrated (~140 boilerplate try/catch blocks eliminated). String passthrough handles `export_*` and `download_attachment`.
+- **P3-2:** Annotation constants lifted to `src/tools/_annotations.ts`; no tool file declares them locally.
+- **P3-3:** `makeReadOnlyProxy` `get` trap now binds non-`registerTool` functions to `target` before returning. New test in `tool-filter.test.ts` verifies the binding.
+- **P3-4:** `dateSchema` added to `_helpers.ts`; applied to all YYYY-MM-DD params across all 14 tool files.
+- **P3-5:** `dist/` dropped from git (Option B). Added to `.gitignore`, `git rm -r --cached dist/` run. `README.md`, `CLAUDE.md`, `CONTRIBUTING.md` updated.
+- **P3-6:** `triggerTypeSchema` and `actionTypeSchema` in `rules.ts` replaced with `z.string().describe(...)` listing common values.
 
 ---
 
