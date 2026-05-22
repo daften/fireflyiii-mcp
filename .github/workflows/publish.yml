@@ -6,7 +6,23 @@ on:
       - 'v*'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      - run: npm test
+
   publish-npm:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,7 +31,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
@@ -25,6 +41,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-docker:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
