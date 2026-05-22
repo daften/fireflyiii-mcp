@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function fetchTransactions(client, params) {
     const query = { page: params.page, limit: params.limit };
     if (params.type)
@@ -130,16 +131,8 @@ export async function createSplitTransaction(client, params) {
     const response = await client.post('/transactions', body);
     return unwrapSingle(response);
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerTransactionTools(server, client) {
-    server.registerTool('get_transactions', {
+    defineTool(server, 'get_transactions', {
         title: 'Get Transactions',
         description: 'Get transactions from Firefly III. Filter by type (withdrawal/deposit/transfer/reconciliation), account ID, or date range. Dates must be YYYY-MM-DD. Use get_transaction to fetch a single transaction by ID.',
         inputSchema: {
@@ -148,43 +141,34 @@ export function registerTransactionTools(server, client) {
                 .optional()
                 .describe('Transaction type filter'),
             accountId: z.string().optional().describe('Filter by account ID — use get_accounts to find valid IDs'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ type, accountId, start, end, page, limit }) => {
-        try {
-            const result = await fetchTransactions(client, { type, accountId, start, end, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_transaction', {
+    }, ({ type, accountId, start, end, page, limit }) => fetchTransactions(client, {
+        type: type,
+        accountId: accountId,
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
+    }));
+    defineTool(server, 'get_transaction', {
         title: 'Get Transaction',
         description: 'Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs.',
         inputSchema: {
             id: z.string().describe('Transaction ID'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await fetchTransaction(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_transaction', {
+    }, ({ id }) => fetchTransaction(client, id));
+    defineTool(server, 'create_transaction', {
         title: 'Create Transaction',
         description: 'Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs.',
         inputSchema: {
             type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type'),
-            date: z.string().describe('Transaction date (YYYY-MM-DD)'),
+            date: dateSchema.describe('Transaction date (YYYY-MM-DD)'),
             amount: z.string().describe('Amount as a positive number string, e.g. "42.50"'),
             description: z.string().describe('Short description of the transaction'),
             source_id: z.string().optional().describe('Source account ID (required for withdrawals and transfers)'),
@@ -196,22 +180,14 @@ export function registerTransactionTools(server, client) {
             tags: z.array(z.string()).optional().describe('Tags to attach'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async ({ type, date, amount, description, source_id, destination_id, category_name, budget_id, currency_code, notes, tags }) => {
-        try {
-            const result = await createTransaction(client, { type, date, amount, description, source_id, destination_id, category_name, budget_id, currency_code, notes, tags });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_transaction', {
+    }, (params) => createTransaction(client, params));
+    defineTool(server, 'update_transaction', {
         title: 'Update Transaction',
         description: 'Update an existing transaction in Firefly III. Only fields provided will be changed. Use get_transaction to confirm the ID before updating.',
         inputSchema: {
             id: z.string().describe('Transaction ID — use get_transactions to find valid IDs'),
             type: z.enum(['withdrawal', 'deposit', 'transfer']).optional().describe('Transaction type'),
-            date: z.string().optional().describe('Transaction date (YYYY-MM-DD)'),
+            date: dateSchema.optional().describe('Transaction date (YYYY-MM-DD)'),
             amount: z.string().optional().describe('Amount as a positive number string'),
             description: z.string().optional().describe('Short description'),
             source_id: z.string().optional().describe('Source account ID'),
@@ -223,32 +199,16 @@ export function registerTransactionTools(server, client) {
             tags: z.array(z.string()).optional().describe('Tags (replaces existing tags)'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateTransaction(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_transaction', {
+    }, ({ id, ...params }) => updateTransaction(client, id, params));
+    defineTool(server, 'delete_transaction', {
         title: 'Delete Transaction',
         description: 'Permanently delete a transaction from Firefly III. **This action cannot be undone.** Use get_transaction to confirm the transaction before deleting.',
         inputSchema: {
             id: z.string().describe('Transaction ID — use get_transactions to find valid IDs'),
         },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteTransaction(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('search_transactions', {
+    }, ({ id }) => deleteTransaction(client, id));
+    defineTool(server, 'search_transactions', {
         title: 'Search Transactions',
         description: 'Search for transactions in Firefly III by keyword. Searches across descriptions, notes, and other fields.',
         inputSchema: {
@@ -257,21 +217,17 @@ export function registerTransactionTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ query, page, limit }) => {
-        try {
-            const result = await searchTransactions(client, { query, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_split_transaction', {
+    }, ({ query, page, limit }) => searchTransactions(client, {
+        query: query,
+        page: page,
+        limit: limit,
+    }));
+    defineTool(server, 'create_split_transaction', {
         title: 'Create Split Transaction',
         description: 'Create a split transaction in Firefly III — one receipt divided across multiple categories, budgets, or descriptions. All splits share the same type, date, and accounts. Use get_accounts to find source and destination account IDs.',
         inputSchema: {
             type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type (shared across all splits)'),
-            date: z.string().describe('Transaction date (YYYY-MM-DD, shared across all splits)'),
+            date: dateSchema.describe('Transaction date (YYYY-MM-DD, shared across all splits)'),
             source_id: z.string().optional().describe('Source account ID (required for withdrawals and transfers)'),
             destination_id: z.string().optional().describe('Destination account ID (required for deposits and transfers)'),
             currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD). Defaults to account currency.'),
@@ -286,16 +242,8 @@ export function registerTransactionTools(server, client) {
             })).min(2).describe('At least 2 splits required'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async ({ type, date, source_id, destination_id, currency_code, group_title, splits }) => {
-        try {
-            const result = await createSplitTransaction(client, { type, date, source_id, destination_id, currency_code, group_title, splits });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('bulk_update_transactions', {
+    }, (params) => createSplitTransaction(client, params));
+    defineTool(server, 'bulk_update_transactions', {
         title: 'Bulk Update Transactions',
         description: 'Update multiple transactions at once using a search query (same syntax as search_transactions). All matching transactions will have the specified fields updated.',
         inputSchema: {
@@ -306,14 +254,6 @@ export function registerTransactionTools(server, client) {
             notes: z.string().optional().describe('Set notes on all matched transactions'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await bulkUpdateTransactions(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, (params) => bulkUpdateTransactions(client, params));
 }
 //# sourceMappingURL=transactions.js.map
