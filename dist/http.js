@@ -10,6 +10,15 @@ function readBody(req) {
         req.on('error', reject);
     });
 }
+const LOOPBACK_REDIRECT_PREFIXES = ['http://127.0.0.1:', 'http://localhost:', 'http://[::1]:'];
+function isRedirectUriAllowed(uri) {
+    if (LOOPBACK_REDIRECT_PREFIXES.some((p) => uri.startsWith(p)))
+        return true;
+    const extra = process.env['MCP_ALLOWED_REDIRECT_PREFIXES']?.trim();
+    if (!extra)
+        return false;
+    return extra.split(',').map((s) => s.trim()).some((p) => p && uri.startsWith(p));
+}
 export function createOAuthHandler(fireflyUrl, oauthClientId, mcpHandler) {
     const FLOW_TTL_MS = 10 * 60 * 1000;
     const pendingFlows = new Map();
@@ -47,6 +56,11 @@ export function createOAuthHandler(fireflyUrl, oauthClientId, mcpHandler) {
         if (req.method === 'GET' && req.url?.startsWith('/oauth/authorize')) {
             const incomingUrl = new URL(req.url, baseUrl);
             const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
+            if (clientRedirectUri && !isRedirectUriAllowed(clientRedirectUri)) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+                return;
+            }
             const state = incomingUrl.searchParams.get('state');
             if (clientRedirectUri && state) {
                 evictExpiredFlows();
@@ -73,6 +87,11 @@ export function createOAuthHandler(fireflyUrl, oauthClientId, mcpHandler) {
             }
             catch {
                 // no body or invalid JSON — return empty redirect_uris
+            }
+            if (redirectUris[0] && !isRedirectUriAllowed(redirectUris[0])) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+                return;
             }
             const registration = {
                 client_id: oauthClientId,
@@ -113,7 +132,12 @@ export function createOAuthHandler(fireflyUrl, oauthClientId, mcpHandler) {
         if (req.method === 'GET' && req.url?.startsWith('/oauth/callback')) {
             const incomingUrl = new URL(req.url, baseUrl);
             const state = incomingUrl.searchParams.get('state');
-            const entry = state ? pendingFlows.get(state) : null;
+            if (!state) {
+                res.writeHead(400, { 'Content-Type': 'text/plain' });
+                res.end('No pending OAuth flow for this state. Start authorization from your MCP client.');
+                return;
+            }
+            const entry = pendingFlows.get(state);
             const isExpired = entry ? Date.now() - entry.createdAt > FLOW_TTL_MS : false;
             if (!entry || isExpired) {
                 evictExpiredFlows();

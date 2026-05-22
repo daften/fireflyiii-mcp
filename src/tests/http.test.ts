@@ -565,6 +565,88 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
   });
 });
 
+describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
+  afterEach(() => {
+    delete process.env['MCP_ALLOWED_REDIRECT_PREFIXES'];
+  });
+
+  it('rejects registration with a non-loopback redirect URI (400 invalid_redirect_uri)', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://evil.example.com/steal'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed['error']).toBe('invalid_redirect_uri');
+  });
+
+  it('accepts registration with a loopback redirect URI (127.0.0.1)', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1:54321/callback'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('accepts registration when redirect URI matches MCP_ALLOWED_REDIRECT_PREFIXES', async () => {
+    process.env['MCP_ALLOWED_REDIRECT_PREFIXES'] = 'https://claude.ai';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/callback'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('rejects authorize with a non-loopback redirect URI (400 invalid_redirect_uri)', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq(
+      'GET',
+      '/oauth/authorize?redirect_uri=http%3A%2F%2Fevil.example.com%2Fsteal&state=abc',
+      { host: '127.0.0.1:3000' }
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed['error']).toBe('invalid_redirect_uri');
+  });
+});
+
 describe('createOAuthHandler — MCP_BASE_URL override', () => {
   afterEach(() => {
     delete process.env['MCP_BASE_URL'];

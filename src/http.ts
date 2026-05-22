@@ -18,6 +18,15 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
+const LOOPBACK_REDIRECT_PREFIXES = ['http://127.0.0.1:', 'http://localhost:', 'http://[::1]:'];
+
+function isRedirectUriAllowed(uri: string): boolean {
+  if (LOOPBACK_REDIRECT_PREFIXES.some((p) => uri.startsWith(p))) return true;
+  const extra = process.env['MCP_ALLOWED_REDIRECT_PREFIXES']?.trim();
+  if (!extra) return false;
+  return extra.split(',').map((s) => s.trim()).some((p) => p && uri.startsWith(p));
+}
+
 export function createOAuthHandler(
   fireflyUrl: string,
   oauthClientId: string,
@@ -63,6 +72,11 @@ export function createOAuthHandler(
     if (req.method === 'GET' && req.url?.startsWith('/oauth/authorize')) {
       const incomingUrl = new URL(req.url, baseUrl);
       const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
+      if (clientRedirectUri && !isRedirectUriAllowed(clientRedirectUri)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+        return;
+      }
       const state = incomingUrl.searchParams.get('state');
       if (clientRedirectUri && state) {
         evictExpiredFlows();
@@ -92,6 +106,11 @@ export function createOAuthHandler(
         }
       } catch {
         // no body or invalid JSON — return empty redirect_uris
+      }
+      if (redirectUris[0] && !isRedirectUriAllowed(redirectUris[0])) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+        return;
       }
       const registration = {
         client_id: oauthClientId,
