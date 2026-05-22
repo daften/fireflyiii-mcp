@@ -134,7 +134,12 @@ export function createOAuthHandler(
     if (req.method === 'GET' && req.url?.startsWith('/oauth/callback')) {
       const incomingUrl = new URL(req.url, baseUrl);
       const state = incomingUrl.searchParams.get('state');
-      const entry = state ? pendingFlows.get(state) : null;
+      if (!state) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('No pending OAuth flow for this state. Start authorization from your MCP client.');
+        return;
+      }
+      const entry = pendingFlows.get(state);
       const isExpired = entry ? Date.now() - entry.createdAt > FLOW_TTL_MS : false;
       if (!entry || isExpired) {
         evictExpiredFlows();
@@ -146,7 +151,7 @@ export function createOAuthHandler(
         );
         return;
       }
-      pendingFlows.delete(state!);
+      pendingFlows.delete(state);
       const target = new URL(entry.redirectUri);
       incomingUrl.searchParams.forEach((value, key) => target.searchParams.set(key, value));
       res.writeHead(302, { Location: target.toString() });
