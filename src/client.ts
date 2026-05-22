@@ -13,7 +13,20 @@ export class FireflyError extends Error {
 
 export function formatError(err: unknown): string {
   if (err instanceof FireflyError) {
-    if (err.status === 400) return 'Bad request — check your input parameters.';
+    if (err.status === 400) {
+      try {
+        const parsed = JSON.parse(err.body) as { errors?: Record<string, string[]> };
+        if (parsed.errors && Object.keys(parsed.errors).length > 0) {
+          const details = Object.entries(parsed.errors)
+            .map(([field, msgs]) => `${field} — ${msgs.join(', ')}`)
+            .join('; ');
+          return `Bad request: ${details}`;
+        }
+      } catch {
+        // fall through
+      }
+      return 'Bad request — check your input parameters.';
+    }
     if (err.status === 401) return 'Authentication failed. Check your FIREFLY_TOKEN.';
     if (err.status === 404) return 'Resource not found.';
     if (err.status === 422) {

@@ -286,6 +286,18 @@ describe('formatError — updated cases', () => {
     expect(formatError(err)).toBe('Bad request — check your input parameters.');
   });
 
+  it('formats field errors from 400 JSON body', () => {
+    const body = JSON.stringify({
+      errors: {
+        amount: ['The amount field is required.'],
+      },
+    });
+    const err = new FireflyError(400, 'https://example.com', body);
+    const msg = formatError(err);
+    expect(msg).toContain('amount');
+    expect(msg).toContain('The amount field is required.');
+  });
+
   it('formats field errors from 422 JSON body', () => {
     const body = JSON.stringify({
       message: 'The given data was invalid.',
