@@ -320,6 +320,45 @@ describe('createOAuthHandler — token proxy', () => {
     expect(res.statusCode).toBe(401);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
+
+  it('returns 504 if Firefly III token endpoint does not respond within 30 seconds', async () => {
+    vi.useFakeTimers();
+    // Mock fetch that hangs until the AbortSignal fires, then rejects with AbortError
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      return new Promise<never>((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    }));
+
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+    );
+
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
+    const res = mockRes();
+
+    const handlerPromise = handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    // Advance fake timers by 30 seconds to trigger the abort
+    await vi.advanceTimersByTimeAsync(30_000);
+    await handlerPromise;
+
+    expect(res.statusCode).toBe(504);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed['error']).toBe('timeout');
+
+    vi.useRealTimers();
+  });
 });
 
 describe('createOAuthHandler — OAuth callback proxy', () => {

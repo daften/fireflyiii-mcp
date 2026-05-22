@@ -135,11 +135,26 @@ export function createOAuthHandler(
       if (params.get('redirect_uri')) {
         params.set('redirect_uri', `${baseUrl}/oauth/callback`);
       }
-      const tokenResponse = await fetch(`${fireflyUrl}/oauth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
-      });
+      const tokenController = new AbortController();
+      const tokenTimer = setTimeout(() => tokenController.abort(), 30_000);
+      let tokenResponse: Response;
+      try {
+        tokenResponse = await fetch(`${fireflyUrl}/oauth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString(),
+          signal: tokenController.signal,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          res.writeHead(504, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'timeout' }));
+          return;
+        }
+        throw err;
+      } finally {
+        clearTimeout(tokenTimer);
+      }
       const responseBody = await tokenResponse.text();
       const contentType = tokenResponse.headers.get('Content-Type') ?? 'application/json';
       res.writeHead(tokenResponse.status, { 'Content-Type': contentType });
