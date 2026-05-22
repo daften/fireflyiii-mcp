@@ -144,6 +144,8 @@ docker compose up -d
 
 To build the image locally instead of pulling from the registry, uncomment `build: .` in `docker-compose.yml`.
 
+> **Note:** OAuth state is held in-process. Run only a single replica — multiple replicas will break the OAuth flow because the callback may land on a different instance than the one that initiated authorization.
+
 ### Step 3: Connect Claude
 
 ```json
