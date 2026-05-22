@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchPiggyBanks, createPiggyBank, updatePiggyBank, deletePiggyBank } from '../tools/piggy-banks.js';
+import { fetchPiggyBanks, createPiggyBank, updatePiggyBank, deletePiggyBank, fetchPiggyBankEvents, createPiggyBankEvent, deletePiggyBankEvent } from '../tools/piggy-banks.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -67,5 +67,38 @@ describe('deletePiggyBank', () => {
     const result = await deletePiggyBank(mockClient, '4');
     expect(mockClient.delete).toHaveBeenCalledWith('/piggy-banks/4');
     expect(result).toEqual({ deleted: true, id: '4' });
+  });
+});
+
+const piggyEventFixture = {
+  data: [{ id: '1', type: 'piggy_bank_events', attributes: { amount: '50.00', date: '2026-01-15' }, links: {} }],
+  meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+};
+const piggyEventSingle = {
+  data: { id: '2', type: 'piggy_bank_events', attributes: { amount: '25.00', date: '2026-01-20' }, links: {} },
+};
+
+describe('fetchPiggyBankEvents', () => {
+  it('calls /piggy-banks/:id/events', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(piggyEventFixture);
+    await fetchPiggyBankEvents(mockClient, '3', { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/piggy-banks/3/events', { page: 1, limit: 50 });
+  });
+});
+
+describe('createPiggyBankEvent', () => {
+  it('posts to /piggy-banks/:id/events', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(piggyEventSingle);
+    await createPiggyBankEvent(mockClient, '3', { amount: '50.00', date: '2026-01-20' });
+    expect(mockClient.post).toHaveBeenCalledWith('/piggy-banks/3/events', { amount: '50.00', date: '2026-01-20' });
+  });
+});
+
+describe('deletePiggyBankEvent', () => {
+  it('calls delete and returns confirmation', async () => {
+    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await deletePiggyBankEvent(mockClient, '3', '1');
+    expect(mockClient.delete).toHaveBeenCalledWith('/piggy-banks/3/events/1');
+    expect(result).toEqual({ deleted: true, id: '1' });
   });
 });

@@ -26,7 +26,7 @@ describe('registerAllTools — no options', () => {
     expect(registered).toContain('get_rule_groups');
     expect(registered).toContain('get_recurring');
     expect(registered).toContain('get_attachments');
-    expect(registered.length).toBe(101);
+    expect(registered.length).toBe(110);
   });
 });
 
@@ -46,7 +46,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(14);
+    expect(registered.length).toBe(15);
   });
 
   it('default preset registers accounts, transactions, budgets, categories, bills (35 tools)', () => {
@@ -64,7 +64,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(35);
+    expect(registered.length).toBe(37);
   });
 
   it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (39 tools)', () => {
@@ -79,7 +79,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(39);
+    expect(registered.length).toBe(44);
   });
 
   it('insights preset registers accounts, transactions, categories, reports (56 tools)', () => {
@@ -97,7 +97,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(56);
+    expect(registered.length).toBe(57);
   });
 
   it('automation preset registers accounts, transactions, rules, recurring (33 tools)', () => {
@@ -113,13 +113,13 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_piggy_banks');
     expect(registered).not.toContain('get_tags');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(33);
+    expect(registered.length).toBe(37);
   });
 
-  it('full preset registers all 101 tools', () => {
+  it('full preset registers all 110 tools', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'full' });
-    expect(registered.length).toBe(101);
+    expect(registered.length).toBe(110);
   });
 });
 
@@ -133,7 +133,7 @@ describe('registerAllTools — groups', () => {
     expect(registered).toContain('get_piggy_banks');
     expect(registered).not.toContain('get_transactions');
     expect(registered).not.toContain('get_budgets');
-    expect(registered.length).toBe(11);
+    expect(registered.length).toBe(14);
   });
 
   it('single group registers only that group', () => {
@@ -143,7 +143,7 @@ describe('registerAllTools — groups', () => {
     expect(registered).toContain('trigger_rule');
     expect(registered).toContain('test_rule');
     expect(registered).not.toContain('get_accounts');
-    expect(registered.length).toBe(14);
+    expect(registered.length).toBe(15);
   });
 });
 

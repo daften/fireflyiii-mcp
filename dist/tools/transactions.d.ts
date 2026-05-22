@@ -45,6 +45,13 @@ export declare function searchTransactions(client: FireflyClient, params: {
     page?: number;
     limit?: number;
 }): Promise<UnwrappedList>;
+export declare function bulkUpdateTransactions(client: FireflyClient, params: {
+    query: string;
+    category_name?: string;
+    budget_id?: string;
+    tags?: string[];
+    notes?: string;
+}): Promise<unknown>;
 export declare function createSplitTransaction(client: FireflyClient, params: {
     type: 'withdrawal' | 'deposit' | 'transfer';
     date: string;

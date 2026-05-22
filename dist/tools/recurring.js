@@ -119,6 +119,18 @@ export async function deleteRecurrence(client, id) {
     await client.delete(`/recurrences/${id}`);
     return { deleted: true, id };
 }
+export async function fetchRecurrenceTransactions(client, id, params) {
+    const query = { page: params.page, limit: params.limit };
+    const response = await client.get(`/recurrences/${id}/transactions`, query);
+    return unwrapList(response);
+}
+export async function triggerRecurrence(client, id, date) {
+    const query = {};
+    if (date)
+        query['date'] = date;
+    await client.post(`/recurrences/${id}/trigger`, {}, query);
+    return { triggered: true, id };
+}
 const READ_ANNOTATIONS = {
     readOnlyHint: true,
     openWorldHint: true,
@@ -246,6 +258,41 @@ export function registerRecurringTools(server, client) {
     }, async ({ id }) => {
         try {
             const result = await deleteRecurrence(client, id);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('get_recurrence_transactions', {
+        title: 'Get Recurrence Transactions',
+        description: 'Get all transactions that have been created by a recurring transaction rule. Use get_recurring to find valid IDs.',
+        inputSchema: {
+            id: z.string().describe('Recurring transaction ID'),
+            page: z.number().int().positive().optional().default(1).describe('Page number'),
+            limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+        },
+        annotations: READ_ANNOTATIONS,
+    }, async ({ id, page, limit }) => {
+        try {
+            const result = await fetchRecurrenceTransactions(client, id, { page, limit });
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('trigger_recurrence', {
+        title: 'Trigger Recurrence',
+        description: 'Manually fire a recurring transaction rule to create its transaction immediately. Optionally specify a date (YYYY-MM-DD) to use instead of today.',
+        inputSchema: {
+            id: z.string().describe('Recurring transaction ID'),
+            date: z.string().optional().describe('Date to use for the triggered transaction (YYYY-MM-DD). Defaults to today.'),
+        },
+        annotations: WRITE_ANNOTATIONS,
+    }, async ({ id, date }) => {
+        try {
+            const result = await triggerRecurrence(client, id, date);
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
         catch (err) {

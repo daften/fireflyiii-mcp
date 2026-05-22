@@ -26,5 +26,6 @@ export declare function uploadAttachment(client: FireflyClient, id: string, cont
     uploaded: true;
     id: string;
 }>;
+export declare function downloadAttachment(client: FireflyClient, id: string): Promise<string>;
 export declare function registerAttachmentTools(server: McpServer, client: FireflyClient): void;
 //# sourceMappingURL=attachments.d.ts.map

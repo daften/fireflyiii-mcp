@@ -3,7 +3,7 @@ import type { FireflyClient } from '../client.js';
 import {
   fetchAttachments, fetchAttachment,
   createAttachment, updateAttachment,
-  deleteAttachment, uploadAttachment,
+  deleteAttachment, uploadAttachment, downloadAttachment,
 } from '../tools/attachments.js';
 
 const mockClient = {
@@ -108,5 +108,14 @@ describe('uploadAttachment', () => {
     const content = new Uint8Array([1, 2, 3]);
     await uploadAttachment(mockClient, '5', content);
     expect(mockClient.postBinary).toHaveBeenCalledWith('/attachments/5/upload', content);
+  });
+});
+
+describe('downloadAttachment', () => {
+  it('calls getText on /attachments/:id/download', async () => {
+    const mockFull = { ...mockClient, getText: vi.fn().mockResolvedValueOnce('receipt content') } as unknown as FireflyClient;
+    const result = await downloadAttachment(mockFull, '7');
+    expect(mockFull.getText).toHaveBeenCalledWith('/attachments/7/download');
+    expect(result).toBe('receipt content');
   });
 });

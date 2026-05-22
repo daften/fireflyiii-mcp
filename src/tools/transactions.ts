@@ -120,6 +120,13 @@ export async function searchTransactions(
   return unwrapList(response);
 }
 
+export async function bulkUpdateTransactions(
+  client: FireflyClient,
+  params: { query: string; category_name?: string; budget_id?: string; tags?: string[]; notes?: string }
+): Promise<unknown> {
+  return client.post('/data/bulk/transactions', params);
+}
+
 export async function createSplitTransaction(
   client: FireflyClient,
   params: {
@@ -349,6 +356,30 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     async ({ type, date, source_id, destination_id, currency_code, group_title, splits }) => {
       try {
         const result = await createSplitTransaction(client, { type, date, source_id, destination_id, currency_code, group_title, splits });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    'bulk_update_transactions',
+    {
+      title: 'Bulk Update Transactions',
+      description: 'Update multiple transactions at once using a search query (same syntax as search_transactions). All matching transactions will have the specified fields updated.',
+      inputSchema: {
+        query: z.string().describe('Search query to select transactions (same syntax as search_transactions)'),
+        category_name: z.string().optional().describe('Set category for all matched transactions'),
+        budget_id: z.string().optional().describe('Set budget for all matched transactions'),
+        tags: z.array(z.string()).optional().describe('Replace tags on all matched transactions'),
+        notes: z.string().optional().describe('Set notes on all matched transactions'),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async (params) => {
+      try {
+        const result = await bulkUpdateTransactions(client, params);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };

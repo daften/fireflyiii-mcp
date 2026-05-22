@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchBills, createBill, updateBill, deleteBill } from '../tools/bills.js';
+import { fetchBills, createBill, updateBill, deleteBill, fetchBillTransactions } from '../tools/bills.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -73,5 +73,13 @@ describe('deleteBill', () => {
     const result = await deleteBill(mockClient, '2');
     expect(mockClient.delete).toHaveBeenCalledWith('/bills/2');
     expect(result).toEqual({ deleted: true, id: '2' });
+  });
+});
+
+describe('fetchBillTransactions', () => {
+  it('calls /bills/:id/transactions', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await fetchBillTransactions(mockClient, '5', { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/bills/5/transactions', { page: 1, limit: 50 });
   });
 });

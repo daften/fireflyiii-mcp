@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchRecurrences, fetchRecurrence, createRecurrence, updateRecurrence, deleteRecurrence } from '../tools/recurring.js';
+import { fetchRecurrences, fetchRecurrence, createRecurrence, updateRecurrence, deleteRecurrence, fetchRecurrenceTransactions, triggerRecurrence } from '../tools/recurring.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -176,5 +176,22 @@ describe('deleteRecurrence', () => {
     mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
     const result = await deleteRecurrence(mockClient, '1');
     expect(result).toEqual({ deleted: true, id: '1' });
+  });
+});
+
+describe('fetchRecurrenceTransactions', () => {
+  it('calls /recurrences/:id/transactions', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await fetchRecurrenceTransactions(mockClient, '2', { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/recurrences/2/transactions', { page: 1, limit: 50 });
+  });
+});
+
+describe('triggerRecurrence', () => {
+  it('posts to /recurrences/:id/trigger', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    const result = await triggerRecurrence(mockClient, '2');
+    expect(mockClient.post).toHaveBeenCalledWith('/recurrences/2/trigger', {}, {});
+    expect(result).toEqual({ triggered: true, id: '2' });
   });
 });

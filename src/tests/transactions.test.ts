@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction, searchTransactions, createSplitTransaction } from '../tools/transactions.js';
+import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction, searchTransactions, createSplitTransaction, bulkUpdateTransactions } from '../tools/transactions.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -237,5 +237,14 @@ describe('createSplitTransaction', () => {
     expect(body.transactions[0]).not.toHaveProperty('source_id');
     expect(body.transactions[0]).not.toHaveProperty('destination_id');
     expect(body.transactions[0]).not.toHaveProperty('currency_code');
+  });
+});
+
+describe('bulkUpdateTransactions', () => {
+  it('posts to /data/bulk/transactions', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce({ count: 3 });
+    const result = await bulkUpdateTransactions(mockClient, { query: 'description:coffee', category_name: 'Food' });
+    expect(mockClient.post).toHaveBeenCalledWith('/data/bulk/transactions', { query: 'description:coffee', category_name: 'Food' });
+    expect(result).toEqual({ count: 3 });
   });
 });

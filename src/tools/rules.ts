@@ -170,6 +170,16 @@ export async function testRuleGroup(
   return unwrapList(response);
 }
 
+export async function fetchRuleGroupRules(
+  client: FireflyClient,
+  id: string,
+  params: { page?: number; limit?: number }
+): Promise<UnwrappedList> {
+  const query: QueryParams = { page: params.page, limit: params.limit };
+  const response = await client.get<JsonApiListResponse>(`/rule-groups/${id}/rules`, query);
+  return unwrapList(response);
+}
+
 export async function testRule(
   client: FireflyClient,
   id: string,
@@ -464,6 +474,28 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
   );
 
   // ---- Trigger and test tools ----
+
+  server.registerTool(
+    'get_rule_group_rules',
+    {
+      title: 'Get Rule Group Rules',
+      description: 'Get all rules belonging to a specific rule group. Use get_rule_groups to find valid rule group IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ id, page, limit }) => {
+      try {
+        const result = await fetchRuleGroupRules(client, id, { page, limit });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
+      }
+    }
+  );
 
   server.registerTool(
     'trigger_rule_group',

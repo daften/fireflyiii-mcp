@@ -3,7 +3,7 @@ import type { FireflyClient } from '../client.js';
 import {
   fetchRuleGroups, fetchRuleGroup, createRuleGroup, updateRuleGroup, deleteRuleGroup,
   fetchRules, fetchRule, createRule, updateRule, deleteRule,
-  triggerRuleGroup, triggerRule, testRuleGroup, testRule,
+  triggerRuleGroup, triggerRule, testRuleGroup, testRule, fetchRuleGroupRules,
 } from '../tools/rules.js';
 
 const mockClient = {
@@ -339,5 +339,18 @@ describe('testRule', () => {
     const result = await testRule(mockClient, '10', {});
     expect(mockClient.get).toHaveBeenCalledWith('/rules/10/test', {});
     expect(result.data).toHaveLength(0);
+  });
+});
+
+const listFixture = {
+  data: [{ id: '10', type: 'rules', attributes: { title: 'Tag groceries', active: true }, links: {} }],
+  meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+};
+
+describe('fetchRuleGroupRules', () => {
+  it('calls /rule-groups/:id/rules', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+    await fetchRuleGroupRules(mockClient, '1', { page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/rule-groups/1/rules', { page: 1, limit: 50 });
   });
 });

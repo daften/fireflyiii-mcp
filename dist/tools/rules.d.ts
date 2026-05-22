@@ -89,6 +89,10 @@ export declare function testRuleGroup(client: FireflyClient, id: string, params:
     search_limit?: number;
     triggered_limit?: number;
 }): Promise<UnwrappedList>;
+export declare function fetchRuleGroupRules(client: FireflyClient, id: string, params: {
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
 export declare function testRule(client: FireflyClient, id: string, params: {
     start?: string;
     end?: string;

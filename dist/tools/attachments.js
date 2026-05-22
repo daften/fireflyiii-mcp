@@ -26,6 +26,9 @@ export async function uploadAttachment(client, id, content) {
     await client.postBinary(`/attachments/${id}/upload`, content);
     return { uploaded: true, id };
 }
+export async function downloadAttachment(client, id) {
+    return client.getText(`/attachments/${id}/download`);
+}
 const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true, idempotentHint: true };
 const WRITE_ANNOTATIONS = { openWorldHint: true };
 const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
@@ -131,6 +134,22 @@ export function registerAttachmentTools(server, client) {
         try {
             const result = await uploadAttachment(client, id, Buffer.from(content_base64, 'base64'));
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('download_attachment', {
+        title: 'Download Attachment',
+        description: 'Download the raw content of an attachment as text. Useful for reading receipts or notes. Use get_attachments to find valid IDs.',
+        inputSchema: {
+            id: z.string().describe('Attachment ID'),
+        },
+        annotations: READ_ANNOTATIONS,
+    }, async ({ id }) => {
+        try {
+            const text = await downloadAttachment(client, id);
+            return { content: [{ type: 'text', text }] };
         }
         catch (err) {
             return { content: [{ type: 'text', text: formatError(err) }], isError: true };

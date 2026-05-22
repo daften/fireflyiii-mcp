@@ -58,5 +58,13 @@ export declare function deleteRecurrence(client: FireflyClient, id: string): Pro
     deleted: true;
     id: string;
 }>;
+export declare function fetchRecurrenceTransactions(client: FireflyClient, id: string, params: {
+    page?: number;
+    limit?: number;
+}): Promise<UnwrappedList>;
+export declare function triggerRecurrence(client: FireflyClient, id: string, date?: string): Promise<{
+    triggered: true;
+    id: string;
+}>;
 export declare function registerRecurringTools(server: McpServer, client: FireflyClient): void;
 //# sourceMappingURL=recurring.d.ts.map

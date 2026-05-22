@@ -22,6 +22,15 @@ export async function deleteBill(client, id) {
     await client.delete(`/bills/${id}`);
     return { deleted: true, id };
 }
+export async function fetchBillTransactions(client, id, params) {
+    const query = { page: params.page, limit: params.limit };
+    if (params.start)
+        query['start'] = params.start;
+    if (params.end)
+        query['end'] = params.end;
+    const response = await client.get(`/bills/${id}/transactions`, query);
+    return unwrapList(response);
+}
 const READ_ANNOTATIONS = {
     readOnlyHint: true,
     openWorldHint: true,
@@ -107,6 +116,26 @@ export function registerBillTools(server, client) {
     }, async ({ id }) => {
         try {
             const result = await deleteBill(client, id);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (err) {
+            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
+        }
+    });
+    server.registerTool('get_bill_transactions', {
+        title: 'Get Bill Transactions',
+        description: 'Get all transactions linked to a specific bill. Use get_bills to find valid bill IDs.',
+        inputSchema: {
+            id: z.string().describe('Bill ID'),
+            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
+            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            page: z.number().int().positive().optional().default(1).describe('Page number'),
+            limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+        },
+        annotations: READ_ANNOTATIONS,
+    }, async ({ id, start, end, page, limit }) => {
+        try {
+            const result = await fetchBillTransactions(client, id, { start, end, page, limit });
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
         }
         catch (err) {
