@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle, cleanSummary } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function fetchTags(client, params) {
     const response = await client.get('/tags', { page: params.page, limit: params.limit });
     return unwrapList(response);
@@ -64,16 +65,8 @@ export async function fetchInsightGrouped(client, endpoint, start, end, filters)
     const query = { start, end, ...filters };
     return client.get(endpoint, query);
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerReportTools(server, client) {
-    server.registerTool('get_tags', {
+    defineTool(server, 'get_tags', {
         title: 'Get Tags',
         description: 'Get all tags defined in Firefly III. Use get_tag_transactions to list transactions for a specific tag.',
         inputSchema: {
@@ -81,306 +74,162 @@ export function registerReportTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ page, limit }) => {
-        try {
-            const result = await fetchTags(client, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_tag_transactions', {
+    }, ({ page, limit }) => fetchTags(client, { page: page, limit: limit }));
+    defineTool(server, 'get_tag_transactions', {
         title: 'Get Tag Transactions',
         description: 'Get all transactions associated with a specific Firefly III tag. Optionally filter by date range (YYYY-MM-DD). Use get_tags to find valid tag names.',
         inputSchema: {
             tag: z.string().describe('Tag name — use get_tags to find valid tag names'),
-            start: z.string().optional().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().optional().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
             page: z.number().int().positive().optional().default(1).describe('Page number'),
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ tag, start, end, page, limit }) => {
-        try {
-            const result = await fetchTagTransactions(client, tag, { start, end, page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_summary', {
+    }, ({ tag, start, end, page, limit }) => fetchTagTransactions(client, tag, { start: start, end: end, page: page, limit: limit }));
+    defineTool(server, 'get_summary', {
         title: 'Get Financial Summary',
         description: 'Get a basic financial summary from Firefly III for a date range, including total assets, liabilities, and net worth. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
-            currencyCode: z.string().optional().describe('Currency code to filter by (e.g. EUR, USD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
+            currency_code: z.string().optional().describe('Currency code to filter by (e.g. EUR, USD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end, currencyCode }) => {
-        try {
-            const result = await fetchSummary(client, start, end, currencyCode);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_expenses', {
+    }, ({ start, end, currency_code }) => fetchSummary(client, start, end, currency_code));
+    defineTool(server, 'get_insight_expenses', {
         title: 'Get Expense Insights',
         description: 'Get expense insights grouped by category for a date range. Returns how much was spent per category. Both start and end dates (YYYY-MM-DD) are required. For income insights, use get_insight_income.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightExpenses(client, start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_income', {
+    }, ({ start, end }) => fetchInsightExpenses(client, start, end));
+    defineTool(server, 'get_insight_income', {
         title: 'Get Income Insights',
         description: 'Get income insights grouped by category for a date range. Returns how much was earned per category. Both start and end dates (YYYY-MM-DD) are required. For expense insights, use get_insight_expenses.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightIncome(client, start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_tag', {
+    }, ({ start, end }) => fetchInsightIncome(client, start, end));
+    defineTool(server, 'create_tag', {
         title: 'Create Tag',
         description: 'Create a new tag in Firefly III.',
         inputSchema: {
             tag: z.string().describe('Tag name'),
-            date: z.string().optional().describe('Tag date (YYYY-MM-DD)'),
+            date: dateSchema.optional().describe('Tag date (YYYY-MM-DD)'),
             description: z.string().optional().describe('Tag description'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await createTag(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_tag', {
+    }, (params) => createTag(client, params));
+    defineTool(server, 'update_tag', {
         title: 'Update Tag',
         description: 'Update an existing tag in Firefly III. Only fields provided will be changed. Use get_tags to find valid tag IDs.',
         inputSchema: {
             id: z.string().describe('Tag ID — use get_tags to find valid IDs'),
             tag: z.string().optional().describe('Tag name'),
-            date: z.string().optional().describe('Tag date (YYYY-MM-DD)'),
+            date: dateSchema.optional().describe('Tag date (YYYY-MM-DD)'),
             description: z.string().optional().describe('Tag description'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateTag(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_tag', {
+    }, ({ id, ...params }) => updateTag(client, id, params));
+    defineTool(server, 'delete_tag', {
         title: 'Delete Tag',
         description: 'Permanently delete a tag from Firefly III. **This action cannot be undone.** Transactions with this tag will have it removed. Use get_tags to confirm the ID before deleting.',
         inputSchema: { id: z.string().describe('Tag ID — use get_tags to find valid IDs') },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteTag(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_expenses_no_bill', {
+    }, ({ id }) => deleteTag(client, id));
+    defineTool(server, 'get_insight_expenses_no_bill', {
         title: 'Get Expense Insights — No Bill',
         description: 'Get expense totals for transactions that have no bill attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/expense/no-bill', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_expenses_no_budget', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-bill', start, end));
+    defineTool(server, 'get_insight_expenses_no_budget', {
         title: 'Get Expense Insights — No Budget',
         description: 'Get expense totals for transactions that have no budget attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/expense/no-budget', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_expenses_no_category', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-budget', start, end));
+    defineTool(server, 'get_insight_expenses_no_category', {
         title: 'Get Expense Insights — No Category',
         description: 'Get expense totals for transactions that have no category attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/expense/no-category', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_expenses_no_tag', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-category', start, end));
+    defineTool(server, 'get_insight_expenses_no_tag', {
         title: 'Get Expense Insights — No Tag',
         description: 'Get expense totals for transactions that have no tag attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/expense/no-tag', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_income_no_category', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-tag', start, end));
+    defineTool(server, 'get_insight_income_no_category', {
         title: 'Get Income Insights — No Category',
         description: 'Get income totals for transactions that have no category attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/income/no-category', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_income_no_tag', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/income/no-category', start, end));
+    defineTool(server, 'get_insight_income_no_tag', {
         title: 'Get Income Insights — No Tag',
         description: 'Get income totals for transactions that have no tag attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/income/no-tag', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_transfer_no_category', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/income/no-tag', start, end));
+    defineTool(server, 'get_insight_transfer_no_category', {
         title: 'Get Transfer Insights — No Category',
         description: 'Get transfer totals for transactions that have no category attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/transfer/no-category', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_insight_transfer_no_tag', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/transfer/no-category', start, end));
+    defineTool(server, 'get_insight_transfer_no_tag', {
         title: 'Get Transfer Insights — No Tag',
         description: 'Get transfer totals for transactions that have no tag attached, grouped by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end }) => {
-        try {
-            const result = await fetchInsightNoX(client, '/insight/transfer/no-tag', start, end);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_about', {
+    }, ({ start, end }) => fetchInsightNoX(client, '/insight/transfer/no-tag', start, end));
+    defineTool(server, 'get_about', {
         title: 'Get Server Info',
         description: 'Get Firefly III server version, PHP version, and OS info. Useful for diagnostics.',
         inputSchema: {},
         annotations: READ_ANNOTATIONS,
-    }, async () => {
-        try {
-            const result = await fetchAbout(client);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_net_worth_summary', {
+    }, () => fetchAbout(client));
+    defineTool(server, 'get_net_worth_summary', {
         title: 'Get Net Worth Summary',
         description: 'Get net worth over a date range, broken down by currency. Both start and end dates (YYYY-MM-DD) are required.',
         inputSchema: {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
             currency_code: z.string().optional().describe('Filter by currency code (e.g. EUR, USD)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ start, end, currency_code }) => {
-        try {
-            const result = await fetchNetWorth(client, start, end, currency_code);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, ({ start, end, currency_code }) => fetchNetWorth(client, start, end, currency_code));
     const CHART_ENDPOINTS = {
         get_account_overview_chart: {
             title: 'Get Account Overview Chart',
@@ -404,42 +253,26 @@ export function registerReportTools(server, client) {
         },
     };
     for (const [name, { title, description, endpoint }] of Object.entries(CHART_ENDPOINTS)) {
-        server.registerTool(name, {
+        defineTool(server, name, {
             title,
             description: `${description} Both start and end dates (YYYY-MM-DD) are required.`,
             inputSchema: {
-                start: z.string().describe('Start date (YYYY-MM-DD)'),
-                end: z.string().describe('End date (YYYY-MM-DD)'),
+                start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+                end: dateSchema.describe('End date (YYYY-MM-DD)'),
             },
             annotations: READ_ANNOTATIONS,
-        }, async ({ start, end }) => {
-            try {
-                const result = await fetchChart(client, endpoint, start, end);
-                return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-            }
-            catch (err) {
-                return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-            }
-        });
+        }, ({ start, end }) => fetchChart(client, endpoint, start, end));
     }
-    server.registerTool('get_exchange_rate', {
+    defineTool(server, 'get_exchange_rate', {
         title: 'Get Exchange Rate',
         description: 'Get the exchange rate between two currencies. Optionally specify a date (YYYY-MM-DD) for historical rates.',
         inputSchema: {
             from: z.string().describe('Source currency code (e.g. EUR)'),
             to: z.string().describe('Target currency code (e.g. USD)'),
-            date: z.string().optional().describe('Date for historical rate (YYYY-MM-DD). Defaults to today.'),
+            date: dateSchema.optional().describe('Date for historical rate (YYYY-MM-DD). Defaults to today.'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ from, to, date }) => {
-        try {
-            const result = await fetchExchangeRate(client, from, to, date);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, ({ from, to, date }) => fetchExchangeRate(client, from, to, date));
     const INSIGHT_GROUPED_TOOLS = [
         { name: 'get_insight_expenses_by_bill', title: 'Get Expense Insights by Bill', description: 'Get expense totals grouped by bill for a date range.', endpoint: '/insight/expense/bill', filterKey: 'bills[]', filterDesc: 'Filter to specific bill IDs' },
         { name: 'get_insight_expenses_by_budget', title: 'Get Expense Insights by Budget', description: 'Get expense totals grouped by budget for a date range.', endpoint: '/insight/expense/budget', filterKey: 'budgets[]', filterDesc: 'Filter to specific budget IDs' },
@@ -458,31 +291,25 @@ export function registerReportTools(server, client) {
     ];
     for (const { name, title, description, endpoint, filterKey, filterDesc } of INSIGHT_GROUPED_TOOLS) {
         const inputSchema = {
-            start: z.string().describe('Start date (YYYY-MM-DD)'),
-            end: z.string().describe('End date (YYYY-MM-DD)'),
+            start: dateSchema.describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.describe('End date (YYYY-MM-DD)'),
         };
         if (filterKey) {
             inputSchema[filterKey] = z.array(z.string()).optional().describe(filterDesc);
         }
-        server.registerTool(name, {
+        defineTool(server, name, {
             title,
             description: `${description} Both start and end dates (YYYY-MM-DD) are required.`,
             inputSchema,
             annotations: READ_ANNOTATIONS,
-        }, async (params) => {
-            try {
-                const { start, end, ...rest } = params;
-                const filters = {};
-                for (const [k, v] of Object.entries(rest)) {
-                    if (Array.isArray(v))
-                        filters[k] = v;
-                }
-                const result = await fetchInsightGrouped(client, endpoint, start, end, Object.keys(filters).length ? filters : undefined);
-                return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }, (params) => {
+            const { start, end, ...rest } = params;
+            const filters = {};
+            for (const [k, v] of Object.entries(rest)) {
+                if (Array.isArray(v))
+                    filters[k] = v;
             }
-            catch (err) {
-                return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-            }
+            return fetchInsightGrouped(client, endpoint, start, end, Object.keys(filters).length ? filters : undefined);
         });
     }
 }

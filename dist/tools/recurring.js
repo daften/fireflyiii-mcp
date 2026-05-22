@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { formatError } from '../client.js';
 import { unwrapList, unwrapSingle } from '../transform.js';
+import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function fetchRecurrences(client, params) {
     const query = { page: params.page, limit: params.limit };
     const response = await client.get('/recurrences', query);
@@ -131,16 +132,8 @@ export async function triggerRecurrence(client, id, date) {
     await client.post(`/recurrences/${id}/trigger`, {}, query);
     return { triggered: true, id };
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
-const WRITE_ANNOTATIONS = { openWorldHint: true };
-const UPDATE_ANNOTATIONS = { openWorldHint: true, idempotentHint: true };
-const DELETE_ANNOTATIONS = { destructiveHint: true, openWorldHint: true };
 export function registerRecurringTools(server, client) {
-    server.registerTool('get_recurring', {
+    defineTool(server, 'get_recurring', {
         title: 'Get Recurring Transactions',
         description: 'Get all recurring transactions from Firefly III.',
         inputSchema: {
@@ -148,32 +141,16 @@ export function registerRecurringTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ page, limit }) => {
-        try {
-            const result = await fetchRecurrences(client, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_recurrence', {
+    }, ({ page, limit }) => fetchRecurrences(client, { page: page, limit: limit }));
+    defineTool(server, 'get_recurrence', {
         title: 'Get Recurring Transaction',
         description: 'Get a single recurring transaction by its numeric ID. Use get_recurring to find valid IDs.',
         inputSchema: {
             id: z.string().describe('Recurrence ID'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await fetchRecurrence(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('create_recurring', {
+    }, ({ id }) => fetchRecurrence(client, id));
+    defineTool(server, 'create_recurring', {
         title: 'Create Recurring Transaction',
         description: 'Create a new recurring transaction in Firefly III. Use get_accounts to find source and destination account IDs. Use get_categories to find category IDs.',
         inputSchema: {
@@ -181,8 +158,8 @@ export function registerRecurringTools(server, client) {
             title: z.string().describe('Name of the recurring transaction'),
             description: z.string().optional().describe('Description of the recurrence (not the individual transactions)'),
             notes: z.string().optional().describe('Notes'),
-            first_date: z.string().describe('Date of first occurrence (YYYY-MM-DD, must be in the future)'),
-            repeat_until: z.string().nullable().optional().describe('Stop after this date (YYYY-MM-DD). Omit or pass null for no end date.'),
+            first_date: dateSchema.describe('First recurrence date (YYYY-MM-DD)'),
+            repeat_until: dateSchema.optional().nullable().describe('Stop after this date (YYYY-MM-DD). Omit or pass null for no end date.'),
             nr_of_repetitions: z.number().int().positive().optional().describe('Stop after N occurrences. Do not combine with repeat_until.'),
             apply_rules: z.boolean().optional().default(true).describe('Apply rules to generated transactions'),
             active: z.boolean().optional().default(true).describe('Whether the recurrence is active'),
@@ -201,16 +178,8 @@ export function registerRecurringTools(server, client) {
             transaction_notes: z.string().optional().describe('Notes for each generated transaction'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async (params) => {
-        try {
-            const result = await createRecurrence(client, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('update_recurring', {
+    }, (params) => createRecurrence(client, params));
+    defineTool(server, 'update_recurring', {
         title: 'Update Recurring Transaction',
         description: 'Update an existing recurring transaction in Firefly III. Only fields provided will be changed. Use get_recurrence to confirm the ID before updating.',
         inputSchema: {
@@ -219,8 +188,8 @@ export function registerRecurringTools(server, client) {
             title: z.string().optional().describe('Name of the recurring transaction'),
             description: z.string().optional().describe('Description of the recurrence'),
             notes: z.string().optional().describe('Notes'),
-            first_date: z.string().optional().describe('Date of first occurrence (YYYY-MM-DD)'),
-            repeat_until: z.string().nullable().optional().describe('Stop after this date (YYYY-MM-DD). Pass null to remove end date.'),
+            first_date: dateSchema.optional().describe('Date of first occurrence (YYYY-MM-DD)'),
+            repeat_until: dateSchema.optional().nullable().describe('Stop after this date (YYYY-MM-DD). Pass null to remove end date.'),
             nr_of_repetitions: z.number().int().positive().optional().describe('Stop after N occurrences'),
             apply_rules: z.boolean().optional().describe('Apply rules to generated transactions'),
             active: z.boolean().optional().describe('Whether the recurrence is active'),
@@ -239,32 +208,16 @@ export function registerRecurringTools(server, client) {
             transaction_notes: z.string().optional().describe('Notes for each generated transaction'),
         },
         annotations: UPDATE_ANNOTATIONS,
-    }, async ({ id, ...params }) => {
-        try {
-            const result = await updateRecurrence(client, id, params);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('delete_recurring', {
+    }, ({ id, ...params }) => updateRecurrence(client, id, params));
+    defineTool(server, 'delete_recurring', {
         title: 'Delete Recurring Transaction',
         description: 'Permanently delete a recurring transaction from Firefly III. **This action cannot be undone.** This deletes the recurrence schedule only — previously generated transactions are not affected. Use get_recurrence to confirm before deleting.',
         inputSchema: {
             id: z.string().describe('Recurrence ID — use get_recurring to find valid IDs'),
         },
         annotations: DELETE_ANNOTATIONS,
-    }, async ({ id }) => {
-        try {
-            const result = await deleteRecurrence(client, id);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('get_recurrence_transactions', {
+    }, ({ id }) => deleteRecurrence(client, id));
+    defineTool(server, 'get_recurrence_transactions', {
         title: 'Get Recurrence Transactions',
         description: 'Get all transactions that have been created by a recurring transaction rule. Use get_recurring to find valid IDs.',
         inputSchema: {
@@ -273,31 +226,15 @@ export function registerRecurringTools(server, client) {
             limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
         },
         annotations: READ_ANNOTATIONS,
-    }, async ({ id, page, limit }) => {
-        try {
-            const result = await fetchRecurrenceTransactions(client, id, { page, limit });
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
-    server.registerTool('trigger_recurrence', {
+    }, ({ id, page, limit }) => fetchRecurrenceTransactions(client, id, { page: page, limit: limit }));
+    defineTool(server, 'trigger_recurrence', {
         title: 'Trigger Recurrence',
         description: 'Manually fire a recurring transaction rule to create its transaction immediately. Optionally specify a date (YYYY-MM-DD) to use instead of today.',
         inputSchema: {
             id: z.string().describe('Recurring transaction ID'),
-            date: z.string().optional().describe('Date to use for the triggered transaction (YYYY-MM-DD). Defaults to today.'),
+            date: dateSchema.optional().describe('Date to use for the triggered transaction (YYYY-MM-DD). Defaults to today.'),
         },
         annotations: WRITE_ANNOTATIONS,
-    }, async ({ id, date }) => {
-        try {
-            const result = await triggerRecurrence(client, id, date);
-            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-        }
-        catch (err) {
-            return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-        }
-    });
+    }, ({ id, date }) => triggerRecurrence(client, id, date));
 }
 //# sourceMappingURL=recurring.js.map
