@@ -14,7 +14,7 @@ Email **dieterblomme@gmail.com** with:
 - Steps to reproduce
 - Any suggested mitigations
 
-You can expect an acknowledgement within **7 days** and a resolution timeline within that response.
+You can expect an acknowledgement within **14 days** and a resolution timeline within that response.
 
 Please do not open a public GitHub issue for security vulnerabilities.
 

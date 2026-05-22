@@ -2,132 +2,7 @@
 
 Derived from the 2026-05-22 repository audit. Items are grouped by priority. Each task is self-contained: file paths, current behavior, proposed change, and acceptance criteria.
 
----
-
-## P1 — CI / release hygiene
-
-### P1-1. Add a CI workflow that runs tests on every PR and push to `main`
-
-**Where:** New file `.github/workflows/ci.yml`.
-
-**Current:** Only `.github/workflows/publish.yml` exists, runs only on `v*` tags, runs no tests. A broken commit can ship to npm and ghcr.
-
-**Change:** Create `.github/workflows/ci.yml`:
-```yaml
-name: CI
-on:
-  pull_request:
-  push:
-    branches: [main]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm test
-```
-
-**Acceptance:**
-- A failing test on a PR blocks the merge button (after enabling branch protection — note this in the PR description, the user does that step manually).
-
----
-
-### P1-2. Gate publish on CI passing
-
-**Where:** `.github/workflows/publish.yml`.
-
-**Current:** `publish-npm` and `publish-docker` run on `v*` tags without verifying tests.
-
-**Change:** Either
-- Add a `test` job inside `publish.yml` and make both publish jobs `needs: test`, OR
-- Use `workflow_run` to require the `CI` workflow on the tag commit before allowing publish.
-
-The first is simpler and recommended.
-
-**Acceptance:** Pushing a tag whose commit has failing tests does not produce an npm or Docker release.
-
----
-
-### P1-3. Bump Dockerfile to Node 20 (or 22)
-
-**Where:** `Dockerfile:2`, `Dockerfile:10` (both `FROM node:18-alpine`).
-
-**Current:** Node 18 is in maintenance / nearing EOL.
-
-**Change:**
-- Switch both stages to `node:22-alpine` (current LTS) or `node:20-alpine`.
-- Bump `engines.node` in `package.json:50` to match (`>=20`).
-- Update CI `setup-node` to the same major.
-
-**Acceptance:**
-- `docker build .` succeeds.
-- `docker run --rm -e FIREFLY_URL=http://x -e FIREFLY_OAUTH_CLIENT_ID=y ghcr.io/daften/fireflyiii-mcp` starts and listens on 3000.
-
----
-
-### P1-4. Add `SECURITY.md`
-
-**Where:** New file `SECURITY.md` at repo root.
-
-**Change:** One-page disclosure policy with:
-- Contact email for security reports.
-- Expected response time.
-- Scope: this server, not Firefly III itself.
-- A note that the project handles auth tokens and financial data, so coordinated disclosure is appreciated.
-
-**Acceptance:** File exists and is linked from `README.md`.
-
----
-
-## P2 — Documentation
-
-### P2-1. Rewrite `CLAUDE.md` to match shipped state
-
-**Where:** `CLAUDE.md`.
-
-**Current:** Lists 7 tool files and ~30 tools. Codebase ships 14 tool files and 140 tools. No mention of `args.ts`, `tool-filter.test.ts`, `--preset`/`--groups`/`--read-only`, Docker, npm publishing, `MCP_BASE_URL`, or attachments/recurring/rules/currencies/exports/object-groups/transaction-links.
-
-**Change:**
-- Update the "File Structure" section to list every file under `src/`.
-- Replace "Phase 1/2/3" wording with current capability inventory.
-- Add a "CLI Flags" section covering `--transport`, `--host`, `--port`, `--preset`, `--groups`, `--read-only`.
-- Add a "Filtering" subsection explaining `TOOL_GROUPS`, `PRESETS`, and the read-only proxy in `src/tools/index.ts`.
-- Update the "Adding a New Tool" steps to include (a) adding the group to `TOOL_GROUPS`, (b) considering preset membership, (c) updating the README tool table.
-- Cross-check the tool inventory list against `registerAllTools` output (test reports 140).
-
-**Acceptance:** `CLAUDE.md` lists every file in `src/`, every CLI flag in `args.ts`, and the tool count matches the test assertion (`registered.length === 140`).
-
----
-
-### P2-2. Bump `package.json` version
-
-**Where:** `package.json:3`.
-
-**Current:** `"version": "0.1.0"`.
-
-**Change:** Move to at least `0.3.0` — OAuth, HTTP transport, Docker, presets, and 14 tool groups all shipped since the initial 0.1.0 tag. Pick a number consistent with whatever has actually been published to npm (`npm view @daften/fireflyiii-mcp versions`).
-
-**Acceptance:** Version reflects shipped feature set; no regression in `npm publish` dry-run.
-
----
-
-### P2-3. Add `CONTRIBUTING.md`
-
-**Where:** New file `CONTRIBUTING.md` at repo root.
-
-**Change:** Cover:
-- `npm install` → `npm test` → `npm run build` loop.
-- The `dist/` rule (commit alongside source changes — or, if P3-5 lands, "do not commit `dist/`").
-- The tool-add checklist (mirroring CLAUDE.md "Adding a New Tool").
-- Commit message conventions (`feat:`/`fix:`/`refactor:`/`test:`/`chore:`).
-- How to run integration tests locally.
-
-**Acceptance:** File exists and is linked from `README.md`.
+**Completed:** P0 (security fixes), P1 (CI/release hygiene), P2 (documentation).
 
 ---
 
@@ -150,7 +25,7 @@ async (params) => {
 ```
 
 **Change:**
-- Add `src/tools/_helpers.ts` (or extend `src/tools/index.ts`) with:
+- Add `src/tools/_helpers.ts` with:
   ```ts
   export function defineTool<Args, Result>(
     server: McpServer,
@@ -351,17 +226,17 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 
 ---
 
-### P5-3. Document the single-replica OAuth constraint (or fix it)
+### P5-3. Document the single-replica OAuth constraint in README (or fix it)
 
-**Where:** `README.md` Docker section, OR `src/http.ts`.
+**Where:** `README.md` Docker section.
 
-**Current:** OAuth state lives in `pendingClientRedirectUri` (or, after P0-1, in an in-process `Map`). Horizontal scaling breaks the auth flow.
+**Current:** OAuth state lives in an in-process `Map`. Horizontal scaling breaks the auth flow. CLAUDE.md mentions it but users reading the Docker README won't see it.
 
 **Change:** Either
-- Add a "Note: single replica only — OAuth state is in-process" line to the Docker README, OR
-- Store the pending state in a signed cookie / JWT keyed by `state`, eliminating server-side state entirely. (This is a deeper refactor; lift to its own design doc if pursued.)
+- Add a "Note: single replica only — OAuth state is in-process" callout to the Docker README section, OR
+- Store the pending state in a signed cookie / JWT keyed by `state`, eliminating server-side state entirely. (Deeper refactor; lift to its own design doc if pursued.)
 
-**Acceptance:** Either README warns clearly, or multi-replica deploys work.
+**Acceptance:** README warns clearly, or multi-replica deploys work.
 
 ---
 
@@ -381,14 +256,11 @@ Auth is in headers today, but any future tool that puts secrets in query params 
 
 ---
 
-## Suggested execution order
+## Execution order
 
-1. **P0 batch as one PR** — security fixes belong together. After this lands, cut a patched release.
-2. **P1-1 + P1-2 + P1-3 as a CI/infra PR.**
-3. **P2-1 + P2-2** as a docs PR (CLAUDE.md is most stale; version bump signals the new release).
-4. **P3-1 + P3-2** as a refactor PR — defineTool migration is mechanical but touches many files, so isolate.
-5. **P3-3, P3-4, P3-5, P3-6** as individual smaller PRs.
-6. **P4 batch** as separate PRs per item (each is independent).
-7. **P5 items** as opportunistic cleanup.
+1. **P3-1 + P3-2** as a refactor PR — `defineTool` migration is mechanical but touches many files, so isolate.
+2. **P3-3, P3-4, P3-5, P3-6** as individual smaller PRs.
+3. **P4 batch** as separate PRs per item (each is independent).
+4. **P5 items** as opportunistic cleanup.
 
-Skip anything that no longer makes sense by the time it comes up — the audit was a snapshot.
+Skip anything that no longer makes sense — the audit was a snapshot.

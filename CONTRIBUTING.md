@@ -41,6 +41,36 @@ npm run test:integration
 
 These are skipped in CI; run them manually before submitting changes to API-calling code.
 
+## Releasing a new version
+
+1. Bump `version` in `package.json` and `src/server.ts` to the new semver.
+2. Run `npm run build` and commit the version bump together with `dist/`.
+3. Create an annotated git tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry covering every change since the previous tag:
+
+```
+git tag -a v0.2.0 -m "$(cat <<'EOF'
+## [0.2.0] - 2026-05-22
+
+### Added
+- Thing that was added
+
+### Changed
+- Thing that changed
+
+### Fixed
+- Bug that was fixed
+
+### Removed
+- Thing that was removed
+EOF
+)"
+git push origin v0.2.0
+```
+
+Sections to include: **Added**, **Changed**, **Deprecated**, **Removed**, **Fixed**, **Security**. Omit empty sections.
+
+---
+
 ## Commit conventions
 
 ```
