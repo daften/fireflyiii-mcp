@@ -124,7 +124,14 @@ export async function bulkUpdateTransactions(
   client: FireflyClient,
   params: { query: string; category_name?: string; budget_id?: string; tags?: string[]; notes?: string }
 ): Promise<unknown> {
-  return client.post('/data/bulk/transactions', params);
+  const update: Record<string, unknown> = {};
+  if (params.category_name !== undefined) update['category_name'] = params.category_name;
+  if (params.budget_id !== undefined) update['budget_id'] = params.budget_id;
+  if (params.tags !== undefined) update['tags'] = params.tags;
+  if (params.notes !== undefined) update['notes'] = params.notes;
+  return client.post('/data/bulk/transactions', undefined, {
+    query: JSON.stringify({ where: params.query, update }),
+  });
 }
 
 export async function createSplitTransaction(

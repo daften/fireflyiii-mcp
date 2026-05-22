@@ -241,10 +241,22 @@ describe('createSplitTransaction', () => {
 });
 
 describe('bulkUpdateTransactions', () => {
-  it('posts to /data/bulk/transactions', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce({ count: 3 });
-    const result = await bulkUpdateTransactions(mockClient, { query: 'description:coffee', category_name: 'Food' });
-    expect(mockClient.post).toHaveBeenCalledWith('/data/bulk/transactions', { query: 'description:coffee', category_name: 'Food' });
-    expect(result).toEqual({ count: 3 });
+  it('sends query as a JSON-encoded URL query param per the OpenAPI spec', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    await bulkUpdateTransactions(mockClient, { query: 'description:coffee', category_name: 'Food', budget_id: '3' });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      '/data/bulk/transactions',
+      undefined,
+      { query: JSON.stringify({ where: 'description:coffee', update: { category_name: 'Food', budget_id: '3' } }) }
+    );
+  });
+
+  it('omits undefined update fields from the JSON query', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
+    await bulkUpdateTransactions(mockClient, { query: 'description:groceries' });
+    const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown, Record<string, string>];
+    const sentQuery = JSON.parse(call[2]['query']) as { where: string; update: Record<string, unknown> };
+    expect(sentQuery.where).toBe('description:groceries');
+    expect(Object.keys(sentQuery.update)).toHaveLength(0);
   });
 });

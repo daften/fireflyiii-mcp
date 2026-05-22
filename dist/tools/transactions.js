@@ -87,7 +87,18 @@ export async function searchTransactions(client, params) {
     return unwrapList(response);
 }
 export async function bulkUpdateTransactions(client, params) {
-    return client.post('/data/bulk/transactions', params);
+    const update = {};
+    if (params.category_name !== undefined)
+        update['category_name'] = params.category_name;
+    if (params.budget_id !== undefined)
+        update['budget_id'] = params.budget_id;
+    if (params.tags !== undefined)
+        update['tags'] = params.tags;
+    if (params.notes !== undefined)
+        update['notes'] = params.notes;
+    return client.post('/data/bulk/transactions', undefined, {
+        query: JSON.stringify({ where: params.query, update }),
+    });
 }
 export async function createSplitTransaction(client, params) {
     const transactions = params.splits.map(split => {
