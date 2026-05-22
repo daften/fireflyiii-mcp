@@ -4,6 +4,9 @@ services:
     # build: .  # Uncomment to build locally instead of pulling from registry
     ports:
       - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
       FIREFLY_URL: ${FIREFLY_URL}
       FIREFLY_OAUTH_CLIENT_ID: ${FIREFLY_OAUTH_CLIENT_ID}

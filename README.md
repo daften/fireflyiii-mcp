@@ -131,6 +131,11 @@ docker run \
 Or with docker-compose (copy `docker-compose.yml` from the repo):
 
 ```bash
+# Option A: use a .env file (copy .env.example and fill in values)
+cp .env.example .env   # then edit .env
+docker compose up -d
+
+# Option B: export variables in your shell
 FIREFLY_URL=https://your-firefly-instance.example.com \
 FIREFLY_OAUTH_CLIENT_ID=your-client-id \
 MCP_BASE_URL=https://mcp.example.com \
