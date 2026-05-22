@@ -228,6 +228,8 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_account` | Create a new account |
 | `update_account` | Update an existing account |
 | `delete_account` | Delete an account. This action cannot be undone. |
+| `get_account_transactions` | Get all transactions for a specific account, filterable by type and date range |
+| `search_accounts` | Search accounts by name, IBAN, or account number |
 
 ### Transactions
 | Tool | Description |
@@ -238,6 +240,7 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_transaction` | Create a new transaction |
 | `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets) |
 | `update_transaction` | Update an existing transaction |
+| `bulk_update_transactions` | Update multiple transactions at once using a search query |
 | `delete_transaction` | Delete a transaction. This action cannot be undone. |
 
 ### Budgets
@@ -251,6 +254,10 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_budget_limit` | Create a budget limit for a specific period |
 | `update_budget_limit` | Update an existing budget limit |
 | `delete_budget_limit` | Delete a budget limit. This action cannot be undone. |
+| `get_available_budgets` | List all available budget periods with amounts available |
+| `get_available_budget` | Get a single available budget period by ID |
+| `get_budget_transactions` | Get all transactions assigned to a specific budget |
+| `get_transactions_without_budget` | Get transactions that have no budget assigned |
 
 ### Categories
 | Tool | Description |
@@ -268,6 +275,7 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_bill` | Create a new bill |
 | `update_bill` | Update an existing bill |
 | `delete_bill` | Delete a bill. This action cannot be undone. |
+| `get_bill_transactions` | Get all transactions linked to a specific bill |
 
 ### Piggy Banks
 | Tool | Description |
@@ -276,6 +284,9 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_piggy_bank` | Create a new piggy bank |
 | `update_piggy_bank` | Update an existing piggy bank |
 | `delete_piggy_bank` | Delete a piggy bank. This action cannot be undone. |
+| `get_piggy_bank_events` | Get all deposit/withdrawal events for a piggy bank |
+| `create_piggy_bank_event` | Add a deposit or withdrawal event to a piggy bank |
+| `delete_piggy_bank_event` | Delete a piggy bank event. This action cannot be undone. |
 
 ### Recurring Transactions
 | Tool | Description |
@@ -285,6 +296,8 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_recurring` | Create a new recurring transaction rule |
 | `update_recurring` | Update an existing recurring transaction rule |
 | `delete_recurring` | Delete a recurring transaction rule. This action cannot be undone. |
+| `get_recurrence_transactions` | Get transactions created by a recurring transaction rule |
+| `trigger_recurrence` | Manually fire a recurring rule to create its transaction immediately |
 
 ### Automation Rules
 | Tool | Description |
@@ -303,6 +316,7 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `trigger_rule` | Manually run a single rule against existing transactions |
 | `test_rule_group` | Dry-run a rule group and return matching transactions (no changes applied) |
 | `test_rule` | Dry-run a single rule and return matching transactions (no changes applied) |
+| `get_rule_group_rules` | Get all rules belonging to a specific rule group |
 
 ### Attachments
 | Tool | Description |
@@ -313,6 +327,7 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `update_attachment` | Update attachment metadata |
 | `delete_attachment` | Delete an attachment and its file data. This action cannot be undone. |
 | `upload_attachment` | Upload base64-encoded file content for an existing attachment record (step 2 of 2) |
+| `download_attachment` | Download the raw content of an attachment as text |
 
 ### Tags & Reports
 | Tool | Description |
@@ -333,10 +348,77 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_insight_income_no_tag` | Income totals for transactions with no tag attached |
 | `get_insight_transfer_no_category` | Transfer totals for transactions with no category attached |
 | `get_insight_transfer_no_tag` | Transfer totals for transactions with no tag attached |
+| `get_about` | Get Firefly III server info (version, PHP version, OS) |
+| `get_net_worth_summary` | Get net worth summary for a date range |
+| `get_account_overview_chart` | Get account overview chart data for a date range |
+| `get_balance_chart` | Get account balance chart data for a date range |
+| `get_budget_chart` | Get budget overview chart data for a date range |
+| `get_category_chart` | Get category overview chart data for a date range |
+| `get_exchange_rate` | Get exchange rate between two currencies |
+| `get_insight_expenses_by_bill` | Expense insights grouped by bill for a date range |
+| `get_insight_expenses_by_budget` | Expense insights grouped by budget for a date range |
+| `get_insight_expenses_by_tag` | Expense insights grouped by tag for a date range |
+| `get_insight_expenses_by_asset` | Expense insights grouped by asset account |
+| `get_insight_expenses_by_expense_account` | Expense insights grouped by expense account |
+| `get_insight_expenses_total` | Total expense amount for a date range |
+| `get_insight_income_by_revenue` | Income insights grouped by revenue account |
+| `get_insight_income_by_tag` | Income insights grouped by tag |
+| `get_insight_income_by_asset` | Income insights grouped by asset account |
+| `get_insight_income_total` | Total income amount for a date range |
+| `get_insight_transfers_by_category` | Transfer insights grouped by category |
+| `get_insight_transfers_by_tag` | Transfer insights grouped by tag |
+| `get_insight_transfers_by_asset` | Transfer insights grouped by asset account |
+| `get_insight_transfers_total` | Total transfer amount for a date range |
+
+### Currencies
+| Tool | Description |
+|------|-------------|
+| `get_currencies` | List all currencies configured in Firefly III |
+| `get_currency` | Get a single currency by code (e.g. EUR, USD) |
+| `create_currency` | Create a new currency |
+| `update_currency` | Update an existing currency |
+| `enable_currency` | Enable a currency for use in transactions |
+| `disable_currency` | Disable a currency |
+| `set_primary_currency` | Set a currency as the primary/default currency |
+| `delete_currency` | Delete a currency. This action cannot be undone. |
+
+### Data Export
+| Tool | Description |
+|------|-------------|
+| `export_transactions` | Export all transactions as CSV (supports date filters) |
+| `export_accounts` | Export all accounts as CSV |
+| `export_bills` | Export all bills as CSV |
+| `export_budgets` | Export all budgets as CSV |
+| `export_categories` | Export all categories as CSV |
+| `export_tags` | Export all tags as CSV |
+| `export_recurring` | Export all recurring transactions as CSV |
+| `export_rules` | Export all rules as CSV |
+| `export_piggy_banks` | Export all piggy banks as CSV |
+
+### Object Groups
+| Tool | Description |
+|------|-------------|
+| `get_object_groups` | List all object groups (used to organise accounts and piggy banks) |
+| `get_object_group` | Get a single object group by ID |
+| `create_object_group` | Create a new object group |
+| `update_object_group` | Update an existing object group |
+| `delete_object_group` | Delete an object group. This action cannot be undone. |
+| `get_object_group_bills` | Get all bills in a specific object group |
+| `get_object_group_piggy_banks` | Get all piggy banks in a specific object group |
+
+### Transaction Links
+| Tool | Description |
+|------|-------------|
+| `get_link_types` | List available transaction link types (Related, Refund, Paid, etc.) |
+| `get_transaction_links` | Get all links attached to a transaction journal entry |
+| `get_transaction_link` | Get a single transaction link by ID |
+| `create_transaction_link` | Create a link between two transactions |
+| `update_transaction_link` | Update an existing transaction link |
+| `delete_transaction_link` | Delete a transaction link. This action cannot be undone. |
 
 ## Filtering Tools
 
-With 74 tools across 10 groups, loading everything can consume significant context window space. Three flags let you control exactly which tools are registered:
+With 140 tools across 14 groups, loading everything can consume significant context window space. Three flags let you control exactly which tools are registered:
 
 ### `--preset <name>`
 
@@ -344,12 +426,12 @@ Load a named subset of tool groups:
 
 | Preset | Groups included | Tools |
 |--------|----------------|-------|
-| `minimal` | accounts, transactions | 12 |
-| `default` | accounts, transactions, budgets, categories, bills | 29 |
-| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 33 |
-| `insights` | accounts, transactions, categories, reports | 33 |
-| `automation` | accounts, transactions, rules, recurring | 31 |
-| `full` | all 10 groups | 74 |
+| `minimal` | accounts, transactions | 15 |
+| `default` | accounts, transactions, budgets, categories, bills | 37 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 44 |
+| `insights` | accounts, transactions, categories, reports | 57 |
+| `automation` | accounts, transactions, rules, recurring | 37 |
+| `full` | all 14 groups | 140 |
 
 ```bash
 node dist/index.js --preset default
@@ -360,7 +442,7 @@ npx @daften/fireflyiii-mcp --preset budgeting
 
 Comma-separated list of specific groups to load. Cannot be combined with `--preset`.
 
-Valid group names: `accounts`, `transactions`, `budgets`, `categories`, `bills`, `piggy-banks`, `reports`, `rules`, `recurring`, `attachments`
+Valid group names: `accounts`, `transactions`, `budgets`, `categories`, `bills`, `piggy-banks`, `reports`, `rules`, `recurring`, `attachments`, `currencies`, `exports`, `object-groups`, `transaction-links`
 
 ```bash
 node dist/index.js --groups accounts,transactions,reports
@@ -375,7 +457,7 @@ node dist/index.js --preset default --read-only
 node dist/index.js --groups rules --read-only
 ```
 
-Without any filter flags the server registers all 74 tools (equivalent to `--preset full`).
+Without any filter flags the server registers all 140 tools (equivalent to `--preset full`).
 
 ---
 
@@ -405,13 +487,14 @@ npm run build             # Compile TypeScript to dist/
 - ~~Tool preset/filter system~~ ✓ done — `--preset`, `--groups`, `--read-only` CLI flags
 
 **Low priority:**
-- Currency management
-- Net worth summary and account chart data
-- Available budgets
-- Piggy bank deposit/withdrawal events
-- Data export (CSV per entity type)
-- System info (`get_about`)
-- Object groups
+- ~~Currency management~~ ✓ done — `get_currencies`, `get_currency`, `create_currency`, `update_currency`, `delete_currency`, `enable_currency`, `disable_currency`, `set_primary_currency`
+- ~~Net worth summary, chart data, exchange rates, and additional insights~~ ✓ done — `get_about`, `get_net_worth_summary`, `get_account_overview_chart`, `get_balance_chart`, `get_budget_chart`, `get_category_chart`, `get_exchange_rate`, + 14 insight grouped variants
+- ~~Available budgets~~ ✓ done — `get_available_budgets`, `get_available_budget`, `get_budget_transactions`, `get_transactions_without_budget`
+- ~~Piggy bank events~~ ✓ done — `get_piggy_bank_events`, `create_piggy_bank_event`, `delete_piggy_bank_event`
+- ~~Data export (CSV per entity type)~~ ✓ done — `export_transactions`, `export_accounts`, `export_bills`, `export_budgets`, `export_categories`, `export_tags`, `export_recurring`, `export_rules`, `export_piggy_banks`
+- ~~Object groups~~ ✓ done — `get_object_groups`, `get_object_group`, `create_object_group`, `update_object_group`, `delete_object_group`, `get_object_group_bills`, `get_object_group_piggy_banks`
+- ~~Transaction links~~ ✓ done — `get_link_types`, `get_transaction_links`, `get_transaction_link`, `create_transaction_link`, `update_transaction_link`, `delete_transaction_link`
+- ~~Sub-resource tools~~ ✓ done — `get_bill_transactions`, `get_budget_transactions`, `get_account_transactions`, `get_recurrence_transactions`, `bulk_update_transactions`, `download_attachment`, `get_rule_group_rules`, `trigger_recurrence`, `search_accounts`
 
 **Won't implement:**
 - Destroy/purge data (too destructive for a natural-language interface)
