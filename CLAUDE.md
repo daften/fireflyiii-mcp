@@ -6,16 +6,14 @@
 
 Users can query their finances in natural language through Claude, getting answers about accounts, transactions, budgets, categories, bills, piggy banks, and financial insights without writing queries themselves.
 
-**Phase 1 (complete):** Read-only tools for querying financial data.  
-**Phase 2 (complete):** Full CRUD write tools and HTTP transport.  
-**Phase 3 (complete):** OAuth via Firefly III for HTTP transport.
+**Current state:** 140 tools across 14 groups, full CRUD, stdio and HTTP/OAuth transports, tool filtering via `--preset`/`--groups`/`--read-only`.
 
 ---
 
 ## Tech Stack
 
 - **Language:** TypeScript (ESM modules, strict mode)
-- **Runtime:** Node.js 18+ with tsx for development
+- **Runtime:** Node.js 22+ with tsx for development
 - **MCP SDK:** `@modelcontextprotocol/sdk` v1.29.0+
 - **Validation:** Zod for input schemas (inline in each tool file)
 - **Testing:** Vitest for unit and integration tests
@@ -36,6 +34,7 @@ FIREFLY_TOKEN     String, required. Personal Access Token from Firefly III Profi
 ```
 FIREFLY_URL                String, required. Base URL of Firefly III instance (no trailing slash).
 FIREFLY_OAUTH_CLIENT_ID    String, required. OAuth client ID from Firefly III Profile → OAuth → Clients.
+MCP_BASE_URL               String, required when not listening on loopback. Public base URL of this server.
 ```
 
 In HTTP mode, the Bearer token is resolved per-request from the Authorization header (set by the MCP client after completing the OAuth flow). `FIREFLY_TOKEN` is not used in HTTP mode.
@@ -44,50 +43,115 @@ Store credentials in `.env` file (which is gitignored). The `.env.example` templ
 
 ---
 
+## CLI Flags
+
+Parsed by `src/args.ts` and passed to `createServer` as `filterOptions`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport stdio\|http` | `stdio` | Transport mode |
+| `--host <host>` | `127.0.0.1` | Bind address (HTTP only) |
+| `--port <n>` | `3000` | Listen port (HTTP only; auto-increments on EADDRINUSE) |
+| `--preset <name>` | — | Load a named tool subset (see Filtering) |
+| `--groups <list>` | — | Comma-separated group names; cannot combine with `--preset` |
+| `--read-only` | false | Filter any selection to read-only tools (`get_*`, `search_*`, `test_*`) |
+
+---
+
 ## File Structure
 
 ```
 fireflyiii-mcp/
 ├── src/
-│   ├── index.ts                 # MCP server entry point — validates env, wires client + server + transport
-│   ├── server.ts                # Server factory: createServer(client) → McpServer
+│   ├── index.ts                 # Entry point — validates env, wires client + server + transport
+│   ├── server.ts                # Server factory: createServer(client, filterOptions) → McpServer
 │   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth; accepts token string or getter fn)
 │   ├── http.ts                  # HTTP server + OAuth proxy (authorize, token, callback, register stubs)
+│   ├── args.ts                  # CLI argument parser (--transport, --host, --port, --preset, --groups, --read-only)
 │   ├── transform.ts             # JSON:API response transforms (unwrapList, unwrapSingle, cleanSummary)
 │   ├── types.ts                 # Shared utility types (QueryParams)
 │   ├── tools/
-│   │   ├── index.ts             # Aggregator: registerAllTools(server, client) calls each registerXxx
+│   │   ├── index.ts             # TOOL_GROUPS, PRESETS, ToolFilterOptions, makeReadOnlyProxy, registerAllTools
 │   │   ├── accounts.ts          # get_accounts, get_account, create_account, update_account, delete_account
-│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction
-│   │   ├── budgets.ts           # get_budgets, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit
-│   │   ├── categories.ts        # get_categories, get_category_transactions, create_category, update_category, delete_category
-│   │   ├── bills.ts             # get_bills, create_bill, update_bill, delete_bill
-│   │   ├── piggy-banks.ts       # get_piggy_banks, create_piggy_bank, update_piggy_bank, delete_piggy_bank
-│   │   ├── reports.ts           # get_tags, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag
+│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction, bulk_update_transactions
+│   │   ├── budgets.ts           # get_budgets, get_budget, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit
+│   │   ├── categories.ts        # get_categories, get_category, get_category_transactions, create_category, update_category, delete_category
+│   │   ├── bills.ts             # get_bills, get_bill, create_bill, update_bill, delete_bill
+│   │   ├── piggy-banks.ts       # get_piggy_banks, get_piggy_bank, create_piggy_bank, update_piggy_bank, delete_piggy_bank
+│   │   ├── reports.ts           # get_tags, get_tag, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag
+│   │   ├── rules.ts             # get_rule_groups, get_rule_group, create_rule_group, update_rule_group, delete_rule_group, get_rules, get_rule, create_rule, update_rule, delete_rule, get_rule_group_rules, trigger_rule_group, trigger_rule, test_rule_group, test_rule
+│   │   ├── recurring.ts         # get_recurring, get_recurrence, create_recurring, update_recurring, delete_recurring, get_recurrence_transactions, trigger_recurrence
+│   │   ├── attachments.ts       # get_attachments, get_attachment, create_attachment, update_attachment, delete_attachment, upload_attachment, download_attachment
 │   │   ├── currencies.ts        # get_currencies, get_currency, create_currency, update_currency, delete_currency, enable_currency, disable_currency, set_primary_currency
 │   │   ├── exports.ts           # export_transactions, export_accounts, export_bills, export_budgets, export_categories, export_tags, export_recurring, export_rules, export_piggy_banks
 │   │   ├── object-groups.ts     # get_object_groups, get_object_group, create_object_group, update_object_group, delete_object_group, get_object_group_bills, get_object_group_piggy_banks
 │   │   └── transaction-links.ts # get_link_types, get_transaction_links, get_transaction_link, create_transaction_link, update_transaction_link, delete_transaction_link
 │   └── tests/
 │       ├── accounts.test.ts
+│       ├── args.test.ts
+│       ├── attachments.test.ts
 │       ├── bills.test.ts
 │       ├── budgets.test.ts
 │       ├── categories.test.ts
 │       ├── client.test.ts
+│       ├── currencies.test.ts
+│       ├── exports.test.ts
 │       ├── http.test.ts
 │       ├── integration.test.ts  # Live Firefly III tests (skipped unless FIREFLY_INTEGRATION=true)
+│       ├── object-groups.test.ts
 │       ├── piggy-banks.test.ts
+│       ├── recurring.test.ts
 │       ├── reports.test.ts
+│       ├── rules.test.ts
+│       ├── tool-filter.test.ts
+│       ├── transaction-links.test.ts
 │       ├── transactions.test.ts
 │       └── transform.test.ts
 ├── dist/                        # Compiled output — committed to git (not gitignored)
+├── .github/
+│   └── workflows/
+│       ├── ci.yml               # Runs tests on every PR and push to main
+│       └── publish.yml          # Publishes npm + Docker on v* tags (gated on tests)
 ├── package.json
 ├── tsconfig.json
+├── Dockerfile
+├── docker-compose.yml
 ├── .env.example
 ├── LICENSE
 ├── README.md
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── TASKS.md                     # Prioritised quality improvement backlog
 └── CLAUDE.md                    # This file
 ```
+
+---
+
+## Tool Filtering
+
+`src/tools/index.ts` exports `TOOL_GROUPS` (the canonical ordered list), `PRESETS` (named subsets), and `registerAllTools(server, client, options)`.
+
+### TOOL_GROUPS
+
+```
+accounts, transactions, budgets, categories, bills, piggy-banks, reports,
+rules, recurring, attachments, currencies, exports, object-groups, transaction-links
+```
+
+### PRESETS
+
+| Name | Groups | Tools |
+|------|--------|-------|
+| `minimal` | accounts, transactions | 15 |
+| `default` | accounts, transactions, budgets, categories, bills | 37 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 44 |
+| `insights` | accounts, transactions, categories, reports | 57 |
+| `automation` | accounts, transactions, rules, recurring | 37 |
+| `full` | all 14 groups | 140 |
+
+### Read-only proxy
+
+`makeReadOnlyProxy(server)` wraps the `McpServer` with a `Proxy` that silently drops any `registerTool` call whose name does not start with `get_`, `search_`, or `test_`. Applied when `--read-only` is passed.
 
 ---
 
@@ -164,9 +228,11 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
 import { registerAccountTools } from './accounts.js';
 // ... other imports
 
-export function registerAllTools(server: McpServer, client: FireflyClient): void {
-  registerAccountTools(server, client);
-  // ... other register calls
+export function registerAllTools(server: McpServer, client: FireflyClient, options: ToolFilterOptions = {}): void {
+  // resolve active groups from preset/groups/default-all
+  // optionally wrap server with makeReadOnlyProxy
+  if (activeGroups.has('accounts')) registerAccountTools(s, client);
+  // ... other groups
 }
 ```
 
@@ -223,6 +289,8 @@ Write tools use:
 - Update: `{ openWorldHint: true, idempotentHint: true }`
 - Delete: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
 
+Each tool file declares these constants locally (a planned refactor will lift them to `src/tools/_annotations.ts`).
+
 ---
 
 ## HTTP Client (`src/client.ts`)
@@ -245,12 +313,14 @@ In HTTP mode, `createOAuthHandler` wraps the MCP request handler with an OAuth p
 
 Routes handled by the proxy (no auth required):
 - `GET /.well-known/oauth-authorization-server` — returns OAuth metadata pointing at our proxy endpoints
-- `GET /oauth/authorize` — stores the MCP client's dynamic `redirect_uri`, substitutes our stable `/oauth/callback` URL, and 302s to Firefly III
+- `GET /oauth/authorize` — stores the MCP client's dynamic `redirect_uri` in a state-keyed Map, substitutes our stable `/oauth/callback` URL, and 302s to Firefly III
 - `POST /oauth/register` — RFC 7591 dynamic client registration stub (Firefly III doesn't support this; we return the configured `FIREFLY_OAUTH_CLIENT_ID`)
-- `POST /oauth/token` — substitutes `redirect_uri` back to our stable callback, proxies token exchange to Firefly III
+- `POST /oauth/token` — substitutes `redirect_uri` back to our stable callback, proxies token exchange to Firefly III (30 s AbortController timeout)
 - `GET /oauth/callback` — receives Firefly III's redirect, forwards `code`+`state` to the MCP client's original dynamic callback URL
 
 All other requests require a `Bearer` token in the `Authorization` header. The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
+
+**Limitation:** OAuth state lives in-process — single replica only. Horizontal scaling breaks the auth flow.
 
 ---
 
@@ -265,6 +335,7 @@ npm run test:watch             # Watch mode for unit tests
 npm run test:integration       # Run integration tests against live Firefly III
 npm run dev -- --transport http          # Run HTTP server in dev mode
 npm run dev -- --transport http --port 4000  # Run on a specific port
+npm run dev -- --preset default          # Load only the default tool subset
 ```
 
 **Important:** `dist/` is committed to git so the server can be used without a build step. Always run `npm run build` and commit `dist/` alongside source changes.
@@ -274,9 +345,14 @@ npm run dev -- --transport http --port 4000  # Run on a specific port
 ## Adding a New Tool
 
 1. **Implement fetch function** in `src/tools/{category}.ts`. Call `client.get<JsonApiListResponse>(...)` and pipe through `unwrapList` (or `unwrapSingle` for single-item endpoints).
-2. **Add `registerXxxTools` call** in `src/tools/index.ts`.
-3. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
-4. **Run `npm run build`** and commit source + dist together.
+2. **Add register call** in the `registerXxxTools` function in that file.
+3. **If creating a new group file:**
+   - Add the group name to `TOOL_GROUPS` in `src/tools/index.ts`.
+   - Wire `registerXxxTools` inside `registerAllTools`.
+   - Consider which presets it belongs in (`PRESETS` map in the same file).
+4. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
+5. **Update the tool table** in `README.md`.
+6. **Run `npm run build`** and commit source + dist together.
 
 Example — adding `get_account` (single account by ID):
 
@@ -345,6 +421,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - `refactor:` Code cleanup without behavior change
 - `test:` Add or update tests
 - `chore:` Dependencies, config, scaffolding
+- `docs:` Documentation only
 
 ---
 
@@ -355,36 +432,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - **Error handling.** Every tool handler wraps in try/catch and returns `{ isError: true }` on failure.
 - **Dependencies.** Keep them minimal and up-to-date.
 - **License.** MIT — include LICENSE file.
-
----
-
-## Completed Phases
-
-**Phase 1 (complete):**
-- Read-only tools only
-- Stdio transport only
-- All tools have `readOnlyHint: true, openWorldHint: true, idempotentHint: true`
-
-**Phase 2 (complete):**
-- Full CRUD write tools for all resources (transactions, accounts, budgets, budget limits, categories, bills, piggy banks, tags)
-- Write tools: `{ openWorldHint: true }`
-- Update tools: `{ openWorldHint: true, idempotentHint: true }`
-- Delete tools: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
-- HTTP transport via `--transport http` (default: stdio)
-- CLI flags: `--transport stdio|http`, `--host <host>` (default 127.0.0.1), `--port <n>` (default 3000, auto-increments if taken)
-
-**Phase 3 (complete):**
-- OAuth via Firefly III for HTTP transport — full proxy in `src/http.ts`
-- `FIREFLY_OAUTH_CLIENT_ID` env var required for HTTP mode; `FIREFLY_TOKEN` used only for stdio
-- Per-request Bearer token propagation via `AsyncLocalStorage`
-- Dynamic client registration stub (RFC 7591) — Firefly III doesn't support it natively
-- Redirect URI substitution proxy solves the dynamic-port mismatch between MCP clients and Firefly III's exact URI matching
-
----
-
-## Inspiration
-
-Feature coverage was informed by [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp).
+- See `SECURITY.md` for the vulnerability disclosure policy.
 
 ---
 
@@ -399,6 +447,7 @@ Feature coverage was informed by [fabianonetto/mcp-server-firefly-iii](https://g
 - Firefly III API is REST; pagination is via query params (`limit`, `page`).
 - `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.
 - Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly.
+- `MCP_BASE_URL` must be set when the HTTP server is not on loopback (e.g. Docker); the server exits with code 1 otherwise.
 
 ---
 
@@ -408,3 +457,9 @@ Feature coverage was informed by [fabianonetto/mcp-server-firefly-iii](https://g
 - [Firefly III OpenAPI YAML (latest stable)](https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml) — machine-readable spec; fetch with `curl -s "https://api-docs.firefly-iii.org/firefly-iii-6.5.5-v1.yaml" -A "Mozilla/5.0"` (WebFetch is blocked by bot protection on this host)
 - [MCP Documentation](https://modelcontextprotocol.io/)
 - [TypeScript ESM Guide](https://nodejs.org/en/docs/guides/ecmascript-modules/)
+
+---
+
+## Inspiration
+
+Feature coverage was informed by [fabianonetto/mcp-server-firefly-iii](https://github.com/fabianonetto/mcp-server-firefly-iii) and [etnperlong/firefly-iii-mcp](https://github.com/etnperlong/firefly-iii-mcp).
