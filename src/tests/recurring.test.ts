@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchRecurrences, fetchRecurrence, createRecurrence, updateRecurrence, deleteRecurrence, fetchRecurrenceTransactions, triggerRecurrence } from '../tools/recurring.js';
+import { createMockServer } from './_helpers.js';
+import { registerRecurringTools } from '../tools/recurring.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -193,5 +195,23 @@ describe('triggerRecurrence', () => {
     const result = await triggerRecurrence(mockClient, '2');
     expect(mockClient.post).toHaveBeenCalledWith('/recurrences/2/trigger', {}, {});
     expect(result).toEqual({ triggered: true, id: '2' });
+  });
+});
+
+describe('handler smoke — recurring', () => {
+  it('get_recurring handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerRecurringTools(server, client);
+    const result = await handlers.get('get_recurring')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_recurring handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerRecurringTools(server, client);
+    const result = await handlers.get('get_recurring')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

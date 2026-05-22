@@ -5,6 +5,8 @@ import {
   fetchRules, fetchRule, createRule, updateRule, deleteRule,
   triggerRuleGroup, triggerRule, testRuleGroup, testRule, fetchRuleGroupRules,
 } from '../tools/rules.js';
+import { createMockServer } from './_helpers.js';
+import { registerRuleTools } from '../tools/rules.js';
 
 const mockClient = {
   get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), postBinary: vi.fn(),
@@ -352,5 +354,23 @@ describe('fetchRuleGroupRules', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await fetchRuleGroupRules(mockClient, '1', { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/rule-groups/1/rules', { page: 1, limit: 50 });
+  });
+});
+
+describe('handler smoke — rules', () => {
+  it('get_rule_groups handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(ruleGroupListFixture) } as unknown as FireflyClient;
+    registerRuleTools(server, client);
+    const result = await handlers.get('get_rule_groups')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_rule_groups handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerRuleTools(server, client);
+    const result = await handlers.get('get_rule_groups')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

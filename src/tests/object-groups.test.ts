@@ -4,6 +4,8 @@ import {
   fetchObjectGroups, fetchObjectGroup, createObjectGroup, updateObjectGroup,
   deleteObjectGroup, fetchObjectGroupBills, fetchObjectGroupPiggyBanks,
 } from '../tools/object-groups.js';
+import { createMockServer } from './_helpers.js';
+import { registerObjectGroupTools } from '../tools/object-groups.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -69,5 +71,23 @@ describe('fetchObjectGroupPiggyBanks', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await fetchObjectGroupPiggyBanks(mockClient, '1', { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/object-groups/1/piggy-banks', { page: 1, limit: 50 });
+  });
+});
+
+describe('handler smoke — object-groups', () => {
+  it('get_object_groups handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerObjectGroupTools(server, client);
+    const result = await handlers.get('get_object_groups')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_object_groups handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerObjectGroupTools(server, client);
+    const result = await handlers.get('get_object_groups')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

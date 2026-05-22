@@ -16,6 +16,8 @@ import {
   fetchChart,
   fetchExchangeRate,
 } from '../tools/reports.js';
+import { createMockServer } from './_helpers.js';
+import { registerReportTools } from '../tools/reports.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -282,5 +284,23 @@ describe('fetchInsightGrouped', () => {
       end: '2026-01-31',
       'bills[]': ['1', '2'],
     });
+  });
+});
+
+describe('handler smoke — reports', () => {
+  it('get_tags handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(tagListFixture) } as unknown as FireflyClient;
+    registerReportTools(server, client);
+    const result = await handlers.get('get_tags')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_tags handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerReportTools(server, client);
+    const result = await handlers.get('get_tags')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

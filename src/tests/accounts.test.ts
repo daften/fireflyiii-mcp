@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchAccounts, fetchAccount, createAccount, updateAccount, deleteAccount, fetchAccountTransactions, searchAccounts } from '../tools/accounts.js';
+import { createMockServer } from './_helpers.js';
+import { registerAccountTools } from '../tools/accounts.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -147,5 +149,23 @@ describe('searchAccounts', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await searchAccounts(mockClient, { query: 'NL01ABNA', field: 'iban', page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/search/accounts', { query: 'NL01ABNA', field: 'iban', page: 1, limit: 50 });
+  });
+});
+
+describe('handler smoke — accounts', () => {
+  it('get_accounts handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerAccountTools(server, client);
+    const result = await handlers.get('get_accounts')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_accounts handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerAccountTools(server, client);
+    const result = await handlers.get('get_accounts')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

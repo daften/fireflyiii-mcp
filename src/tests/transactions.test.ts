@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchTransactions, fetchTransaction, createTransaction, updateTransaction, deleteTransaction, searchTransactions, createSplitTransaction, bulkUpdateTransactions } from '../tools/transactions.js';
+import { createMockServer } from './_helpers.js';
+import { registerTransactionTools } from '../tools/transactions.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -258,5 +260,23 @@ describe('bulkUpdateTransactions', () => {
     const sentQuery = JSON.parse(call[2]['query']) as { where: string; update: Record<string, unknown> };
     expect(sentQuery.where).toBe('description:groceries');
     expect(Object.keys(sentQuery.update)).toHaveLength(0);
+  });
+});
+
+describe('handler smoke — transactions', () => {
+  it('get_transactions handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerTransactionTools(server, client);
+    const result = await handlers.get('get_transactions')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_transactions handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerTransactionTools(server, client);
+    const result = await handlers.get('get_transactions')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

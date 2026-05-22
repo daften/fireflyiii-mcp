@@ -4,6 +4,8 @@ import {
   fetchLinkTypes, fetchTransactionLinks, fetchTransactionLink,
   createTransactionLink, updateTransactionLink, deleteTransactionLink,
 } from '../tools/transaction-links.js';
+import { createMockServer } from './_helpers.js';
+import { registerTransactionLinkTools } from '../tools/transaction-links.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -61,5 +63,23 @@ describe('deleteTransactionLink', () => {
     const result = await deleteTransactionLink(mockClient, '5');
     expect(mockClient.delete).toHaveBeenCalledWith('/transaction-links/5');
     expect(result).toEqual({ deleted: true, id: '5' });
+  });
+});
+
+describe('handler smoke — transaction-links', () => {
+  it('get_link_types handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerTransactionLinkTools(server, client);
+    const result = await handlers.get('get_link_types')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_link_types handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerTransactionLinkTools(server, client);
+    const result = await handlers.get('get_link_types')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

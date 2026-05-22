@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchBudgets, fetchBudgetLimits, createBudget, updateBudget, deleteBudget, createBudgetLimit, updateBudgetLimit, deleteBudgetLimit, fetchAvailableBudgets, fetchAvailableBudget, fetchBudgetTransactions, fetchTransactionsWithoutBudget } from '../tools/budgets.js';
+import { createMockServer } from './_helpers.js';
+import { registerBudgetTools } from '../tools/budgets.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -168,5 +170,23 @@ describe('fetchTransactionsWithoutBudget', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
     await fetchTransactionsWithoutBudget(mockClient, { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/budgets/transactions-without-budget', { page: 1, limit: 50 });
+  });
+});
+
+describe('handler smoke — budgets', () => {
+  it('get_budgets handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerBudgetTools(server, client);
+    const result = await handlers.get('get_budgets')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_budgets handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerBudgetTools(server, client);
+    const result = await handlers.get('get_budgets')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

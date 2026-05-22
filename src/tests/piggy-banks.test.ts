@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchPiggyBanks, createPiggyBank, updatePiggyBank, deletePiggyBank, fetchPiggyBankEvents, createPiggyBankEvent, deletePiggyBankEvent } from '../tools/piggy-banks.js';
+import { createMockServer } from './_helpers.js';
+import { registerPiggyBankTools } from '../tools/piggy-banks.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -100,5 +102,23 @@ describe('deletePiggyBankEvent', () => {
     const result = await deletePiggyBankEvent(mockClient, '3', '1');
     expect(mockClient.delete).toHaveBeenCalledWith('/piggy-banks/3/events/1');
     expect(result).toEqual({ deleted: true, id: '1' });
+  });
+});
+
+describe('handler smoke — piggy-banks', () => {
+  it('get_piggy_banks handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerPiggyBankTools(server, client);
+    const result = await handlers.get('get_piggy_banks')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_piggy_banks handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerPiggyBankTools(server, client);
+    const result = await handlers.get('get_piggy_banks')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchBills, createBill, updateBill, deleteBill, fetchBillTransactions } from '../tools/bills.js';
+import { createMockServer } from './_helpers.js';
+import { registerBillTools } from '../tools/bills.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -81,5 +83,23 @@ describe('fetchBillTransactions', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await fetchBillTransactions(mockClient, '5', { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/bills/5/transactions', { page: 1, limit: 50 });
+  });
+});
+
+describe('handler smoke — bills', () => {
+  it('get_bills handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerBillTools(server, client);
+    const result = await handlers.get('get_bills')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_bills handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerBillTools(server, client);
+    const result = await handlers.get('get_bills')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

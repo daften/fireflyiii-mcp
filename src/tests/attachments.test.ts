@@ -5,6 +5,8 @@ import {
   createAttachment, updateAttachment,
   deleteAttachment, uploadAttachment, downloadAttachment,
 } from '../tools/attachments.js';
+import { createMockServer } from './_helpers.js';
+import { registerAttachmentTools } from '../tools/attachments.js';
 
 const mockClient = {
   get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), postBinary: vi.fn(),
@@ -117,5 +119,23 @@ describe('downloadAttachment', () => {
     const result = await downloadAttachment(mockFull, '7');
     expect(mockFull.getText).toHaveBeenCalledWith('/attachments/7/download');
     expect(result).toBe('receipt content');
+  });
+});
+
+describe('handler smoke — attachments', () => {
+  it('get_attachments handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(attachmentListFixture) } as unknown as FireflyClient;
+    registerAttachmentTools(server, client);
+    const result = await handlers.get('get_attachments')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_attachments handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerAttachmentTools(server, client);
+    const result = await handlers.get('get_attachments')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

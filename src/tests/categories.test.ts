@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { fetchCategories, fetchCategoryTransactions, createCategory, updateCategory, deleteCategory } from '../tools/categories.js';
+import { createMockServer } from './_helpers.js';
+import { registerCategoryTools } from '../tools/categories.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -92,5 +94,23 @@ describe('deleteCategory', () => {
     const result = await deleteCategory(mockClient, '8');
     expect(mockClient.delete).toHaveBeenCalledWith('/categories/8');
     expect(result).toEqual({ deleted: true, id: '8' });
+  });
+});
+
+describe('handler smoke — categories', () => {
+  it('get_categories handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce(listFixture) } as unknown as FireflyClient;
+    registerCategoryTools(server, client);
+    const result = await handlers.get('get_categories')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('get_categories handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerCategoryTools(server, client);
+    const result = await handlers.get('get_categories')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });

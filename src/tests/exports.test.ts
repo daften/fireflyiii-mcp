@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import { exportEntity } from '../tools/exports.js';
+import { createMockServer } from './_helpers.js';
+import { registerExportTools } from '../tools/exports.js';
 
 const mockClient = {
   getText: vi.fn(),
@@ -70,5 +72,23 @@ describe('exportEntity', () => {
     mockClient.getText = vi.fn().mockResolvedValueOnce('id,name\n1,Vacation Fund');
     await exportEntity(mockClient, 'piggy-banks', {});
     expect(mockClient.getText).toHaveBeenCalledWith('/data/export/piggy-banks', { type: 'csv' });
+  });
+});
+
+describe('handler smoke — exports', () => {
+  it('export_transactions handler returns text content on success', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { getText: vi.fn().mockResolvedValueOnce('csv data') } as unknown as FireflyClient;
+    registerExportTools(server, client);
+    const result = await handlers.get('export_transactions')!({});
+    expect(result).toMatchObject({ content: [{ type: 'text', text: expect.any(String) }] });
+  });
+
+  it('export_transactions handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { getText: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerExportTools(server, client);
+    const result = await handlers.get('export_transactions')!({});
+    expect(result).toMatchObject({ isError: true });
   });
 });
