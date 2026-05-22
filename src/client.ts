@@ -11,37 +11,31 @@ export class FireflyError extends Error {
   }
 }
 
+function parseFieldErrors(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { errors?: Record<string, string[]> };
+    if (parsed.errors && Object.keys(parsed.errors).length > 0) {
+      return Object.entries(parsed.errors)
+        .map(([field, msgs]) => `${field} — ${msgs.join(', ')}`)
+        .join('; ');
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
 export function formatError(err: unknown): string {
   if (err instanceof FireflyError) {
     if (err.status === 400) {
-      try {
-        const parsed = JSON.parse(err.body) as { errors?: Record<string, string[]> };
-        if (parsed.errors && Object.keys(parsed.errors).length > 0) {
-          const details = Object.entries(parsed.errors)
-            .map(([field, msgs]) => `${field} — ${msgs.join(', ')}`)
-            .join('; ');
-          return `Bad request: ${details}`;
-        }
-      } catch {
-        // fall through
-      }
-      return 'Bad request — check your input parameters.';
+      const details = parseFieldErrors(err.body);
+      return details ? `Bad request: ${details}` : 'Bad request — check your input parameters.';
     }
     if (err.status === 401) return 'Authentication failed. Check your FIREFLY_TOKEN.';
     if (err.status === 404) return 'Resource not found.';
     if (err.status === 422) {
-      try {
-        const parsed = JSON.parse(err.body) as { errors?: Record<string, string[]> };
-        if (parsed.errors && Object.keys(parsed.errors).length > 0) {
-          const details = Object.entries(parsed.errors)
-            .map(([field, msgs]) => `${field} — ${msgs.join(', ')}`)
-            .join('; ');
-          return `Validation failed: ${details}`;
-        }
-      } catch {
-        // fall through
-      }
-      return 'Invalid request parameters.';
+      const details = parseFieldErrors(err.body);
+      return details ? `Validation failed: ${details}` : 'Invalid request parameters.';
     }
     if (err.status >= 500) return 'Firefly III server error. Try again later.';
     return `API error ${err.status}.`;
