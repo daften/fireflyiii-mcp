@@ -8,6 +8,7 @@ import { registerReportTools } from './reports.js';
 import { registerRecurringTools } from './recurring.js';
 import { registerRuleTools } from './rules.js';
 import { registerAttachmentTools } from './attachments.js';
+import { registerCurrencyTools } from './currencies.js';
 export const TOOL_GROUPS = [
     'accounts',
     'transactions',
@@ -19,6 +20,7 @@ export const TOOL_GROUPS = [
     'rules',
     'recurring',
     'attachments',
+    'currencies',
 ];
 export const PRESETS = {
     minimal: ['accounts', 'transactions'],
@@ -73,5 +75,7 @@ export function registerAllTools(server, client, options = {}) {
         registerRecurringTools(s, client);
     if (activeGroups.has('attachments'))
         registerAttachmentTools(s, client);
+    if (activeGroups.has('currencies'))
+        registerCurrencyTools(s, client);
 }
 //# sourceMappingURL=index.js.map

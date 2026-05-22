@@ -26,7 +26,8 @@ describe('registerAllTools — no options', () => {
     expect(registered).toContain('get_rule_groups');
     expect(registered).toContain('get_recurring');
     expect(registered).toContain('get_attachments');
-    expect(registered.length).toBe(110);
+    expect(registered).toContain('get_currencies');
+    expect(registered.length).toBe(118);
   });
 });
 
@@ -116,10 +117,10 @@ describe('registerAllTools — presets', () => {
     expect(registered.length).toBe(37);
   });
 
-  it('full preset registers all 110 tools', () => {
+  it('full preset registers all 118 tools', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'full' });
-    expect(registered.length).toBe(110);
+    expect(registered.length).toBe(118);
   });
 });
 
@@ -205,7 +206,8 @@ describe('TOOL_GROUPS and PRESETS exports', () => {
     expect(TOOL_GROUPS).toContain('rules');
     expect(TOOL_GROUPS).toContain('recurring');
     expect(TOOL_GROUPS).toContain('attachments');
-    expect(TOOL_GROUPS.length).toBe(10);
+    expect(TOOL_GROUPS).toContain('currencies');
+    expect(TOOL_GROUPS.length).toBe(11);
   });
 
   it('PRESETS defines all six preset names', () => {

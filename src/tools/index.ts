@@ -10,6 +10,7 @@ import { registerReportTools } from './reports.js';
 import { registerRecurringTools } from './recurring.js';
 import { registerRuleTools } from './rules.js';
 import { registerAttachmentTools } from './attachments.js';
+import { registerCurrencyTools } from './currencies.js';
 
 export const TOOL_GROUPS = [
   'accounts',
@@ -22,6 +23,7 @@ export const TOOL_GROUPS = [
   'rules',
   'recurring',
   'attachments',
+  'currencies',
 ] as const;
 
 export type ToolGroup = typeof TOOL_GROUPS[number];
@@ -87,4 +89,5 @@ export function registerAllTools(
   if (activeGroups.has('rules'))       registerRuleTools(s, client);
   if (activeGroups.has('recurring'))   registerRecurringTools(s, client);
   if (activeGroups.has('attachments')) registerAttachmentTools(s, client);
+  if (activeGroups.has('currencies'))  registerCurrencyTools(s, client);
 }
