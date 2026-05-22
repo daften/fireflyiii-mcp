@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { formatError } from '../client.js';
 export function defineTool(server, name, config, fetch) {
+    // registerTool is generic in the SDK; the cast avoids fighting its complex overload resolution
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     server.registerTool(name, config, async (args) => {
         try {

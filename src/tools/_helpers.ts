@@ -20,6 +20,7 @@ export function defineTool(
   config: ToolConfig,
   fetch: (args: Record<string, unknown>) => Promise<unknown>,
 ): void {
+  // registerTool is generic in the SDK; the cast avoids fighting its complex overload resolution
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (server as any).registerTool(name, config, async (args: Record<string, unknown>) => {
     try {
