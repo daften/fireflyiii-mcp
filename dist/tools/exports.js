@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { formatError } from '../client.js';
+import { READ_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 export async function exportEntity(client, entity, params) {
     const query = { type: 'csv' };
     if (params.start)
@@ -8,11 +8,6 @@ export async function exportEntity(client, entity, params) {
         query['end'] = params.end;
     return client.getText(`/data/export/${entity}`, query);
 }
-const READ_ANNOTATIONS = {
-    readOnlyHint: true,
-    openWorldHint: true,
-    idempotentHint: true,
-};
 const EXPORT_TOOLS = [
     { name: 'export_transactions', title: 'Export Transactions', entity: 'transactions', hasDates: true },
     { name: 'export_accounts', title: 'Export Accounts', entity: 'accounts', hasDates: false },
@@ -28,24 +23,15 @@ export function registerExportTools(server, client) {
     for (const { name, title, entity, hasDates } of EXPORT_TOOLS) {
         const inputSchema = {};
         if (hasDates) {
-            inputSchema['start'] = z.string().optional().describe('Start date (YYYY-MM-DD)');
-            inputSchema['end'] = z.string().optional().describe('End date (YYYY-MM-DD)');
+            inputSchema['start'] = dateSchema.optional().describe('Start date (YYYY-MM-DD)');
+            inputSchema['end'] = dateSchema.optional().describe('End date (YYYY-MM-DD)');
         }
-        server.registerTool(name, {
+        defineTool(server, name, {
             title,
             description: `Export all ${entity} as a CSV file. Returns raw CSV text.${hasDates ? ' Optionally filter by date range.' : ''}`,
             inputSchema,
             annotations: READ_ANNOTATIONS,
-        }, async (params) => {
-            try {
-                const { start, end } = params;
-                const csv = await exportEntity(client, entity, { start, end });
-                return { content: [{ type: 'text', text: csv }] };
-            }
-            catch (err) {
-                return { content: [{ type: 'text', text: formatError(err) }], isError: true };
-            }
-        });
+        }, ({ start, end }) => exportEntity(client, entity, { start: start, end: end }));
     }
 }
 //# sourceMappingURL=exports.js.map

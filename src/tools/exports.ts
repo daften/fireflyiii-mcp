@@ -1,7 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
+import type { FireflyClient } from '../client.js';
 import type { QueryParams } from '../types.js';
+import { READ_ANNOTATIONS } from './_annotations.js';
+import { defineTool, dateSchema } from './_helpers.js';
 
 type ExportEntity = 'transactions' | 'accounts' | 'bills' | 'budgets' | 'categories' | 'tags' | 'recurring' | 'rules' | 'piggy-banks';
 
@@ -15,12 +17,6 @@ export async function exportEntity(
   if (params.end) query['end'] = params.end;
   return client.getText(`/data/export/${entity}`, query);
 }
-
-const READ_ANNOTATIONS = {
-  readOnlyHint: true,
-  openWorldHint: true,
-  idempotentHint: true,
-} as const;
 
 const EXPORT_TOOLS: Array<{ name: string; title: string; entity: ExportEntity; hasDates: boolean }> = [
   { name: 'export_transactions', title: 'Export Transactions', entity: 'transactions', hasDates: true },
@@ -38,27 +34,16 @@ export function registerExportTools(server: McpServer, client: FireflyClient): v
   for (const { name, title, entity, hasDates } of EXPORT_TOOLS) {
     const inputSchema: Record<string, z.ZodTypeAny> = {};
     if (hasDates) {
-      inputSchema['start'] = z.string().optional().describe('Start date (YYYY-MM-DD)');
-      inputSchema['end'] = z.string().optional().describe('End date (YYYY-MM-DD)');
+      inputSchema['start'] = dateSchema.optional().describe('Start date (YYYY-MM-DD)');
+      inputSchema['end'] = dateSchema.optional().describe('End date (YYYY-MM-DD)');
     }
 
-    server.registerTool(
-      name,
-      {
-        title,
-        description: `Export all ${entity} as a CSV file. Returns raw CSV text.${hasDates ? ' Optionally filter by date range.' : ''}`,
-        inputSchema,
-        annotations: READ_ANNOTATIONS,
-      },
-      async (params: Record<string, unknown>) => {
-        try {
-          const { start, end } = params as { start?: string; end?: string };
-          const csv = await exportEntity(client, entity, { start, end });
-          return { content: [{ type: 'text' as const, text: csv }] };
-        } catch (err) {
-          return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-        }
-      }
-    );
+    defineTool(server, name, {
+      title,
+      description: `Export all ${entity} as a CSV file. Returns raw CSV text.${hasDates ? ' Optionally filter by date range.' : ''}`,
+      inputSchema,
+      annotations: READ_ANNOTATIONS,
+    }, ({ start, end }) =>
+      exportEntity(client, entity, { start: start as string | undefined, end: end as string | undefined }));
   }
 }
