@@ -8,7 +8,7 @@ import {
   type UnwrappedList, type UnwrappedSingle,
 } from '../transform.js';
 import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
-import { defineTool } from './_helpers.js';
+import { defineTool, dateSchema } from './_helpers.js';
 
 // ---- Rule group fetch + CRUD ----
 
@@ -381,8 +381,8 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
     description: 'Manually run all rules in a rule group against existing transactions. Use get_rule_groups to find valid IDs.',
     inputSchema: {
       id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
-      start: z.string().optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
       accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
     },
     annotations: { openWorldHint: true },
@@ -393,8 +393,8 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
     description: 'Manually run a single rule against existing transactions. Use get_rules to find valid IDs.',
     inputSchema: {
       id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
-      start: z.string().optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
       accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
     },
     annotations: { openWorldHint: true },
@@ -405,8 +405,8 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
     description: 'Dry-run a rule group against existing transactions and return matching transactions without applying any changes. Use get_rule_groups to find valid IDs.',
     inputSchema: {
       id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
-      start: z.string().optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
       accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
       search_limit: z.number().int().positive().optional().describe('Maximum number of transactions to search'),
       triggered_limit: z.number().int().positive().optional().describe('Maximum number of triggered transactions to return'),
@@ -426,8 +426,8 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
     description: 'Dry-run a single rule against existing transactions and return matching transactions without applying any changes. Use get_rules to find valid IDs.',
     inputSchema: {
       id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
-      start: z.string().optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: z.string().optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
       accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
       search_limit: z.number().int().positive().optional().describe('Maximum number of transactions to search'),
       triggered_limit: z.number().int().positive().optional().describe('Maximum number of triggered transactions to return'),
