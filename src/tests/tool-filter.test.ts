@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { FireflyClient } from '../client.js';
-import { registerAllTools, PRESETS, TOOL_GROUPS } from '../tools/index.js';
+import { registerAllTools, PRESETS, TOOL_GROUPS, makeReadOnlyProxy } from '../tools/index.js';
 
 function createMockServer() {
   const registered: string[] = [];
@@ -191,6 +191,19 @@ describe('registerAllTools — readOnly', () => {
     expect(registered).toContain('test_rule');
     expect(registered).not.toContain('create_rule');
     expect(registered).not.toContain('trigger_rule');
+  });
+});
+
+describe('makeReadOnlyProxy — this-binding', () => {
+  it('non-registerTool methods are bound to the underlying server, not the proxy', () => {
+    const inner = {
+      value: 42,
+      getValue(this: typeof inner) { return this.value; },
+      registerTool: vi.fn(),
+    };
+    const proxy = makeReadOnlyProxy(inner as unknown as McpServer);
+    const method = (proxy as unknown as typeof inner).getValue;
+    expect(method()).toBe(42);
   });
 });
 

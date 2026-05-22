@@ -39,7 +39,7 @@ export const PRESETS = {
 function isReadOnlyTool(name) {
     return name.startsWith('get_') || name.startsWith('search_') || name.startsWith('test_');
 }
-function makeReadOnlyProxy(server) {
+export function makeReadOnlyProxy(server) {
     return new Proxy(server, {
         get(target, prop) {
             if (prop === 'registerTool') {
@@ -49,7 +49,8 @@ function makeReadOnlyProxy(server) {
                     }
                 };
             }
-            return target[prop];
+            const v = target[prop];
+            return typeof v === 'function' ? v.bind(target) : v;
         },
     });
 }

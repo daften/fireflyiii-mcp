@@ -55,7 +55,7 @@ function isReadOnlyTool(name: string): boolean {
   return name.startsWith('get_') || name.startsWith('search_') || name.startsWith('test_');
 }
 
-function makeReadOnlyProxy(server: McpServer): McpServer {
+export function makeReadOnlyProxy(server: McpServer): McpServer {
   return new Proxy(server, {
     get(target, prop) {
       if (prop === 'registerTool') {
@@ -65,7 +65,8 @@ function makeReadOnlyProxy(server: McpServer): McpServer {
           }
         };
       }
-      return (target as unknown as Record<string | symbol, unknown>)[prop];
+      const v = (target as unknown as Record<string | symbol, unknown>)[prop];
+      return typeof v === 'function' ? (v as (...args: unknown[]) => unknown).bind(target) : v;
     },
   });
 }

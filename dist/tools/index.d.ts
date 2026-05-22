@@ -9,5 +9,6 @@ export interface ToolFilterOptions {
     groups?: ToolGroup[];
     readOnly?: boolean;
 }
+export declare function makeReadOnlyProxy(server: McpServer): McpServer;
 export declare function registerAllTools(server: McpServer, client: FireflyClient, options?: ToolFilterOptions): void;
 //# sourceMappingURL=index.d.ts.map
