@@ -2,13 +2,12 @@ name: Nightly Integration Tests
 
 on:
   schedule:
-    - cron: '0 2 * * *'
-  workflow_dispatch:
+    - cron: '0 2 * * *'   # 02:00 UTC every night
+  workflow_dispatch:        # allow manual trigger
 
 jobs:
   integration:
     runs-on: ubuntu-latest
-    if: ${{ secrets.FIREFLY_INTEGRATION_URL != '' && secrets.FIREFLY_INTEGRATION_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,9 +18,22 @@ jobs:
       - name: Install dependencies
         run: for i in 1 2 3; do npm ci && break || sleep 5; done
 
+      - name: Start Firefly III
+        run: docker compose -f docker-compose.ci.yml up -d
+
+      - name: Create test user and token
+        id: firefly-token
+        run: |
+          TOKEN=$(bash scripts/ci-create-token.sh http://localhost:8080)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
       - name: Run integration tests
         run: npm run test:integration
         env:
           FIREFLY_INTEGRATION: 'true'
-          FIREFLY_URL: ${{ secrets.FIREFLY_INTEGRATION_URL }}
-          FIREFLY_TOKEN: ${{ secrets.FIREFLY_INTEGRATION_TOKEN }}
+          FIREFLY_URL: 'http://localhost:8080'
+          FIREFLY_TOKEN: ${{ steps.firefly-token.outputs.token }}
+
+      - name: Stop Firefly III
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down

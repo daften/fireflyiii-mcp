@@ -1,0 +1,24 @@
+services:
+  firefly:
+    image: fireflyiii/core:latest
+    container_name: fireflyiii-ci
+    environment:
+      # Fixed key for ephemeral CI use only — not a secret.
+      APP_KEY: "base64:Y4JA+ihRFmfM1P6v0KD2lMLtFnR+8eCOo5xhHqL0j3Q="
+      APP_ENV: local
+      APP_URL: "http://localhost:8080"
+      DB_CONNECTION: sqlite
+      DEFAULT_LANGUAGE: en_US
+      DEFAULT_LOCALE: equal
+      TRUSTED_PROXIES: "**"
+      LOG_CHANNEL: stderr
+      SEND_ERROR_MESSAGE: "false"
+      SEND_REGISTRATION_MAIL: "false"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 36
+      start_period: 30s
