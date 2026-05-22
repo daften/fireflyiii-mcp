@@ -6,7 +6,7 @@ export class FireflyError extends Error {
     public readonly url: string,
     public readonly body: string
   ) {
-    super(`Firefly III API error ${status} at ${url}: ${body}`);
+    super(`Firefly III API error ${status} at ${url.split('?')[0]}: ${body}`);
     this.name = 'FireflyError';
   }
 }

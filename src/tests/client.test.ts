@@ -304,4 +304,15 @@ describe('formatError — updated cases', () => {
     const err = new FireflyError(422, 'https://example.com', 'Unprocessable Entity');
     expect(formatError(err)).toBe('Invalid request parameters.');
   });
+
+  it('does not include query string in error message', () => {
+    const err = new FireflyError(
+      404,
+      'https://firefly.example.com/api/v1/accounts?page=1&secret=abc',
+      'Not Found'
+    );
+    expect(err.message).not.toContain('secret=abc');
+    expect(err.message).not.toContain('?page=1');
+    expect(err.message).toContain('/api/v1/accounts');
+  });
 });
