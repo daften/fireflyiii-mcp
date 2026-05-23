@@ -1,4 +1,4 @@
-import { TOOL_GROUPS, PRESETS, type ToolGroup, type PresetName, type ToolFilterOptions } from './tools/index.js';
+import { PRESETS, type PresetName, TOOL_GROUPS, type ToolFilterOptions, type ToolGroup } from './tools/index.js';
 
 export interface ParsedArgs {
   transport: 'stdio' | 'http';
@@ -30,7 +30,7 @@ export function parseArgs(args: string[]): ParsedArgs {
       host = args[++i];
     } else if (arg === '--port' && args[i + 1]) {
       const parsed = parseInt(args[++i], 10);
-      if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
         throw new Error('--port must be a valid port number (1–65535)');
       }
       port = parsed;
@@ -42,12 +42,13 @@ export function parseArgs(args: string[]): ParsedArgs {
       }
       preset = val as PresetName;
     } else if (arg === '--groups' && args[i + 1]) {
-      const parts = args[++i].split(',').map((g) => g.trim()).filter(Boolean);
+      const parts = args[++i]
+        .split(',')
+        .map((g) => g.trim())
+        .filter(Boolean);
       for (const g of parts) {
         if (!(TOOL_GROUPS as readonly string[]).includes(g)) {
-          throw new Error(
-            `Unknown group "${g}". Valid groups: ${TOOL_GROUPS.join(', ')}`
-          );
+          throw new Error(`Unknown group "${g}". Valid groups: ${TOOL_GROUPS.join(', ')}`);
         }
       }
       groups = parts as ToolGroup[];

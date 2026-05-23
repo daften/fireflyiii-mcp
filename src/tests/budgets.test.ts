@@ -1,8 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchBudgets, fetchBudgetLimits, createBudget, updateBudget, deleteBudget, createBudgetLimit, updateBudgetLimit, deleteBudgetLimit, fetchAvailableBudgets, fetchAvailableBudget, fetchBudgetTransactions, fetchTransactionsWithoutBudget } from '../tools/budgets.js';
+import {
+  createBudget,
+  createBudgetLimit,
+  deleteBudget,
+  deleteBudgetLimit,
+  fetchAvailableBudget,
+  fetchAvailableBudgets,
+  fetchBudgetLimits,
+  fetchBudgets,
+  fetchBudgetTransactions,
+  fetchTransactionsWithoutBudget,
+  registerBudgetTools,
+  updateBudget,
+  updateBudgetLimit,
+} from '../tools/budgets.js';
 import { createMockServer } from './_helpers.js';
-import { registerBudgetTools } from '../tools/budgets.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -60,7 +73,12 @@ const budgetSingleFixture = {
   data: { id: '3', type: 'budgets', attributes: { name: 'Groceries', active: true }, links: {} },
 };
 const limitSingleFixture = {
-  data: { id: '7', type: 'budget_limits', attributes: { amount: '500.00', start: '2024-01-01', end: '2024-01-31' }, links: {} },
+  data: {
+    id: '7',
+    type: 'budget_limits',
+    attributes: { amount: '500.00', start: '2024-01-01', end: '2024-01-31' },
+    links: {},
+  },
 };
 
 describe('createBudget', () => {
@@ -97,11 +115,19 @@ describe('createBudgetLimit', () => {
   it('posts to /budgets/:id/limits', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(limitSingleFixture);
     await createBudgetLimit(mockClient, '3', { start: '2024-01-01', end: '2024-01-31', amount: '500.00' });
-    expect(mockClient.post).toHaveBeenCalledWith('/budgets/3/limits', { start: '2024-01-01', end: '2024-01-31', amount: '500.00' });
+    expect(mockClient.post).toHaveBeenCalledWith('/budgets/3/limits', {
+      start: '2024-01-01',
+      end: '2024-01-31',
+      amount: '500.00',
+    });
   });
   it('returns unwrapped single', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(limitSingleFixture);
-    const result = await createBudgetLimit(mockClient, '3', { start: '2024-01-01', end: '2024-01-31', amount: '500.00' });
+    const result = await createBudgetLimit(mockClient, '3', {
+      start: '2024-01-01',
+      end: '2024-01-31',
+      amount: '500.00',
+    });
     expect(result).toEqual({ amount: '500.00', start: '2024-01-01', end: '2024-01-31', id: '7' });
   });
 });
@@ -124,7 +150,14 @@ describe('deleteBudgetLimit', () => {
 });
 
 const availableBudgetListFixture = {
-  data: [{ id: '1', type: 'available_budgets', attributes: { amount: '500.00', currency_code: 'EUR', start: '2026-01-01', end: '2026-01-31' }, links: {} }],
+  data: [
+    {
+      id: '1',
+      type: 'available_budgets',
+      attributes: { amount: '500.00', currency_code: 'EUR', start: '2026-01-01', end: '2026-01-31' },
+      links: {},
+    },
+  ],
   meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
 };
 const availableBudgetSingleFixture = {
@@ -140,7 +173,13 @@ describe('fetchAvailableBudgets', () => {
   it('returns flat items with pagination', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
     const result = await fetchAvailableBudgets(mockClient, { page: 1, limit: 50 });
-    expect(result.data[0]).toEqual({ amount: '500.00', currency_code: 'EUR', start: '2026-01-01', end: '2026-01-31', id: '1' });
+    expect(result.data[0]).toEqual({
+      amount: '500.00',
+      currency_code: 'EUR',
+      start: '2026-01-01',
+      end: '2026-01-31',
+      id: '1',
+    });
   });
 });
 
@@ -161,7 +200,12 @@ describe('fetchBudgetTransactions', () => {
   it('includes start/end when provided', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(availableBudgetListFixture);
     await fetchBudgetTransactions(mockClient, '3', { start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
-    expect(mockClient.get).toHaveBeenCalledWith('/budgets/3/transactions', { start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/budgets/3/transactions', {
+      start: '2026-01-01',
+      end: '2026-01-31',
+      page: 1,
+      limit: 50,
+    });
   });
 });
 

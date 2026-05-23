@@ -1,20 +1,29 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { FireflyClient } from '../client.js';
 import type { QueryParams } from '../types.js';
 import { READ_ANNOTATIONS } from './_annotations.js';
-import { defineTool, dateSchema } from './_helpers.js';
+import { dateSchema, defineTool } from './_helpers.js';
 
-type ExportEntity = 'transactions' | 'accounts' | 'bills' | 'budgets' | 'categories' | 'tags' | 'recurring' | 'rules' | 'piggy-banks';
+type ExportEntity =
+  | 'transactions'
+  | 'accounts'
+  | 'bills'
+  | 'budgets'
+  | 'categories'
+  | 'tags'
+  | 'recurring'
+  | 'rules'
+  | 'piggy-banks';
 
 export async function exportEntity(
   client: FireflyClient,
   entity: ExportEntity,
-  params: { start?: string; end?: string }
+  params: { start?: string; end?: string },
 ): Promise<string> {
   const query: QueryParams = { type: 'csv' };
-  if (params.start) query['start'] = params.start;
-  if (params.end) query['end'] = params.end;
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
   return client.getText(`/data/export/${entity}`, query);
 }
 
@@ -34,16 +43,21 @@ export function registerExportTools(server: McpServer, client: FireflyClient): v
   for (const { name, title, entity, hasDates } of EXPORT_TOOLS) {
     const inputSchema: Record<string, z.ZodTypeAny> = {};
     if (hasDates) {
-      inputSchema['start'] = dateSchema.optional().describe('Start date (YYYY-MM-DD)');
-      inputSchema['end'] = dateSchema.optional().describe('End date (YYYY-MM-DD)');
+      inputSchema.start = dateSchema.optional().describe('Start date (YYYY-MM-DD)');
+      inputSchema.end = dateSchema.optional().describe('End date (YYYY-MM-DD)');
     }
 
-    defineTool(server, name, {
-      title,
-      description: `Export all ${entity} as a CSV file. Returns raw CSV text.${hasDates ? ' Optionally filter by date range.' : ''}`,
-      inputSchema,
-      annotations: READ_ANNOTATIONS,
-    }, ({ start, end }) =>
-      exportEntity(client, entity, { start: start as string | undefined, end: end as string | undefined }));
+    defineTool(
+      server,
+      name,
+      {
+        title,
+        description: `Export all ${entity} as a CSV file. Returns raw CSV text.${hasDates ? ' Optionally filter by date range.' : ''}`,
+        inputSchema,
+        annotations: READ_ANNOTATIONS,
+      },
+      ({ start, end }) =>
+        exportEntity(client, entity, { start: start as string | undefined, end: end as string | undefined }),
+    );
   }
 }

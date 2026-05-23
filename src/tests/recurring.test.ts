@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchRecurrences, fetchRecurrence, createRecurrence, updateRecurrence, deleteRecurrence, fetchRecurrenceTransactions, triggerRecurrence } from '../tools/recurring.js';
+import {
+  createRecurrence,
+  deleteRecurrence,
+  fetchRecurrence,
+  fetchRecurrences,
+  fetchRecurrenceTransactions,
+  registerRecurringTools,
+  triggerRecurrence,
+  updateRecurrence,
+} from '../tools/recurring.js';
 import { createMockServer } from './_helpers.js';
-import { registerRecurringTools } from '../tools/recurring.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -37,7 +45,13 @@ describe('fetchRecurrences', () => {
   it('returns flat items with pagination', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     const result = await fetchRecurrences(mockClient, { page: 1, limit: 50 });
-    expect(result.data[0]).toEqual({ title: 'Monthly rent', type: 'withdrawal', first_date: '2026-06-01', active: true, id: '1' });
+    expect(result.data[0]).toEqual({
+      title: 'Monthly rent',
+      type: 'withdrawal',
+      first_date: '2026-06-01',
+      active: true,
+      id: '1',
+    });
     expect(result.pagination).toEqual({ page: 1, totalPages: 1, total: 1 });
   });
 });
@@ -52,7 +66,13 @@ describe('fetchRecurrence', () => {
   it('returns flat item', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(singleFixture);
     const result = await fetchRecurrence(mockClient, '1');
-    expect(result).toEqual({ title: 'Monthly rent', type: 'withdrawal', first_date: '2026-06-01', active: true, id: '1' });
+    expect(result).toEqual({
+      title: 'Monthly rent',
+      type: 'withdrawal',
+      first_date: '2026-06-01',
+      active: true,
+      id: '1',
+    });
   });
 });
 
@@ -111,13 +131,16 @@ describe('createRecurrence', () => {
       category_id: '12',
       budget_id: '3',
     });
-    expect(mockClient.post).toHaveBeenCalledWith('/recurrences', expect.objectContaining({
-      description: 'Monthly rent recurrence',
-      notes: 'Pay on time',
-      repeat_until: '2027-06-01',
-      repetitions: [expect.objectContaining({ skip: 0 })],
-      transactions: [expect.objectContaining({ category_id: '12', budget_id: '3' })],
-    }));
+    expect(mockClient.post).toHaveBeenCalledWith(
+      '/recurrences',
+      expect.objectContaining({
+        description: 'Monthly rent recurrence',
+        notes: 'Pay on time',
+        repeat_until: '2027-06-01',
+        repetitions: [expect.objectContaining({ skip: 0 })],
+        transactions: [expect.objectContaining({ category_id: '12', budget_id: '3' })],
+      }),
+    );
   });
 
   it('returns unwrapped single', async () => {
@@ -133,7 +156,13 @@ describe('createRecurrence', () => {
       source_id: '1',
       destination_id: '2',
     });
-    expect(result).toEqual({ title: 'Weekly groceries', type: 'withdrawal', first_date: '2026-06-07', active: true, id: '2' });
+    expect(result).toEqual({
+      title: 'Weekly groceries',
+      type: 'withdrawal',
+      first_date: '2026-06-07',
+      active: true,
+      id: '2',
+    });
   });
 });
 
@@ -163,7 +192,13 @@ describe('updateRecurrence', () => {
   it('returns unwrapped single', async () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
     const result = await updateRecurrence(mockClient, '1', { active: false });
-    expect(result).toEqual({ title: 'Weekly groceries', type: 'withdrawal', first_date: '2026-06-07', active: true, id: '2' });
+    expect(result).toEqual({
+      title: 'Weekly groceries',
+      type: 'withdrawal',
+      first_date: '2026-06-07',
+      active: true,
+      id: '2',
+    });
   });
 });
 

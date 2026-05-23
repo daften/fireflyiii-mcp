@@ -1,12 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { registerAllTools, PRESETS, TOOL_GROUPS, makeReadOnlyProxy } from '../tools/index.js';
+import { makeReadOnlyProxy, PRESETS, registerAllTools, TOOL_GROUPS } from '../tools/index.js';
 
 function createMockServer() {
   const registered: string[] = [];
   const server = {
-    registerTool: vi.fn((name: string) => { registered.push(name); }),
+    registerTool: vi.fn((name: string) => {
+      registered.push(name);
+    }),
   } as unknown as McpServer;
   return { server, registered };
 }
@@ -168,7 +170,7 @@ describe('registerAllTools — readOnly', () => {
     for (const name of registered) {
       expect(
         name.startsWith('get_') || name.startsWith('search_') || name.startsWith('test_'),
-        `"${name}" should not be registered in readOnly mode`
+        `"${name}" should not be registered in readOnly mode`,
       ).toBe(true);
     }
   });
@@ -198,7 +200,9 @@ describe('makeReadOnlyProxy — this-binding', () => {
   it('non-registerTool methods are bound to the underlying server, not the proxy', () => {
     const inner = {
       value: 42,
-      getValue(this: typeof inner) { return this.value; },
+      getValue(this: typeof inner) {
+        return this.value;
+      },
       registerTool: vi.fn(),
     };
     const proxy = makeReadOnlyProxy(inner as unknown as McpServer);
@@ -228,7 +232,7 @@ describe('TOOL_GROUPS and PRESETS exports', () => {
 
   it('PRESETS defines all six preset names', () => {
     expect(Object.keys(PRESETS)).toEqual(
-      expect.arrayContaining(['minimal', 'default', 'budgeting', 'insights', 'automation', 'full'])
+      expect.arrayContaining(['minimal', 'default', 'budgeting', 'insights', 'automation', 'full']),
     );
   });
 });

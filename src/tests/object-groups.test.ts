@@ -1,11 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
-  fetchObjectGroups, fetchObjectGroup, createObjectGroup, updateObjectGroup,
-  deleteObjectGroup, fetchObjectGroupBills, fetchObjectGroupPiggyBanks,
+  createObjectGroup,
+  deleteObjectGroup,
+  fetchObjectGroup,
+  fetchObjectGroupBills,
+  fetchObjectGroupPiggyBanks,
+  fetchObjectGroups,
+  registerObjectGroupTools,
+  updateObjectGroup,
 } from '../tools/object-groups.js';
 import { createMockServer } from './_helpers.js';
-import { registerObjectGroupTools } from '../tools/object-groups.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 

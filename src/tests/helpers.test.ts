@@ -1,14 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { describe, expect, it, vi } from 'vitest';
 import { FireflyError } from '../client.js';
-import { defineTool, dateSchema } from '../tools/_helpers.js';
+import { dateSchema, defineTool } from '../tools/_helpers.js';
 
 function makeServer() {
   let capturedHandler: ((args: Record<string, unknown>) => Promise<unknown>) | null = null;
   const server = {
-    registerTool: vi.fn((_name: string, _config: unknown, handler: (args: Record<string, unknown>) => Promise<unknown>) => {
-      capturedHandler = handler;
-    }),
+    registerTool: vi.fn(
+      (_name: string, _config: unknown, handler: (args: Record<string, unknown>) => Promise<unknown>) => {
+        capturedHandler = handler;
+      },
+    ),
     getHandler: () => capturedHandler!,
   };
   return server;
@@ -17,8 +19,7 @@ function makeServer() {
 describe('defineTool', () => {
   it('serialises object result to pretty-printed JSON', async () => {
     const server = makeServer();
-    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' },
-      async () => ({ foo: 'bar', n: 1 }));
+    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' }, async () => ({ foo: 'bar', n: 1 }));
     const result = await server.getHandler()({});
     expect(result).toEqual({
       content: [{ type: 'text', text: '{\n  "foo": "bar",\n  "n": 1\n}' }],
@@ -27,8 +28,7 @@ describe('defineTool', () => {
 
   it('passes string result through without double-encoding', async () => {
     const server = makeServer();
-    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' },
-      async () => 'col1,col2\n1,2');
+    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' }, async () => 'col1,col2\n1,2');
     const result = await server.getHandler()({});
     expect(result).toEqual({
       content: [{ type: 'text', text: 'col1,col2\n1,2' }],
@@ -37,8 +37,9 @@ describe('defineTool', () => {
 
   it('wraps thrown FireflyError into { isError: true }', async () => {
     const server = makeServer();
-    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' },
-      async () => { throw new FireflyError(404, '/test', ''); });
+    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' }, async () => {
+      throw new FireflyError(404, '/test', '');
+    });
     const result = await server.getHandler()({});
     expect(result).toMatchObject({
       isError: true,
@@ -48,8 +49,9 @@ describe('defineTool', () => {
 
   it('wraps generic Error into { isError: true }', async () => {
     const server = makeServer();
-    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' },
-      async () => { throw new Error('boom'); });
+    defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' }, async () => {
+      throw new Error('boom');
+    });
     const result = await server.getHandler()({});
     expect(result).toMatchObject({ isError: true, content: [{ type: 'text', text: 'boom' }] });
   });

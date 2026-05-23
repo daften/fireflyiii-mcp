@@ -4,7 +4,7 @@ export class FireflyError extends Error {
   constructor(
     public readonly status: number,
     public readonly url: string,
-    public readonly body: string
+    public readonly body: string,
   ) {
     super(`Firefly III API error ${status} at ${url.split('?')[0]}: ${body}`);
     this.name = 'FireflyError';
@@ -48,7 +48,10 @@ export class FireflyClient {
   private readonly baseUrl: string;
   private readonly timeoutMs = 30_000;
 
-  constructor(baseUrl: string, private readonly tokenResolver: string | (() => string)) {
+  constructor(
+    baseUrl: string,
+    private readonly tokenResolver: string | (() => string),
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 

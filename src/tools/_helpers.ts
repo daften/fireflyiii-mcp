@@ -26,10 +26,12 @@ export function defineTool(
     try {
       const result = await fetch(args);
       return {
-        content: [{
-          type: 'text' as const,
-          text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-        }],
+        content: [
+          {
+            type: 'text' as const,
+            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+          },
+        ],
       };
     } catch (err) {
       return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };

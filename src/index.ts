@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { type ParsedArgs, parseArgs } from './args.js';
 import { FireflyClient } from './client.js';
+import { requestContext, startHttpServer } from './http.js';
 import { createServer } from './server.js';
-import { startHttpServer, requestContext } from './http.js';
-import { parseArgs } from './args.js';
 
-let parsed;
+let parsed: ParsedArgs;
 try {
   parsed = parseArgs(process.argv.slice(2));
 } catch (err) {
@@ -15,14 +15,14 @@ try {
 
 const { transport, host, port, portWasExplicit, filterOptions } = parsed;
 
-const url = process.env['FIREFLY_URL'];
+const url = process.env.FIREFLY_URL;
 
 if (transport === 'http') {
-  const oauthClientId = process.env['FIREFLY_OAUTH_CLIENT_ID'];
+  const oauthClientId = process.env.FIREFLY_OAUTH_CLIENT_ID;
   if (!url || !oauthClientId) {
     process.stderr.write(
       'Error: FIREFLY_URL and FIREFLY_OAUTH_CLIENT_ID environment variables are required for HTTP transport.\n' +
-      'See .env.example for configuration instructions.\n'
+        'See .env.example for configuration instructions.\n',
     );
     process.exit(1);
   }
@@ -33,11 +33,11 @@ if (transport === 'http') {
   });
   await startHttpServer(() => createServer(client, filterOptions), host, port, portWasExplicit, oauthClientId, url);
 } else {
-  const token = process.env['FIREFLY_TOKEN'];
+  const token = process.env.FIREFLY_TOKEN;
   if (!url || !token) {
     process.stderr.write(
       'Error: FIREFLY_URL and FIREFLY_TOKEN environment variables are required for stdio transport.\n' +
-      'See .env.example for configuration instructions.\n'
+        'See .env.example for configuration instructions.\n',
     );
     process.exit(1);
   }

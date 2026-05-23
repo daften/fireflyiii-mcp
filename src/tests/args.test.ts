@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseArgs } from '../args.js';
 
 describe('parseArgs — filter flags', () => {
@@ -28,18 +28,17 @@ describe('parseArgs — filter flags', () => {
   });
 
   it('throws when both --preset and --groups are provided', () => {
-    expect(() => parseArgs(['--preset', 'default', '--groups', 'accounts']))
-      .toThrow(/cannot use both --preset and --groups/i);
+    expect(() => parseArgs(['--preset', 'default', '--groups', 'accounts'])).toThrow(
+      /cannot use both --preset and --groups/i,
+    );
   });
 
   it('throws when unknown preset name is provided', () => {
-    expect(() => parseArgs(['--preset', 'nonexistent']))
-      .toThrow(/unknown preset/i);
+    expect(() => parseArgs(['--preset', 'nonexistent'])).toThrow(/unknown preset/i);
   });
 
   it('throws when unknown group name is provided', () => {
-    expect(() => parseArgs(['--groups', 'accounts,fakething']))
-      .toThrow(/unknown group.*fakething/i);
+    expect(() => parseArgs(['--groups', 'accounts,fakething'])).toThrow(/unknown group.*fakething/i);
   });
 
   it('parses --read-only alongside --preset', () => {
@@ -69,12 +68,10 @@ describe('parseArgs — existing flags still work', () => {
   });
 
   it('throws on invalid --transport value', () => {
-    expect(() => parseArgs(['--transport', 'grpc']))
-      .toThrow(/--transport must be/i);
+    expect(() => parseArgs(['--transport', 'grpc'])).toThrow(/--transport must be/i);
   });
 
   it('throws on invalid --port value', () => {
-    expect(() => parseArgs(['--port', 'abc']))
-      .toThrow(/--port must be/i);
+    expect(() => parseArgs(['--port', 'abc'])).toThrow(/--port must be/i);
   });
 });

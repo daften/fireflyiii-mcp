@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchPiggyBanks, createPiggyBank, updatePiggyBank, deletePiggyBank, fetchPiggyBankEvents, createPiggyBankEvent, deletePiggyBankEvent } from '../tools/piggy-banks.js';
+import {
+  createPiggyBank,
+  createPiggyBankEvent,
+  deletePiggyBank,
+  deletePiggyBankEvent,
+  fetchPiggyBankEvents,
+  fetchPiggyBanks,
+  registerPiggyBankTools,
+  updatePiggyBank,
+} from '../tools/piggy-banks.js';
 import { createMockServer } from './_helpers.js';
-import { registerPiggyBankTools } from '../tools/piggy-banks.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -39,7 +47,12 @@ describe('fetchPiggyBanks', () => {
 });
 
 const piggyBankSingleFixture = {
-  data: { id: '4', type: 'piggy_banks', attributes: { name: 'Vacation', target_amount: '1000.00', account_id: '1' }, links: {} },
+  data: {
+    id: '4',
+    type: 'piggy_banks',
+    attributes: { name: 'Vacation', target_amount: '1000.00', account_id: '1' },
+    links: {},
+  },
 };
 
 describe('createPiggyBank', () => {

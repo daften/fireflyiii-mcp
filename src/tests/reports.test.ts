@@ -1,23 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
-  fetchTags,
-  fetchTagTransactions,
-  fetchSummary,
-  fetchInsightExpenses,
-  fetchInsightIncome,
-  fetchInsightNoX,
-  fetchInsightGrouped,
   createTag,
-  updateTag,
   deleteTag,
   fetchAbout,
-  fetchNetWorth,
   fetchChart,
   fetchExchangeRate,
+  fetchInsightExpenses,
+  fetchInsightGrouped,
+  fetchInsightIncome,
+  fetchInsightNoX,
+  fetchNetWorth,
+  fetchSummary,
+  fetchTags,
+  fetchTagTransactions,
+  registerReportTools,
+  updateTag,
 } from '../tools/reports.js';
 import { createMockServer } from './_helpers.js';
-import { registerReportTools } from '../tools/reports.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -49,7 +49,14 @@ const summaryFixture = {
 };
 
 const insightFixture = [
-  { id: '20', name: 'Bank costs', difference: '-102.97', difference_float: -102.97, currency_id: '1', currency_code: 'EUR' },
+  {
+    id: '20',
+    name: 'Bank costs',
+    difference: '-102.97',
+    difference_float: -102.97,
+    currency_id: '1',
+    currency_code: 'EUR',
+  },
 ];
 
 describe('fetchTags', () => {
@@ -239,7 +246,11 @@ describe('fetchNetWorth', () => {
   it('includes currency_code when provided', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce([]);
     await fetchNetWorth(mockClient, '2026-01-01', '2026-01-31', 'EUR');
-    expect(mockClient.get).toHaveBeenCalledWith('/summary/net-worth', { start: '2026-01-01', end: '2026-01-31', currency_code: 'EUR' });
+    expect(mockClient.get).toHaveBeenCalledWith('/summary/net-worth', {
+      start: '2026-01-01',
+      end: '2026-01-31',
+      currency_code: 'EUR',
+    });
   });
 });
 
@@ -278,7 +289,9 @@ describe('fetchInsightGrouped', () => {
 
   it('passes filter arrays as query params', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce([]);
-    await fetchInsightGrouped(mockClient, '/insight/expense/bill', '2026-01-01', '2026-01-31', { 'bills[]': ['1', '2'] });
+    await fetchInsightGrouped(mockClient, '/insight/expense/bill', '2026-01-01', '2026-01-31', {
+      'bills[]': ['1', '2'],
+    });
     expect(mockClient.get).toHaveBeenCalledWith('/insight/expense/bill', {
       start: '2026-01-01',
       end: '2026-01-31',

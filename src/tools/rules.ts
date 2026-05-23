@@ -1,20 +1,23 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { FireflyClient } from '../client.js';
-import type { QueryParams } from '../types.js';
 import {
-  unwrapList, unwrapSingle,
-  type JsonApiListResponse, type JsonApiSingleResponse,
-  type UnwrappedList, type UnwrappedSingle,
+  type JsonApiListResponse,
+  type JsonApiSingleResponse,
+  type UnwrappedList,
+  type UnwrappedSingle,
+  unwrapList,
+  unwrapSingle,
 } from '../transform.js';
-import { READ_ANNOTATIONS, WRITE_ANNOTATIONS, UPDATE_ANNOTATIONS, DELETE_ANNOTATIONS } from './_annotations.js';
-import { defineTool, dateSchema } from './_helpers.js';
+import type { QueryParams } from '../types.js';
+import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
+import { dateSchema, defineTool } from './_helpers.js';
 
 // ---- Rule group fetch + CRUD ----
 
 export async function fetchRuleGroups(
   client: FireflyClient,
-  params: { page?: number; limit?: number }
+  params: { page?: number; limit?: number },
 ): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
   const response = await client.get<JsonApiListResponse>('/rule-groups', query);
@@ -28,7 +31,7 @@ export async function fetchRuleGroup(client: FireflyClient, id: string): Promise
 
 export async function createRuleGroup(
   client: FireflyClient,
-  params: { title: string; description?: string; active?: boolean }
+  params: { title: string; description?: string; active?: boolean },
 ): Promise<UnwrappedSingle> {
   const response = await client.post<JsonApiSingleResponse>('/rule-groups', params);
   return unwrapSingle(response);
@@ -37,16 +40,13 @@ export async function createRuleGroup(
 export async function updateRuleGroup(
   client: FireflyClient,
   id: string,
-  params: { title?: string; description?: string; active?: boolean }
+  params: { title?: string; description?: string; active?: boolean },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/rule-groups/${id}`, params);
   return unwrapSingle(response);
 }
 
-export async function deleteRuleGroup(
-  client: FireflyClient,
-  id: string
-): Promise<{ deleted: true; id: string }> {
+export async function deleteRuleGroup(client: FireflyClient, id: string): Promise<{ deleted: true; id: string }> {
   await client.delete(`/rule-groups/${id}`);
   return { deleted: true, id };
 }
@@ -72,7 +72,7 @@ type RuleActionInput = {
 
 export async function fetchRules(
   client: FireflyClient,
-  params: { page?: number; limit?: number }
+  params: { page?: number; limit?: number },
 ): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
   const response = await client.get<JsonApiListResponse>('/rules', query);
@@ -96,7 +96,7 @@ export async function createRule(
     active?: boolean;
     strict?: boolean;
     stop_processing?: boolean;
-  }
+  },
 ): Promise<UnwrappedSingle> {
   const response = await client.post<JsonApiSingleResponse>('/rules', params);
   return unwrapSingle(response);
@@ -115,16 +115,13 @@ export async function updateRule(
     active?: boolean;
     strict?: boolean;
     stop_processing?: boolean;
-  }
+  },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/rules/${id}`, params);
   return unwrapSingle(response);
 }
 
-export async function deleteRule(
-  client: FireflyClient,
-  id: string
-): Promise<{ deleted: true; id: string }> {
+export async function deleteRule(client: FireflyClient, id: string): Promise<{ deleted: true; id: string }> {
   await client.delete(`/rules/${id}`);
   return { deleted: true, id };
 }
@@ -134,11 +131,11 @@ export async function deleteRule(
 export async function triggerRuleGroup(
   client: FireflyClient,
   id: string,
-  params: { start?: string; end?: string; accounts?: number[] }
+  params: { start?: string; end?: string; accounts?: number[] },
 ): Promise<{ triggered: true; id: string }> {
   const query: QueryParams = {};
-  if (params.start) query['start'] = params.start;
-  if (params.end) query['end'] = params.end;
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
   await client.post<void>(`/rule-groups/${id}/trigger`, undefined, query);
   return { triggered: true, id };
@@ -147,11 +144,11 @@ export async function triggerRuleGroup(
 export async function triggerRule(
   client: FireflyClient,
   id: string,
-  params: { start?: string; end?: string; accounts?: number[] }
+  params: { start?: string; end?: string; accounts?: number[] },
 ): Promise<{ triggered: true; id: string }> {
   const query: QueryParams = {};
-  if (params.start) query['start'] = params.start;
-  if (params.end) query['end'] = params.end;
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
   await client.post<void>(`/rules/${id}/trigger`, undefined, query);
   return { triggered: true, id };
@@ -160,14 +157,14 @@ export async function triggerRule(
 export async function testRuleGroup(
   client: FireflyClient,
   id: string,
-  params: { start?: string; end?: string; accounts?: number[]; search_limit?: number; triggered_limit?: number }
+  params: { start?: string; end?: string; accounts?: number[]; search_limit?: number; triggered_limit?: number },
 ): Promise<UnwrappedList> {
   const query: QueryParams = {};
-  if (params.start) query['start'] = params.start;
-  if (params.end) query['end'] = params.end;
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
-  if (params.search_limit !== undefined) query['search_limit'] = params.search_limit;
-  if (params.triggered_limit !== undefined) query['triggered_limit'] = params.triggered_limit;
+  if (params.search_limit !== undefined) query.search_limit = params.search_limit;
+  if (params.triggered_limit !== undefined) query.triggered_limit = params.triggered_limit;
   const response = await client.get<JsonApiListResponse>(`/rule-groups/${id}/test`, query);
   return unwrapList(response);
 }
@@ -175,7 +172,7 @@ export async function testRuleGroup(
 export async function fetchRuleGroupRules(
   client: FireflyClient,
   id: string,
-  params: { page?: number; limit?: number }
+  params: { page?: number; limit?: number },
 ): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
   const response = await client.get<JsonApiListResponse>(`/rule-groups/${id}/rules`, query);
@@ -185,25 +182,29 @@ export async function fetchRuleGroupRules(
 export async function testRule(
   client: FireflyClient,
   id: string,
-  params: { start?: string; end?: string; accounts?: number[]; search_limit?: number; triggered_limit?: number }
+  params: { start?: string; end?: string; accounts?: number[]; search_limit?: number; triggered_limit?: number },
 ): Promise<UnwrappedList> {
   const query: QueryParams = {};
-  if (params.start) query['start'] = params.start;
-  if (params.end) query['end'] = params.end;
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
-  if (params.search_limit !== undefined) query['search_limit'] = params.search_limit;
-  if (params.triggered_limit !== undefined) query['triggered_limit'] = params.triggered_limit;
+  if (params.search_limit !== undefined) query.search_limit = params.search_limit;
+  if (params.triggered_limit !== undefined) query.triggered_limit = params.triggered_limit;
   const response = await client.get<JsonApiListResponse>(`/rules/${id}/test`, query);
   return unwrapList(response);
 }
 
-const triggerTypeSchema = z.string().describe(
-  'Trigger type. Common values: from_account_starts, from_account_ends, from_account_is, from_account_contains, to_account_starts, to_account_ends, to_account_is, to_account_contains, amount_less, amount_exactly, amount_more, description_starts, description_ends, description_contains, description_is, transaction_type, category_is, budget_is, tag_is, currency_is, has_attachments, has_no_category, has_any_category, has_no_budget, has_any_budget, has_no_tag, has_any_tag, notes_contains, notes_starts, notes_end, notes_are, no_notes, any_notes, source_account_is, destination_account_is, source_account_starts'
-);
+const triggerTypeSchema = z
+  .string()
+  .describe(
+    'Trigger type. Common values: from_account_starts, from_account_ends, from_account_is, from_account_contains, to_account_starts, to_account_ends, to_account_is, to_account_contains, amount_less, amount_exactly, amount_more, description_starts, description_ends, description_contains, description_is, transaction_type, category_is, budget_is, tag_is, currency_is, has_attachments, has_no_category, has_any_category, has_no_budget, has_any_budget, has_no_tag, has_any_tag, notes_contains, notes_starts, notes_end, notes_are, no_notes, any_notes, source_account_is, destination_account_is, source_account_starts',
+  );
 
-const actionTypeSchema = z.string().describe(
-  'Action type. Common values: user_action, set_category, clear_category, set_budget, clear_budget, add_tag, remove_tag, remove_all_tags, set_description, append_description, prepend_description, set_source_account, set_destination_account, set_notes, append_notes, prepend_notes, clear_notes, link_to_bill, convert_withdrawal, convert_deposit, convert_transfer, delete_transaction'
-);
+const actionTypeSchema = z
+  .string()
+  .describe(
+    'Action type. Common values: user_action, set_category, clear_category, set_budget, clear_budget, add_tag, remove_tag, remove_all_tags, set_description, append_description, prepend_description, set_source_account, set_destination_account, set_notes, append_notes, prepend_notes, clear_notes, link_to_bill, convert_withdrawal, convert_deposit, convert_transfer, delete_transaction',
+  );
 
 const triggerObjectSchema = z.object({
   type: triggerTypeSchema.describe('Trigger type'),
@@ -225,220 +226,346 @@ const actionObjectSchema = z.object({
 export function registerRuleTools(server: McpServer, client: FireflyClient): void {
   // ---- Rule Group tools ----
 
-  defineTool(server, 'get_rule_groups', {
-    title: 'Get Rule Groups',
-    description: 'Get all rule groups from Firefly III.',
-    inputSchema: {
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+  defineTool(
+    server,
+    'get_rule_groups',
+    {
+      title: 'Get Rule Groups',
+      description: 'Get all rule groups from Firefly III.',
+      inputSchema: {
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ page, limit }) => fetchRuleGroups(client, { page: page as number | undefined, limit: limit as number | undefined }));
+    ({ page, limit }) =>
+      fetchRuleGroups(client, { page: page as number | undefined, limit: limit as number | undefined }),
+  );
 
-  defineTool(server, 'get_rule_group', {
-    title: 'Get Rule Group',
-    description: 'Get a single rule group by its numeric ID. Use get_rule_groups to find valid IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule group ID'),
+  defineTool(
+    server,
+    'get_rule_group',
+    {
+      title: 'Get Rule Group',
+      description: 'Get a single rule group by its numeric ID. Use get_rule_groups to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ id }) => fetchRuleGroup(client, id as string));
+    ({ id }) => fetchRuleGroup(client, id as string),
+  );
 
-  defineTool(server, 'create_rule_group', {
-    title: 'Create Rule Group',
-    description: 'Create a new rule group in Firefly III.',
-    inputSchema: {
-      title: z.string().describe('Rule group name'),
-      description: z.string().optional().describe('Description'),
-      active: z.boolean().optional().default(true).describe('Whether the group is active'),
+  defineTool(
+    server,
+    'create_rule_group',
+    {
+      title: 'Create Rule Group',
+      description: 'Create a new rule group in Firefly III.',
+      inputSchema: {
+        title: z.string().describe('Rule group name'),
+        description: z.string().optional().describe('Description'),
+        active: z.boolean().optional().default(true).describe('Whether the group is active'),
+      },
+      annotations: WRITE_ANNOTATIONS,
     },
-    annotations: WRITE_ANNOTATIONS,
-  }, ({ title, description, active }) => createRuleGroup(client, { title: title as string, description: description as string | undefined, active: active as boolean | undefined }));
+    ({ title, description, active }) =>
+      createRuleGroup(client, {
+        title: title as string,
+        description: description as string | undefined,
+        active: active as boolean | undefined,
+      }),
+  );
 
-  defineTool(server, 'update_rule_group', {
-    title: 'Update Rule Group',
-    description: 'Update an existing rule group. Only fields provided will be changed. Use get_rule_group to confirm the ID before updating.',
-    inputSchema: {
-      id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
-      title: z.string().optional().describe('Rule group name'),
-      description: z.string().optional().describe('Description'),
-      active: z.boolean().optional().describe('Whether the group is active'),
+  defineTool(
+    server,
+    'update_rule_group',
+    {
+      title: 'Update Rule Group',
+      description:
+        'Update an existing rule group. Only fields provided will be changed. Use get_rule_group to confirm the ID before updating.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        title: z.string().optional().describe('Rule group name'),
+        description: z.string().optional().describe('Description'),
+        active: z.boolean().optional().describe('Whether the group is active'),
+      },
+      annotations: UPDATE_ANNOTATIONS,
     },
-    annotations: UPDATE_ANNOTATIONS,
-  }, ({ id, title, description, active }) => updateRuleGroup(client, id as string, { title: title as string | undefined, description: description as string | undefined, active: active as boolean | undefined }));
+    ({ id, title, description, active }) =>
+      updateRuleGroup(client, id as string, {
+        title: title as string | undefined,
+        description: description as string | undefined,
+        active: active as boolean | undefined,
+      }),
+  );
 
-  defineTool(server, 'delete_rule_group', {
-    title: 'Delete Rule Group',
-    description: 'Permanently delete a rule group and all its rules from Firefly III. **This action cannot be undone.** Use get_rule_group to confirm before deleting.',
-    inputSchema: {
-      id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+  defineTool(
+    server,
+    'delete_rule_group',
+    {
+      title: 'Delete Rule Group',
+      description:
+        'Permanently delete a rule group and all its rules from Firefly III. **This action cannot be undone.** Use get_rule_group to confirm before deleting.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+      },
+      annotations: DELETE_ANNOTATIONS,
     },
-    annotations: DELETE_ANNOTATIONS,
-  }, ({ id }) => deleteRuleGroup(client, id as string));
+    ({ id }) => deleteRuleGroup(client, id as string),
+  );
 
   // ---- Rule tools ----
 
-  defineTool(server, 'get_rules', {
-    title: 'Get Rules',
-    description: 'Get all automation rules from Firefly III.',
-    inputSchema: {
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+  defineTool(
+    server,
+    'get_rules',
+    {
+      title: 'Get Rules',
+      description: 'Get all automation rules from Firefly III.',
+      inputSchema: {
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ page, limit }) => fetchRules(client, { page: page as number | undefined, limit: limit as number | undefined }));
+    ({ page, limit }) => fetchRules(client, { page: page as number | undefined, limit: limit as number | undefined }),
+  );
 
-  defineTool(server, 'get_rule', {
-    title: 'Get Rule',
-    description: 'Get a single automation rule by its numeric ID. Use get_rules to find valid IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule ID'),
+  defineTool(
+    server,
+    'get_rule',
+    {
+      title: 'Get Rule',
+      description: 'Get a single automation rule by its numeric ID. Use get_rules to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule ID'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ id }) => fetchRule(client, id as string));
+    ({ id }) => fetchRule(client, id as string),
+  );
 
-  defineTool(server, 'create_rule', {
-    title: 'Create Rule',
-    description: 'Create a new automation rule in Firefly III. Use get_rule_groups to find a valid rule_group_id.',
-    inputSchema: {
-      title: z.string().describe('Rule name'),
-      rule_group_id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
-      trigger: z.enum(['store-journal', 'update-journal']).describe('When this rule fires: store-journal (on transaction creation) or update-journal (on transaction update)'),
-      triggers: z.array(triggerObjectSchema).min(1).describe('List of trigger conditions'),
-      actions: z.array(actionObjectSchema).min(1).describe('List of actions to perform when triggers match'),
-      description: z.string().optional().describe('Description'),
-      active: z.boolean().optional().default(true).describe('Whether the rule is active'),
-      strict: z.boolean().optional().default(true).describe('ALL triggers must match (true) or ANY trigger (false)'),
-      stop_processing: z.boolean().optional().default(false).describe('Stop processing further rules after this one matches'),
+  defineTool(
+    server,
+    'create_rule',
+    {
+      title: 'Create Rule',
+      description: 'Create a new automation rule in Firefly III. Use get_rule_groups to find a valid rule_group_id.',
+      inputSchema: {
+        title: z.string().describe('Rule name'),
+        rule_group_id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        trigger: z
+          .enum(['store-journal', 'update-journal'])
+          .describe(
+            'When this rule fires: store-journal (on transaction creation) or update-journal (on transaction update)',
+          ),
+        triggers: z.array(triggerObjectSchema).min(1).describe('List of trigger conditions'),
+        actions: z.array(actionObjectSchema).min(1).describe('List of actions to perform when triggers match'),
+        description: z.string().optional().describe('Description'),
+        active: z.boolean().optional().default(true).describe('Whether the rule is active'),
+        strict: z.boolean().optional().default(true).describe('ALL triggers must match (true) or ANY trigger (false)'),
+        stop_processing: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe('Stop processing further rules after this one matches'),
+      },
+      annotations: WRITE_ANNOTATIONS,
     },
-    annotations: WRITE_ANNOTATIONS,
-  }, ({ title, rule_group_id, trigger, triggers, actions, description, active, strict, stop_processing }) =>
-    createRule(client, {
-      title: title as string,
-      rule_group_id: rule_group_id as string,
-      trigger: trigger as string,
-      triggers: triggers as RuleTriggerInput[],
-      actions: actions as RuleActionInput[],
-      description: description as string | undefined,
-      active: active as boolean | undefined,
-      strict: strict as boolean | undefined,
-      stop_processing: stop_processing as boolean | undefined,
-    }));
+    ({ title, rule_group_id, trigger, triggers, actions, description, active, strict, stop_processing }) =>
+      createRule(client, {
+        title: title as string,
+        rule_group_id: rule_group_id as string,
+        trigger: trigger as string,
+        triggers: triggers as RuleTriggerInput[],
+        actions: actions as RuleActionInput[],
+        description: description as string | undefined,
+        active: active as boolean | undefined,
+        strict: strict as boolean | undefined,
+        stop_processing: stop_processing as boolean | undefined,
+      }),
+  );
 
-  defineTool(server, 'update_rule', {
-    title: 'Update Rule',
-    description: 'Update an existing automation rule. Only fields provided will be changed. Use get_rule to confirm the ID before updating.',
-    inputSchema: {
-      id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
-      title: z.string().optional().describe('Rule name'),
-      rule_group_id: z.string().optional().describe('Rule group ID'),
-      trigger: z.enum(['store-journal', 'update-journal']).optional().describe('When this rule fires'),
-      triggers: z.array(triggerObjectSchema).min(1).optional().describe('List of trigger conditions'),
-      actions: z.array(actionObjectSchema).min(1).optional().describe('List of actions'),
-      description: z.string().optional().describe('Description'),
-      active: z.boolean().optional().describe('Whether the rule is active'),
-      strict: z.boolean().optional().describe('ALL triggers must match (true) or ANY trigger (false)'),
-      stop_processing: z.boolean().optional().describe('Stop processing further rules after this one'),
+  defineTool(
+    server,
+    'update_rule',
+    {
+      title: 'Update Rule',
+      description:
+        'Update an existing automation rule. Only fields provided will be changed. Use get_rule to confirm the ID before updating.',
+      inputSchema: {
+        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        title: z.string().optional().describe('Rule name'),
+        rule_group_id: z.string().optional().describe('Rule group ID'),
+        trigger: z.enum(['store-journal', 'update-journal']).optional().describe('When this rule fires'),
+        triggers: z.array(triggerObjectSchema).min(1).optional().describe('List of trigger conditions'),
+        actions: z.array(actionObjectSchema).min(1).optional().describe('List of actions'),
+        description: z.string().optional().describe('Description'),
+        active: z.boolean().optional().describe('Whether the rule is active'),
+        strict: z.boolean().optional().describe('ALL triggers must match (true) or ANY trigger (false)'),
+        stop_processing: z.boolean().optional().describe('Stop processing further rules after this one'),
+      },
+      annotations: UPDATE_ANNOTATIONS,
     },
-    annotations: UPDATE_ANNOTATIONS,
-  }, ({ id, title, rule_group_id, trigger, triggers, actions, description, active, strict, stop_processing }) =>
-    updateRule(client, id as string, {
-      title: title as string | undefined,
-      rule_group_id: rule_group_id as string | undefined,
-      trigger: trigger as string | undefined,
-      triggers: triggers as RuleTriggerInput[] | undefined,
-      actions: actions as RuleActionInput[] | undefined,
-      description: description as string | undefined,
-      active: active as boolean | undefined,
-      strict: strict as boolean | undefined,
-      stop_processing: stop_processing as boolean | undefined,
-    }));
+    ({ id, title, rule_group_id, trigger, triggers, actions, description, active, strict, stop_processing }) =>
+      updateRule(client, id as string, {
+        title: title as string | undefined,
+        rule_group_id: rule_group_id as string | undefined,
+        trigger: trigger as string | undefined,
+        triggers: triggers as RuleTriggerInput[] | undefined,
+        actions: actions as RuleActionInput[] | undefined,
+        description: description as string | undefined,
+        active: active as boolean | undefined,
+        strict: strict as boolean | undefined,
+        stop_processing: stop_processing as boolean | undefined,
+      }),
+  );
 
-  defineTool(server, 'delete_rule', {
-    title: 'Delete Rule',
-    description: 'Permanently delete an automation rule from Firefly III. **This action cannot be undone.** Use get_rule to confirm before deleting.',
-    inputSchema: {
-      id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+  defineTool(
+    server,
+    'delete_rule',
+    {
+      title: 'Delete Rule',
+      description:
+        'Permanently delete an automation rule from Firefly III. **This action cannot be undone.** Use get_rule to confirm before deleting.',
+      inputSchema: {
+        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+      },
+      annotations: DELETE_ANNOTATIONS,
     },
-    annotations: DELETE_ANNOTATIONS,
-  }, ({ id }) => deleteRule(client, id as string));
+    ({ id }) => deleteRule(client, id as string),
+  );
 
   // ---- Trigger and test tools ----
 
-  defineTool(server, 'get_rule_group_rules', {
-    title: 'Get Rule Group Rules',
-    description: 'Get all rules belonging to a specific rule group. Use get_rule_groups to find valid rule group IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule group ID'),
-      page: z.number().int().positive().optional().default(1).describe('Page number'),
-      limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+  defineTool(
+    server,
+    'get_rule_group_rules',
+    {
+      title: 'Get Rule Group Rules',
+      description:
+        'Get all rules belonging to a specific rule group. Use get_rule_groups to find valid rule group IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID'),
+        page: z.number().int().positive().optional().default(1).describe('Page number'),
+        limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ id, page, limit }) => fetchRuleGroupRules(client, id as string, { page: page as number | undefined, limit: limit as number | undefined }));
+    ({ id, page, limit }) =>
+      fetchRuleGroupRules(client, id as string, {
+        page: page as number | undefined,
+        limit: limit as number | undefined,
+      }),
+  );
 
-  defineTool(server, 'trigger_rule_group', {
-    title: 'Trigger Rule Group',
-    description: 'Manually run all rules in a rule group against existing transactions. Use get_rule_groups to find valid IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
-      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
-      accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
+  defineTool(
+    server,
+    'trigger_rule_group',
+    {
+      title: 'Trigger Rule Group',
+      description:
+        'Manually run all rules in a rule group against existing transactions. Use get_rule_groups to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+        end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+        accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
+      },
+      annotations: { openWorldHint: true },
     },
-    annotations: { openWorldHint: true },
-  }, ({ id, start, end, accounts }) => triggerRuleGroup(client, id as string, { start: start as string | undefined, end: end as string | undefined, accounts: accounts as number[] | undefined }));
+    ({ id, start, end, accounts }) =>
+      triggerRuleGroup(client, id as string, {
+        start: start as string | undefined,
+        end: end as string | undefined,
+        accounts: accounts as number[] | undefined,
+      }),
+  );
 
-  defineTool(server, 'trigger_rule', {
-    title: 'Trigger Rule',
-    description: 'Manually run a single rule against existing transactions. Use get_rules to find valid IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
-      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
-      accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
+  defineTool(
+    server,
+    'trigger_rule',
+    {
+      title: 'Trigger Rule',
+      description: 'Manually run a single rule against existing transactions. Use get_rules to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+        end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+        accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
+      },
+      annotations: { openWorldHint: true },
     },
-    annotations: { openWorldHint: true },
-  }, ({ id, start, end, accounts }) => triggerRule(client, id as string, { start: start as string | undefined, end: end as string | undefined, accounts: accounts as number[] | undefined }));
+    ({ id, start, end, accounts }) =>
+      triggerRule(client, id as string, {
+        start: start as string | undefined,
+        end: end as string | undefined,
+        accounts: accounts as number[] | undefined,
+      }),
+  );
 
-  defineTool(server, 'test_rule_group', {
-    title: 'Test Rule Group',
-    description: 'Dry-run a rule group against existing transactions and return matching transactions without applying any changes. Use get_rule_groups to find valid IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
-      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
-      accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
-      search_limit: z.number().int().positive().optional().describe('Maximum number of transactions to search'),
-      triggered_limit: z.number().int().positive().optional().describe('Maximum number of triggered transactions to return'),
+  defineTool(
+    server,
+    'test_rule_group',
+    {
+      title: 'Test Rule Group',
+      description:
+        'Dry-run a rule group against existing transactions and return matching transactions without applying any changes. Use get_rule_groups to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+        end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+        accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
+        search_limit: z.number().int().positive().optional().describe('Maximum number of transactions to search'),
+        triggered_limit: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Maximum number of triggered transactions to return'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ id, start, end, accounts, search_limit, triggered_limit }) =>
-    testRuleGroup(client, id as string, {
-      start: start as string | undefined,
-      end: end as string | undefined,
-      accounts: accounts as number[] | undefined,
-      search_limit: search_limit as number | undefined,
-      triggered_limit: triggered_limit as number | undefined,
-    }));
+    ({ id, start, end, accounts, search_limit, triggered_limit }) =>
+      testRuleGroup(client, id as string, {
+        start: start as string | undefined,
+        end: end as string | undefined,
+        accounts: accounts as number[] | undefined,
+        search_limit: search_limit as number | undefined,
+        triggered_limit: triggered_limit as number | undefined,
+      }),
+  );
 
-  defineTool(server, 'test_rule', {
-    title: 'Test Rule',
-    description: 'Dry-run a single rule against existing transactions and return matching transactions without applying any changes. Use get_rules to find valid IDs.',
-    inputSchema: {
-      id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
-      start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
-      end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
-      accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
-      search_limit: z.number().int().positive().optional().describe('Maximum number of transactions to search'),
-      triggered_limit: z.number().int().positive().optional().describe('Maximum number of triggered transactions to return'),
+  defineTool(
+    server,
+    'test_rule',
+    {
+      title: 'Test Rule',
+      description:
+        'Dry-run a single rule against existing transactions and return matching transactions without applying any changes. Use get_rules to find valid IDs.',
+      inputSchema: {
+        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
+        end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
+        accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
+        search_limit: z.number().int().positive().optional().describe('Maximum number of transactions to search'),
+        triggered_limit: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Maximum number of triggered transactions to return'),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    annotations: READ_ANNOTATIONS,
-  }, ({ id, start, end, accounts, search_limit, triggered_limit }) =>
-    testRule(client, id as string, {
-      start: start as string | undefined,
-      end: end as string | undefined,
-      accounts: accounts as number[] | undefined,
-      search_limit: search_limit as number | undefined,
-      triggered_limit: triggered_limit as number | undefined,
-    }));
+    ({ id, start, end, accounts, search_limit, triggered_limit }) =>
+      testRule(client, id as string, {
+        start: start as string | undefined,
+        end: end as string | undefined,
+        accounts: accounts as number[] | undefined,
+        search_limit: search_limit as number | undefined,
+        triggered_limit: triggered_limit as number | undefined,
+      }),
+  );
 }

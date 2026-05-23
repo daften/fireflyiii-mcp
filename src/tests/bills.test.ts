@@ -1,8 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchBills, createBill, updateBill, deleteBill, fetchBillTransactions } from '../tools/bills.js';
+import {
+  createBill,
+  deleteBill,
+  fetchBills,
+  fetchBillTransactions,
+  registerBillTools,
+  updateBill,
+} from '../tools/bills.js';
 import { createMockServer } from './_helpers.js';
-import { registerBillTools } from '../tools/bills.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -45,19 +51,43 @@ describe('fetchBills', () => {
 });
 
 const billSingleFixture = {
-  data: { id: '2', type: 'bills', attributes: { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', repeat_freq: 'monthly', active: true }, links: {} },
+  data: {
+    id: '2',
+    type: 'bills',
+    attributes: { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', repeat_freq: 'monthly', active: true },
+    links: {},
+  },
 };
 
 describe('createBill', () => {
   it('posts to /bills', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(billSingleFixture);
-    await createBill(mockClient, { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', date: '2024-01-01', repeat_freq: 'monthly' });
+    await createBill(mockClient, {
+      name: 'Netflix',
+      amount_min: '10.00',
+      amount_max: '15.00',
+      date: '2024-01-01',
+      repeat_freq: 'monthly',
+    });
     expect(mockClient.post).toHaveBeenCalledWith('/bills', expect.objectContaining({ name: 'Netflix' }));
   });
   it('returns unwrapped single', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(billSingleFixture);
-    const result = await createBill(mockClient, { name: 'Netflix', amount_min: '10.00', amount_max: '15.00', date: '2024-01-01', repeat_freq: 'monthly' });
-    expect(result).toEqual({ name: 'Netflix', amount_min: '10.00', amount_max: '15.00', repeat_freq: 'monthly', active: true, id: '2' });
+    const result = await createBill(mockClient, {
+      name: 'Netflix',
+      amount_min: '10.00',
+      amount_max: '15.00',
+      date: '2024-01-01',
+      repeat_freq: 'monthly',
+    });
+    expect(result).toEqual({
+      name: 'Netflix',
+      amount_min: '10.00',
+      amount_max: '15.00',
+      repeat_freq: 'monthly',
+      active: true,
+      id: '2',
+    });
   });
 });
 

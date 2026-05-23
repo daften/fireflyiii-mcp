@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FireflyClient, FireflyError, formatError } from '../client.js';
 
 describe('FireflyClient', () => {
@@ -11,23 +11,19 @@ describe('FireflyClient', () => {
   });
 
   it('sends request with correct Authorization header', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: [] }), { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'my-token');
     await client.get('/accounts');
     expect(fetch).toHaveBeenCalledWith(
       'https://firefly.example.com/api/v1/accounts',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer my-token' }),
-      })
+      }),
     );
   });
 
   it('strips trailing slash from base URL', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({}), { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com/', 'token');
     await client.get('/accounts');
     const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
@@ -35,9 +31,7 @@ describe('FireflyClient', () => {
   });
 
   it('appends query params to URL', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({}), { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'token');
     await client.get('/accounts', { page: 2, limit: 10 });
     const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
@@ -46,9 +40,7 @@ describe('FireflyClient', () => {
   });
 
   it('omits undefined query params', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({}), { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'token');
     await client.get('/accounts', { page: 1, type: undefined });
     const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
@@ -82,9 +74,7 @@ describe('FireflyClient', () => {
   });
 
   it('calls token resolver function at request time', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: [] }), { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     const resolver = vi.fn().mockReturnValue('resolved-token');
     const client = new FireflyClient('https://firefly.example.com', resolver);
     await client.get('/accounts');
@@ -93,7 +83,7 @@ describe('FireflyClient', () => {
       expect.any(String),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer resolved-token' }),
-      })
+      }),
     );
   });
 
@@ -109,14 +99,12 @@ describe('FireflyClient', () => {
     expect(resolver).toHaveBeenCalledTimes(2);
     const firstCall = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
     const secondCall = vi.mocked(fetch).mock.calls[1][1] as RequestInit;
-    expect((firstCall.headers as Record<string, string>)['Authorization']).toBe('Bearer token-1');
-    expect((secondCall.headers as Record<string, string>)['Authorization']).toBe('Bearer token-2');
+    expect((firstCall.headers as Record<string, string>).Authorization).toBe('Bearer token-1');
+    expect((secondCall.headers as Record<string, string>).Authorization).toBe('Bearer token-2');
   });
 
   it('appends repeated query params for number[] values in get()', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: [] }), { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'token');
     await client.get('/rule-groups/1/test', { 'accounts[]': [1, 2, 3] });
     const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
@@ -181,7 +169,7 @@ describe('FireflyClient write methods', () => {
     const result = await client.post('/accounts', body);
     expect(fetch).toHaveBeenCalledWith(
       'https://firefly.example.com/api/v1/accounts',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify(body) })
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(body) }),
     );
     expect(result).toEqual(responseData);
   });
@@ -194,7 +182,7 @@ describe('FireflyClient write methods', () => {
     const result = await client.put('/accounts/1', body);
     expect(fetch).toHaveBeenCalledWith(
       'https://firefly.example.com/api/v1/accounts/1',
-      expect.objectContaining({ method: 'PUT', body: JSON.stringify(body) })
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify(body) }),
     );
     expect(result).toEqual(responseData);
   });
@@ -205,7 +193,7 @@ describe('FireflyClient write methods', () => {
     const result = await client.delete('/accounts/1');
     expect(fetch).toHaveBeenCalledWith(
       'https://firefly.example.com/api/v1/accounts/1',
-      expect.objectContaining({ method: 'DELETE' })
+      expect.objectContaining({ method: 'DELETE' }),
     );
     expect(result).toBeUndefined();
   });
@@ -244,7 +232,7 @@ describe('FireflyClient write methods', () => {
         method: 'POST',
         body: data,
         headers: expect.objectContaining({ 'Content-Type': 'application/octet-stream' }),
-      })
+      }),
     );
     expect(result).toBeUndefined();
   });
@@ -256,22 +244,18 @@ describe('FireflyClient write methods', () => {
   });
 
   it('getText returns raw response text', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response('id,name\n1,Checking', { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('id,name\n1,Checking', { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'my-token');
     const result = await client.getText('/data/export/accounts', { type: 'csv' });
     expect(result).toBe('id,name\n1,Checking');
     expect(fetch).toHaveBeenCalledWith(
       'https://firefly.example.com/api/v1/data/export/accounts?type=csv',
-      expect.objectContaining({ method: 'GET' })
+      expect.objectContaining({ method: 'GET' }),
     );
   });
 
   it('serializes string[] params as repeated query params', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response('csv data', { status: 200 })
-    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('csv data', { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'my-token');
     await client.getText('/data/export/transactions', { 'columns[]': ['id', 'name'] });
     const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string;
@@ -318,11 +302,7 @@ describe('formatError — updated cases', () => {
   });
 
   it('does not include query string in error message', () => {
-    const err = new FireflyError(
-      404,
-      'https://firefly.example.com/api/v1/accounts?page=1&secret=abc',
-      'Not Found'
-    );
+    const err = new FireflyError(404, 'https://firefly.example.com/api/v1/accounts?page=1&secret=abc', 'Not Found');
     expect(err.message).not.toContain('secret=abc');
     expect(err.message).not.toContain('?page=1');
     expect(err.message).toContain('/api/v1/accounts');

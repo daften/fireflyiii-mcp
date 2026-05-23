@@ -1,24 +1,34 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
-  fetchAttachments, fetchAttachment,
-  createAttachment, updateAttachment,
-  deleteAttachment, uploadAttachment, downloadAttachment,
+  createAttachment,
+  deleteAttachment,
+  downloadAttachment,
+  fetchAttachment,
+  fetchAttachments,
+  registerAttachmentTools,
+  updateAttachment,
+  uploadAttachment,
 } from '../tools/attachments.js';
 import { createMockServer } from './_helpers.js';
-import { registerAttachmentTools } from '../tools/attachments.js';
 
 const mockClient = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), postBinary: vi.fn(),
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
+  postBinary: vi.fn(),
 } as unknown as FireflyClient;
 
 const attachmentListFixture = {
-  data: [{
-    id: '5',
-    type: 'attachments',
-    attributes: { filename: 'receipt.pdf', title: 'Receipt', notes: null, file_size: 1024 },
-    links: {},
-  }],
+  data: [
+    {
+      id: '5',
+      type: 'attachments',
+      attributes: { filename: 'receipt.pdf', title: 'Receipt', notes: null, file_size: 1024 },
+      links: {},
+    },
+  ],
   meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
 };
 
@@ -41,7 +51,13 @@ describe('fetchAttachments', () => {
   it('returns flat items with pagination', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(attachmentListFixture);
     const result = await fetchAttachments(mockClient, { page: 1, limit: 50 });
-    expect(result.data[0]).toEqual({ filename: 'receipt.pdf', title: 'Receipt', notes: null, file_size: 1024, id: '5' });
+    expect(result.data[0]).toEqual({
+      filename: 'receipt.pdf',
+      title: 'Receipt',
+      notes: null,
+      file_size: 1024,
+      id: '5',
+    });
     expect(result.pagination).toEqual({ page: 1, totalPages: 1, total: 1 });
   });
 });
@@ -63,13 +79,25 @@ describe('fetchAttachment', () => {
 describe('createAttachment', () => {
   it('posts to /attachments with body', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(attachmentSingleFixture);
-    await createAttachment(mockClient, { filename: 'receipt.pdf', attachable_type: 'TransactionJournal', attachable_id: '42' });
-    expect(mockClient.post).toHaveBeenCalledWith('/attachments', { filename: 'receipt.pdf', attachable_type: 'TransactionJournal', attachable_id: '42' });
+    await createAttachment(mockClient, {
+      filename: 'receipt.pdf',
+      attachable_type: 'TransactionJournal',
+      attachable_id: '42',
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/attachments', {
+      filename: 'receipt.pdf',
+      attachable_type: 'TransactionJournal',
+      attachable_id: '42',
+    });
   });
 
   it('returns unwrapped single', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(attachmentSingleFixture);
-    const result = await createAttachment(mockClient, { filename: 'receipt.pdf', attachable_type: 'TransactionJournal', attachable_id: '42' });
+    const result = await createAttachment(mockClient, {
+      filename: 'receipt.pdf',
+      attachable_type: 'TransactionJournal',
+      attachable_id: '42',
+    });
     expect(result).toMatchObject({ filename: 'receipt.pdf', id: '5' });
   });
 });
@@ -115,7 +143,10 @@ describe('uploadAttachment', () => {
 
 describe('downloadAttachment', () => {
   it('calls getText on /attachments/:id/download', async () => {
-    const mockFull = { ...mockClient, getText: vi.fn().mockResolvedValueOnce('receipt content') } as unknown as FireflyClient;
+    const mockFull = {
+      ...mockClient,
+      getText: vi.fn().mockResolvedValueOnce('receipt content'),
+    } as unknown as FireflyClient;
     const result = await downloadAttachment(mockFull, '7');
     expect(mockFull.getText).toHaveBeenCalledWith('/attachments/7/download');
     expect(result).toBe('receipt content');

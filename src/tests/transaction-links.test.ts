@@ -1,11 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
-  fetchLinkTypes, fetchTransactionLinks, fetchTransactionLink,
-  createTransactionLink, updateTransactionLink, deleteTransactionLink,
+  createTransactionLink,
+  deleteTransactionLink,
+  fetchLinkTypes,
+  fetchTransactionLink,
+  fetchTransactionLinks,
+  registerTransactionLinkTools,
+  updateTransactionLink,
 } from '../tools/transaction-links.js';
 import { createMockServer } from './_helpers.js';
-import { registerTransactionLinkTools } from '../tools/transaction-links.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -14,7 +18,12 @@ const listFixture = {
   meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
 };
 const linkSingle = {
-  data: { id: '5', type: 'transaction_links', attributes: { link_type_id: '1', in_id: '10', out_id: '11', notes: '' }, links: {} },
+  data: {
+    id: '5',
+    type: 'transaction_links',
+    attributes: { link_type_id: '1', in_id: '10', out_id: '11', notes: '' },
+    links: {},
+  },
 };
 
 describe('fetchLinkTypes', () => {
@@ -45,7 +54,11 @@ describe('createTransactionLink', () => {
   it('posts to /transaction-links', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(linkSingle);
     await createTransactionLink(mockClient, { link_type_id: '1', in_id: '10', out_id: '11' });
-    expect(mockClient.post).toHaveBeenCalledWith('/transaction-links', { link_type_id: '1', in_id: '10', out_id: '11' });
+    expect(mockClient.post).toHaveBeenCalledWith('/transaction-links', {
+      link_type_id: '1',
+      in_id: '10',
+      out_id: '11',
+    });
   });
 });
 

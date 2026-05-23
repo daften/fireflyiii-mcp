@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { FireflyClient } from '../client.js';
 
-const SKIP = !process.env['FIREFLY_INTEGRATION'];
+const SKIP = !process.env.FIREFLY_INTEGRATION;
 
 describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
   let client: FireflyClient;
 
   beforeAll(() => {
-    const url = process.env['FIREFLY_URL'];
-    const token = process.env['FIREFLY_TOKEN'];
+    const url = process.env.FIREFLY_URL;
+    const token = process.env.FIREFLY_TOKEN;
     if (!url || !token) {
       throw new Error('FIREFLY_URL and FIREFLY_TOKEN must be set for integration tests');
     }

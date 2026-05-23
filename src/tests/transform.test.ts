@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { unwrapList, unwrapSingle, cleanSummary } from '../transform.js';
+import { describe, expect, it } from 'vitest';
 import type { JsonApiListResponse, JsonApiSingleResponse, RawSummaryResponse } from '../transform.js';
+import { cleanSummary, unwrapList, unwrapSingle } from '../transform.js';
 
 const listFixture: JsonApiListResponse = {
   data: [
@@ -43,9 +43,7 @@ const summaryFixture: RawSummaryResponse = {
 describe('unwrapList', () => {
   it('flattens id and attributes, strips type and links', () => {
     const result = unwrapList(listFixture);
-    expect(result.data).toEqual([
-      { id: '240', name: 'Checking', current_balance: '1234.56', active: true },
-    ]);
+    expect(result.data).toEqual([{ id: '240', name: 'Checking', current_balance: '1234.56', active: true }]);
   });
 
   it('extracts compact pagination', () => {

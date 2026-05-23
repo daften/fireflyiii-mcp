@@ -1,7 +1,7 @@
-import * as http from 'node:http';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import * as http from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 interface RequestContext {
   token: string;
@@ -12,7 +12,9 @@ export const requestContext = new AsyncLocalStorage<RequestContext>();
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     let data = '';
-    req.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+    req.on('data', (chunk: Buffer) => {
+      data += chunk.toString();
+    });
     req.on('end', () => resolve(data));
     req.on('error', reject);
   });
@@ -22,15 +24,18 @@ const LOOPBACK_REDIRECT_PREFIXES = ['http://127.0.0.1:', 'http://localhost:', 'h
 
 function isRedirectUriAllowed(uri: string): boolean {
   if (LOOPBACK_REDIRECT_PREFIXES.some((p) => uri.startsWith(p))) return true;
-  const extra = process.env['MCP_ALLOWED_REDIRECT_PREFIXES']?.trim();
+  const extra = process.env.MCP_ALLOWED_REDIRECT_PREFIXES?.trim();
   if (!extra) return false;
-  return extra.split(',').map((s) => s.trim()).some((p) => p && uri.startsWith(p));
+  return extra
+    .split(',')
+    .map((s) => s.trim())
+    .some((p) => p && uri.startsWith(p));
 }
 
 export function createOAuthHandler(
   fireflyUrl: string,
   oauthClientId: string,
-  mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+  mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
 ): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
   const FLOW_TTL_MS = 10 * 60 * 1000;
   const pendingFlows = new Map<string, { redirectUri: string; createdAt: number }>();
@@ -44,8 +49,7 @@ export function createOAuthHandler(
 
   return async (req, res) => {
     const baseUrl =
-      (process.env['MCP_BASE_URL']?.trim().replace(/\/$/, '') || null) ??
-      `http://${req.headers['host'] ?? '127.0.0.1:3000'}`;
+      (process.env.MCP_BASE_URL?.trim().replace(/\/$/, '') || null) ?? `http://${req.headers.host ?? '127.0.0.1:3000'}`;
 
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
       const metadata = {
@@ -84,10 +88,7 @@ export function createOAuthHandler(
       }
       const fireflyAuthUrl = new URL(`${fireflyUrl}/oauth/authorize`);
       incomingUrl.searchParams.forEach((value, key) => {
-        fireflyAuthUrl.searchParams.set(
-          key,
-          key === 'redirect_uri' ? `${baseUrl}/oauth/callback` : value
-        );
+        fireflyAuthUrl.searchParams.set(key, key === 'redirect_uri' ? `${baseUrl}/oauth/callback` : value);
       });
       res.writeHead(302, { Location: fireflyAuthUrl.toString() });
       res.end();
@@ -101,8 +102,8 @@ export function createOAuthHandler(
       let redirectUris: string[] = [];
       try {
         const parsed = JSON.parse(body) as Record<string, unknown>;
-        if (Array.isArray(parsed['redirect_uris'])) {
-          redirectUris = parsed['redirect_uris'] as string[];
+        if (Array.isArray(parsed.redirect_uris)) {
+          redirectUris = parsed.redirect_uris as string[];
         }
       } catch {
         // no body or invalid JSON — return empty redirect_uris
@@ -181,19 +182,21 @@ export function createOAuthHandler(
         res.end(
           isExpired
             ? 'OAuth flow expired. Start authorization again from your MCP client.'
-            : 'No pending OAuth flow for this state. Start authorization from your MCP client.'
+            : 'No pending OAuth flow for this state. Start authorization from your MCP client.',
         );
         return;
       }
       pendingFlows.delete(state);
       const target = new URL(entry.redirectUri);
-      incomingUrl.searchParams.forEach((value, key) => target.searchParams.set(key, value));
+      incomingUrl.searchParams.forEach((value, key) => {
+        target.searchParams.set(key, value);
+      });
       res.writeHead(302, { Location: target.toString() });
       res.end();
       return;
     }
 
-    const authHeader = req.headers['authorization'];
+    const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) {
       res.writeHead(401, {
@@ -229,20 +232,20 @@ export async function startHttpServer(
   portWasExplicit: boolean,
   oauthClientId: string,
   fireflyUrl: string,
-  tryListenFn: (server: http.Server, host: string, port: number) => Promise<void> = tryListen
+  tryListenFn: (server: http.Server, host: string, port: number) => Promise<void> = tryListen,
 ): Promise<void> {
-  if (!process.env['MCP_BASE_URL']?.trim()) {
+  if (!process.env.MCP_BASE_URL?.trim()) {
     if (classifyHost(host) === 'non-loopback') {
       process.stderr.write(
         `Error: MCP_BASE_URL must be set when binding to a non-loopback interface (--host ${host}).\n` +
-        `Without it, the Host header controls OAuth callback URLs — an attacker can forge it.\n` +
-        `Set MCP_BASE_URL to the public URL of this server, e.g.:\n` +
-        `  MCP_BASE_URL=https://mcp.example.com\n`
+          `Without it, the Host header controls OAuth callback URLs — an attacker can forge it.\n` +
+          `Set MCP_BASE_URL to the public URL of this server, e.g.:\n` +
+          `  MCP_BASE_URL=https://mcp.example.com\n`,
       );
       process.exit(1);
     } else {
       process.stderr.write(
-        `Warning: MCP_BASE_URL is not set. OAuth URLs use the Host header — safe for local use only.\n`
+        `Warning: MCP_BASE_URL is not set. OAuth URLs use the Host header — safe for local use only.\n`,
       );
     }
   }
@@ -281,13 +284,15 @@ export async function startHttpServer(
         throw err;
       }
       if (portWasExplicit) {
-        process.stderr.write(`Error: Port ${port} on ${host} is already in use. Choose a different port with --port.\n`);
+        process.stderr.write(
+          `Error: Port ${port} on ${host} is already in use. Choose a different port with --port.\n`,
+        );
         process.exit(1);
       }
       const attempted = port - requestedPort;
       if (attempted >= 10) {
         process.stderr.write(
-          `Error: Ports ${requestedPort}–${requestedPort + 10} on ${host} are all in use. Specify an available port with --port.\n`
+          `Error: Ports ${requestedPort}–${requestedPort + 10} on ${host} are all in use. Specify an available port with --port.\n`,
         );
         process.exit(1);
       }

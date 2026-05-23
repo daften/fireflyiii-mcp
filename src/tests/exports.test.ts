@@ -1,8 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { exportEntity } from '../tools/exports.js';
+import { exportEntity, registerExportTools } from '../tools/exports.js';
 import { createMockServer } from './_helpers.js';
-import { registerExportTools } from '../tools/exports.js';
 
 const mockClient = {
   getText: vi.fn(),

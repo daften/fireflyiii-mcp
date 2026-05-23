@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import * as http from 'node:http';
-import { createOAuthHandler, requestContext, classifyHost, startHttpServer } from '../http.js';
+import type * as http from 'node:http';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { classifyHost, createOAuthHandler, requestContext, startHttpServer } from '../http.js';
 
 type MockRequest = {
   method: string;
@@ -18,12 +18,7 @@ type MockResponse = {
   end: (data?: string) => void;
 };
 
-function mockReq(
-  method: string,
-  url: string,
-  headers: Record<string, string> = {},
-  body = ''
-): MockRequest {
+function mockReq(method: string, url: string, headers: Record<string, string> = {}, body = ''): MockRequest {
   const req: MockRequest = {
     method,
     url,
@@ -61,7 +56,7 @@ describe('createOAuthHandler — metadata endpoint', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('GET', '/.well-known/oauth-authorization-server', { host: '127.0.0.1:3000' });
@@ -71,15 +66,15 @@ describe('createOAuthHandler — metadata endpoint', () => {
 
     expect(res.statusCode).toBe(200);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['issuer']).toBe('https://firefly.example.com');
+    expect(parsed.issuer).toBe('https://firefly.example.com');
     // Both OAuth endpoints are served by our proxy so we can substitute redirect_uri transparently.
-    expect(parsed['authorization_endpoint']).toBe('http://127.0.0.1:3000/oauth/authorize');
-    expect(parsed['token_endpoint']).toBe('http://127.0.0.1:3000/oauth/token');
-    expect(parsed['registration_endpoint']).toBe('http://127.0.0.1:3000/oauth/register');
-    expect(parsed['response_types_supported']).toEqual(['code']);
-    expect(parsed['grant_types_supported']).toEqual(['authorization_code', 'refresh_token']);
-    expect(parsed['code_challenge_methods_supported']).toEqual(['S256']);
-    expect(parsed['client_id']).toBe('client-id-123');
+    expect(parsed.authorization_endpoint).toBe('http://127.0.0.1:3000/oauth/authorize');
+    expect(parsed.token_endpoint).toBe('http://127.0.0.1:3000/oauth/token');
+    expect(parsed.registration_endpoint).toBe('http://127.0.0.1:3000/oauth/register');
+    expect(parsed.response_types_supported).toEqual(['code']);
+    expect(parsed.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
+    expect(parsed.code_challenge_methods_supported).toEqual(['S256']);
+    expect(parsed.client_id).toBe('client-id-123');
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -88,7 +83,7 @@ describe('createOAuthHandler — metadata endpoint', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('GET', '/.well-known/oauth-authorization-server');
@@ -106,20 +101,20 @@ describe('createOAuthHandler — authorize proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq(
       'GET',
       '/oauth/authorize?response_type=code&client_id=client-id-123&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc&code_challenge=xyz&code_challenge_method=S256',
-      { host: '127.0.0.1:3000' }
+      { host: '127.0.0.1:3000' },
     );
     const res = mockRes();
 
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(302);
-    const location = res.writtenHeaders['Location'] as string;
+    const location = res.writtenHeaders.Location as string;
     const locationUrl = new URL(location);
     expect(`${locationUrl.origin}${locationUrl.pathname}`).toBe('https://firefly.example.com/oauth/authorize');
     expect(locationUrl.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:3000/oauth/callback');
@@ -134,10 +129,12 @@ describe('createOAuthHandler — authorize proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
-    const req = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback', { host: '127.0.0.1:3000' });
+    const req = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback', {
+      host: '127.0.0.1:3000',
+    });
     const res = mockRes();
 
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
@@ -150,15 +147,13 @@ describe('createOAuthHandler — authorize proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     // Step 1: authorize proxy stores Claude's real redirect URI
-    const authReq = mockReq(
-      'GET',
-      '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc',
-      { host: '127.0.0.1:3000' }
-    );
+    const authReq = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc', {
+      host: '127.0.0.1:3000',
+    });
     await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
 
     // Step 2: Firefly III redirects to our stable callback
@@ -167,7 +162,7 @@ describe('createOAuthHandler — authorize proxy', () => {
     await handler(callbackReq as http.IncomingMessage, callbackRes as unknown as http.ServerResponse);
 
     expect(callbackRes.statusCode).toBe(302);
-    const location = callbackRes.writtenHeaders['Location'] as string;
+    const location = callbackRes.writtenHeaders.Location as string;
     expect(location).toContain('http://localhost:9999/callback');
     expect(location).toContain('code=authcode');
     expect(location).toContain('state=abc');
@@ -181,7 +176,7 @@ describe('createOAuthHandler — registration endpoint', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1:9999/callback'] });
@@ -192,12 +187,12 @@ describe('createOAuthHandler — registration endpoint', () => {
 
     expect(res.statusCode).toBe(201);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['client_id']).toBe('client-id-123');
-    expect(parsed['client_secret_expires_at']).toBe(0);
-    expect(parsed['token_endpoint_auth_method']).toBe('none');
-    expect(parsed['grant_types']).toEqual(['authorization_code', 'refresh_token']);
-    expect(parsed['response_types']).toEqual(['code']);
-    expect(parsed['redirect_uris']).toEqual(['http://127.0.0.1:3000/oauth/callback']);
+    expect(parsed.client_id).toBe('client-id-123');
+    expect(parsed.client_secret_expires_at).toBe(0);
+    expect(parsed.token_endpoint_auth_method).toBe('none');
+    expect(parsed.grant_types).toEqual(['authorization_code', 'refresh_token']);
+    expect(parsed.response_types).toEqual(['code']);
+    expect(parsed.redirect_uris).toEqual(['http://127.0.0.1:3000/oauth/callback']);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -206,7 +201,7 @@ describe('createOAuthHandler — registration endpoint', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/oauth/register');
@@ -216,7 +211,7 @@ describe('createOAuthHandler — registration endpoint', () => {
 
     expect(res.statusCode).toBe(201);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['redirect_uris']).toEqual([]);
+    expect(parsed.redirect_uris).toEqual([]);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -225,7 +220,7 @@ describe('createOAuthHandler — registration endpoint', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/oauth/register');
@@ -255,10 +250,11 @@ describe('createOAuthHandler — token proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
-    const body = 'grant_type=authorization_code&code=abc123&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&code_verifier=verifier123';
+    const body =
+      'grant_type=authorization_code&code=abc123&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&code_verifier=verifier123';
     const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, body);
     const res = mockRes();
 
@@ -276,17 +272,20 @@ describe('createOAuthHandler — token proxy', () => {
   });
 
   it('does not require Authorization header for token endpoint', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      status: 200,
-      text: () => Promise.resolve('{}'),
-      headers: { get: () => 'application/json' },
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        status: 200,
+        text: () => Promise.resolve('{}'),
+        headers: { get: () => 'application/json' },
+      }),
+    );
 
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
@@ -299,17 +298,20 @@ describe('createOAuthHandler — token proxy', () => {
   });
 
   it('forwards Firefly III error responses unchanged', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      status: 401,
-      text: () => Promise.resolve(JSON.stringify({ error: 'invalid_client' })),
-      headers: { get: () => 'application/json' },
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        status: 401,
+        text: () => Promise.resolve(JSON.stringify({ error: 'invalid_client' })),
+        headers: { get: () => 'application/json' },
+      }),
+    );
 
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
@@ -324,24 +326,27 @@ describe('createOAuthHandler — token proxy', () => {
   it('returns 504 if Firefly III token endpoint does not respond within 30 seconds', async () => {
     vi.useFakeTimers();
     // Mock fetch that hangs until the AbortSignal fires, then rejects with AbortError
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-      return new Promise<never>((_resolve, reject) => {
-        const signal = init?.signal as AbortSignal | undefined;
-        if (signal) {
-          signal.addEventListener('abort', () => {
-            const err = new Error('The operation was aborted');
-            err.name = 'AbortError';
-            reject(err);
-          });
-        }
-      });
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+        return new Promise<never>((_resolve, reject) => {
+          const signal = init?.signal as AbortSignal | undefined;
+          if (signal) {
+            signal.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          }
+        });
+      }),
+    );
 
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
@@ -355,7 +360,7 @@ describe('createOAuthHandler — token proxy', () => {
 
     expect(res.statusCode).toBe(504);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['error']).toBe('timeout');
+    expect(parsed.error).toBe('timeout');
 
     vi.useRealTimers();
   });
@@ -367,28 +372,22 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     // Step 1: authorize proxy stores Claude's real redirect URI by state
-    const authReq = mockReq(
-      'GET',
-      '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=xyz',
-      { host: '127.0.0.1:3000' }
-    );
+    const authReq = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=xyz', {
+      host: '127.0.0.1:3000',
+    });
     await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
 
     // Step 2: Firefly III redirects to our stable callback
-    const callbackReq = mockReq(
-      'GET',
-      '/oauth/callback?code=auth-code-abc&state=xyz',
-      { host: '127.0.0.1:3000' }
-    );
+    const callbackReq = mockReq('GET', '/oauth/callback?code=auth-code-abc&state=xyz', { host: '127.0.0.1:3000' });
     const callbackRes = mockRes();
     await handler(callbackReq as http.IncomingMessage, callbackRes as unknown as http.ServerResponse);
 
     expect(callbackRes.statusCode).toBe(302);
-    const location = callbackRes.writtenHeaders['Location'] as string;
+    const location = callbackRes.writtenHeaders.Location as string;
     expect(location).toContain('http://127.0.0.1:9999/callback');
     expect(location).toContain('code=auth-code-abc');
     expect(location).toContain('state=xyz');
@@ -400,7 +399,7 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('GET', '/oauth/callback?code=abc&state=xyz', { host: '127.0.0.1:3000' });
@@ -417,15 +416,13 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     // Authorize to set pending entry for state=abc
-    const authReq = mockReq(
-      'GET',
-      '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=abc',
-      { host: '127.0.0.1:3000' }
-    );
+    const authReq = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=abc', {
+      host: '127.0.0.1:3000',
+    });
     await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
 
     // First callback — should succeed
@@ -448,7 +445,7 @@ describe('createOAuthHandler — Bearer guard', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/mcp');
@@ -466,7 +463,7 @@ describe('createOAuthHandler — Bearer guard', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/mcp', { authorization: 'Basic dXNlcjpwYXNz' });
@@ -486,7 +483,7 @@ describe('createOAuthHandler — Bearer guard', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/mcp', { authorization: 'Bearer test-token-xyz' });
@@ -503,7 +500,7 @@ describe('createOAuthHandler — Bearer guard', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('POST', '/mcp', { authorization: 'Bearer isolated-token' });
@@ -525,40 +522,44 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     // Flow A: user A starts authorize with state=stateA
     await handler(
-      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A1111%2FcbA&state=stateA', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
-      mockRes() as unknown as http.ServerResponse
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A1111%2FcbA&state=stateA', {
+        host: '127.0.0.1:3000',
+      }) as http.IncomingMessage,
+      mockRes() as unknown as http.ServerResponse,
     );
 
     // Flow B: user B starts authorize with state=stateB
     await handler(
-      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A2222%2FcbB&state=stateB', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
-      mockRes() as unknown as http.ServerResponse
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A2222%2FcbB&state=stateB', {
+        host: '127.0.0.1:3000',
+      }) as http.IncomingMessage,
+      mockRes() as unknown as http.ServerResponse,
     );
 
     // Flow A completes its callback
     const resA = mockRes();
     await handler(
       mockReq('GET', '/oauth/callback?code=codeA&state=stateA', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
-      resA as unknown as http.ServerResponse
+      resA as unknown as http.ServerResponse,
     );
     expect(resA.statusCode).toBe(302);
-    expect(resA.writtenHeaders['Location']).toContain('127.0.0.1:1111/cbA');
-    expect(resA.writtenHeaders['Location']).not.toContain('2222');
+    expect(resA.writtenHeaders.Location).toContain('127.0.0.1:1111/cbA');
+    expect(resA.writtenHeaders.Location).not.toContain('2222');
 
     // Flow B completes its callback
     const resB = mockRes();
     await handler(
       mockReq('GET', '/oauth/callback?code=codeB&state=stateB', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
-      resB as unknown as http.ServerResponse
+      resB as unknown as http.ServerResponse,
     );
     expect(resB.statusCode).toBe(302);
-    expect(resB.writtenHeaders['Location']).toContain('127.0.0.1:2222/cbB');
-    expect(resB.writtenHeaders['Location']).not.toContain('1111');
+    expect(resB.writtenHeaders.Location).toContain('127.0.0.1:2222/cbB');
+    expect(resB.writtenHeaders.Location).not.toContain('1111');
   });
 
   it('returns 400 for callback with unknown state', async () => {
@@ -566,7 +567,7 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('GET', '/oauth/callback?code=x&state=unknown-state', { host: '127.0.0.1:3000' });
@@ -581,7 +582,7 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const startTime = 1_000_000_000_000;
@@ -589,8 +590,10 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
 
     // Authorize at startTime
     await handler(
-      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcb&state=expiring', { host: '127.0.0.1:3000' }) as http.IncomingMessage,
-      mockRes() as unknown as http.ServerResponse
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcb&state=expiring', {
+        host: '127.0.0.1:3000',
+      }) as http.IncomingMessage,
+      mockRes() as unknown as http.ServerResponse,
     );
 
     // Advance time by 11 minutes (past the 10-minute TTL)
@@ -606,7 +609,7 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
 
 describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
   afterEach(() => {
-    delete process.env['MCP_ALLOWED_REDIRECT_PREFIXES'];
+    delete process.env.MCP_ALLOWED_REDIRECT_PREFIXES;
   });
 
   it('rejects registration with a non-loopback redirect URI (400 invalid_redirect_uri)', async () => {
@@ -614,7 +617,7 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const body = JSON.stringify({ redirect_uris: ['http://evil.example.com/steal'] });
@@ -625,7 +628,7 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
 
     expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['error']).toBe('invalid_redirect_uri');
+    expect(parsed.error).toBe('invalid_redirect_uri');
   });
 
   it('accepts registration with a loopback redirect URI (127.0.0.1)', async () => {
@@ -633,7 +636,7 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1:54321/callback'] });
@@ -646,12 +649,12 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
   });
 
   it('accepts registration when redirect URI matches MCP_ALLOWED_REDIRECT_PREFIXES', async () => {
-    process.env['MCP_ALLOWED_REDIRECT_PREFIXES'] = 'https://claude.ai';
+    process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://claude.ai';
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/callback'] });
@@ -668,37 +671,35 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
-    const req = mockReq(
-      'GET',
-      '/oauth/authorize?redirect_uri=http%3A%2F%2Fevil.example.com%2Fsteal&state=abc',
-      { host: '127.0.0.1:3000' }
-    );
+    const req = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Fevil.example.com%2Fsteal&state=abc', {
+      host: '127.0.0.1:3000',
+    });
     const res = mockRes();
 
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['error']).toBe('invalid_redirect_uri');
+    expect(parsed.error).toBe('invalid_redirect_uri');
   });
 });
 
 describe('createOAuthHandler — MCP_BASE_URL override', () => {
   afterEach(() => {
-    delete process.env['MCP_BASE_URL'];
+    delete process.env.MCP_BASE_URL;
     vi.restoreAllMocks();
   });
 
   it('uses MCP_BASE_URL for OAuth metadata endpoints when set', async () => {
-    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('GET', '/.well-known/oauth-authorization-server', { host: '127.0.0.1:3000' });
@@ -707,41 +708,41 @@ describe('createOAuthHandler — MCP_BASE_URL override', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['authorization_endpoint']).toBe('https://mcp.example.com/oauth/authorize');
-    expect(parsed['token_endpoint']).toBe('https://mcp.example.com/oauth/token');
-    expect(parsed['registration_endpoint']).toBe('https://mcp.example.com/oauth/register');
+    expect(parsed.authorization_endpoint).toBe('https://mcp.example.com/oauth/authorize');
+    expect(parsed.token_endpoint).toBe('https://mcp.example.com/oauth/token');
+    expect(parsed.registration_endpoint).toBe('https://mcp.example.com/oauth/register');
   });
 
   it('uses MCP_BASE_URL for stable redirect_uri in authorize proxy', async () => {
-    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq(
       'GET',
       '/oauth/authorize?response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback',
-      { host: '127.0.0.1:3000' }
+      { host: '127.0.0.1:3000' },
     );
     const res = mockRes();
 
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
-    const location = res.writtenHeaders['Location'] as string;
+    const location = res.writtenHeaders.Location as string;
     const locationUrl = new URL(location);
     expect(locationUrl.searchParams.get('redirect_uri')).toBe('https://mcp.example.com/oauth/callback');
   });
 
   it('strips trailing slash from MCP_BASE_URL', async () => {
-    process.env['MCP_BASE_URL'] = 'https://mcp.example.com/';
+    process.env.MCP_BASE_URL = 'https://mcp.example.com/';
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const req = mockReq('GET', '/.well-known/oauth-authorization-server', { host: '127.0.0.1:3000' });
@@ -750,11 +751,11 @@ describe('createOAuthHandler — MCP_BASE_URL override', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed['authorization_endpoint']).toBe('https://mcp.example.com/oauth/authorize');
+    expect(parsed.authorization_endpoint).toBe('https://mcp.example.com/oauth/authorize');
   });
 
   it('uses MCP_BASE_URL for redirect_uri in token proxy', async () => {
-    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
     const mockFetch = vi.fn().mockResolvedValue({
       status: 200,
       text: () => Promise.resolve('{}'),
@@ -766,7 +767,7 @@ describe('createOAuthHandler — MCP_BASE_URL override', () => {
     const handler = createOAuthHandler(
       'https://firefly.example.com',
       'client-id-123',
-      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
     );
 
     const body = 'grant_type=authorization_code&code=abc&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback';
@@ -810,14 +811,14 @@ describe('classifyHost', () => {
 describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
   beforeEach(() => {
     // Suppress the MCP_BASE_URL warning by providing a value
-    process.env['MCP_BASE_URL'] = 'https://mcp.example.com';
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
 
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    delete process.env['MCP_BASE_URL'];
+    delete process.env.MCP_BASE_URL;
     vi.restoreAllMocks();
   });
 
@@ -842,8 +843,8 @@ describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
         false,
         'client-id',
         'https://firefly.example.com',
-        mockTryListen
-      )
+        mockTryListen,
+      ),
     ).resolves.toBeUndefined();
 
     expect(mockTryListen).toHaveBeenCalledTimes(2);
@@ -879,8 +880,8 @@ describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
         false,
         'client-id',
         'https://firefly.example.com',
-        mockTryListen
-      )
+        mockTryListen,
+      ),
     ).rejects.toThrow('process.exit called');
 
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -908,8 +909,8 @@ describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
         true,
         'client-id',
         'https://firefly.example.com',
-        mockTryListen
-      )
+        mockTryListen,
+      ),
     ).rejects.toThrow('process.exit called');
 
     expect(exitSpy).toHaveBeenCalledWith(1);

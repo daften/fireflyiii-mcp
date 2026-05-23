@@ -1,8 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchCategories, fetchCategoryTransactions, createCategory, updateCategory, deleteCategory } from '../tools/categories.js';
+import {
+  createCategory,
+  deleteCategory,
+  fetchCategories,
+  fetchCategoryTransactions,
+  registerCategoryTools,
+  updateCategory,
+} from '../tools/categories.js';
 import { createMockServer } from './_helpers.js';
-import { registerCategoryTools } from '../tools/categories.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 

@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
-import { fetchAccounts, fetchAccount, createAccount, updateAccount, deleteAccount, fetchAccountTransactions, searchAccounts } from '../tools/accounts.js';
+import {
+  createAccount,
+  deleteAccount,
+  fetchAccount,
+  fetchAccounts,
+  fetchAccountTransactions,
+  registerAccountTools,
+  searchAccounts,
+  updateAccount,
+} from '../tools/accounts.js';
 import { createMockServer } from './_helpers.js';
-import { registerAccountTools } from '../tools/accounts.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
@@ -82,7 +90,9 @@ describe('createAccount', () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(accountSingleFixture);
     await createAccount(mockClient, { name: 'New Account', type: 'asset', currency_code: 'EUR' });
     expect(mockClient.post).toHaveBeenCalledWith('/accounts', {
-      name: 'New Account', type: 'asset', currency_code: 'EUR',
+      name: 'New Account',
+      type: 'asset',
+      currency_code: 'EUR',
     });
   });
   it('returns unwrapped single', async () => {
@@ -123,7 +133,10 @@ describe('fetchAccountTransactions', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await fetchAccountTransactions(mockClient, '1', { start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/accounts/1/transactions', {
-      start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50,
+      start: '2026-01-01',
+      end: '2026-01-31',
+      page: 1,
+      limit: 50,
     });
   });
   it('omits undefined optional params', async () => {
@@ -148,7 +161,12 @@ describe('searchAccounts', () => {
   it('includes field when provided', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await searchAccounts(mockClient, { query: 'NL01ABNA', field: 'iban', page: 1, limit: 50 });
-    expect(mockClient.get).toHaveBeenCalledWith('/search/accounts', { query: 'NL01ABNA', field: 'iban', page: 1, limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith('/search/accounts', {
+      query: 'NL01ABNA',
+      field: 'iban',
+      page: 1,
+      limit: 50,
+    });
   });
 });
 

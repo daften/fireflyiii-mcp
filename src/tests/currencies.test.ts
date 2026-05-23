@@ -1,20 +1,38 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
-  fetchCurrencies, fetchCurrency, createCurrency, updateCurrency,
-  deleteCurrency, enableCurrency, disableCurrency, setPrimaryCurrency,
+  createCurrency,
+  deleteCurrency,
+  disableCurrency,
+  enableCurrency,
+  fetchCurrencies,
+  fetchCurrency,
+  registerCurrencyTools,
+  setPrimaryCurrency,
+  updateCurrency,
 } from '../tools/currencies.js';
 import { createMockServer } from './_helpers.js';
-import { registerCurrencyTools } from '../tools/currencies.js';
 
 const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } as unknown as FireflyClient;
 
 const listFixture = {
-  data: [{ id: '1', type: 'currencies', attributes: { name: 'Euro', code: 'EUR', symbol: '€', decimal_places: 2, enabled: true, default: true }, links: {} }],
+  data: [
+    {
+      id: '1',
+      type: 'currencies',
+      attributes: { name: 'Euro', code: 'EUR', symbol: '€', decimal_places: 2, enabled: true, default: true },
+      links: {},
+    },
+  ],
   meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
 };
 const singleFixture = {
-  data: { id: '1', type: 'currencies', attributes: { name: 'Euro', code: 'EUR', symbol: '€', decimal_places: 2, enabled: true, default: true }, links: {} },
+  data: {
+    id: '1',
+    type: 'currencies',
+    attributes: { name: 'Euro', code: 'EUR', symbol: '€', decimal_places: 2, enabled: true, default: true },
+    links: {},
+  },
 };
 
 describe('fetchCurrencies', () => {
@@ -26,7 +44,15 @@ describe('fetchCurrencies', () => {
   it('returns flat items with pagination', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     const result = await fetchCurrencies(mockClient, { page: 1, limit: 50 });
-    expect(result.data[0]).toEqual({ name: 'Euro', code: 'EUR', symbol: '€', decimal_places: 2, enabled: true, default: true, id: '1' });
+    expect(result.data[0]).toEqual({
+      name: 'Euro',
+      code: 'EUR',
+      symbol: '€',
+      decimal_places: 2,
+      enabled: true,
+      default: true,
+      id: '1',
+    });
   });
 });
 
