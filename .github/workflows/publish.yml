@@ -15,6 +15,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate CHANGELOG entry exists for this tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! grep -E "^## \[${VERSION}\]" CHANGELOG.md > /dev/null; then
+            echo "::error file=CHANGELOG.md::No '## [${VERSION}]' section found in CHANGELOG.md. Add a release entry before tagging."
+            exit 1
+          fi
+          echo "Found CHANGELOG entry for v${VERSION}"
+
       - run: npm ci
 
       - run: npx tsc --noEmit

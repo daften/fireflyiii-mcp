@@ -406,10 +406,13 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 ## Releasing a New Version
 
-1. Bump `version` in `package.json` only — `src/server.ts` reads the version at runtime from `package.json`.
-2. Run `npm run build` and commit the bump.
-3. Create an annotated tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry listing every change since the previous tag (Added / Changed / Deprecated / Removed / Fixed / Security — omit empty sections).
-4. Push the tag: `git push origin v<version>` — this triggers the publish workflow.
+`CHANGELOG.md` is the single source of truth. Contributors add entries under `## [Unreleased]`; releases promote that section to a dated version and paste the same block into the tag annotation. The publish workflow validates the changelog before publishing, and the GitHub Release is auto-created from the tag annotation.
+
+1. Move items from `## [Unreleased]` in `CHANGELOG.md` to a new `## [X.Y.Z] - YYYY-MM-DD` section. Update the link references at the bottom of the file.
+2. Bump `version` in `package.json` (`src/server.ts` reads the version at runtime).
+3. Run `npm run build` and commit the version bump + changelog update together.
+4. Create an annotated git tag whose message is the same `## [X.Y.Z]` block from `CHANGELOG.md`. The publish workflow validates that this section exists before publishing.
+5. Push the tag: `git push origin v<version>` — this triggers the publish workflow, which validates the changelog, runs tests, publishes to npm + GHCR, and auto-creates a GitHub Release from the tag annotation.
 
 ---
 

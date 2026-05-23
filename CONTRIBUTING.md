@@ -43,9 +43,12 @@ These are skipped in CI; run them manually before submitting changes to API-call
 
 ## Releasing a new version
 
-1. Bump `version` in `package.json` to the new semver — `src/server.ts` reads the version at runtime from `package.json`.
-2. Run `npm run build` and commit the version bump.
-3. Create an annotated git tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry covering every change since the previous tag:
+`CHANGELOG.md` is the single source of truth. Contributors add entries under `## [Unreleased]` as part of their PRs; releases promote that section to a dated version and paste the same block into the tag annotation. The publish workflow validates the changelog before publishing, and the GitHub Release is auto-created from the tag annotation.
+
+1. Move items from `## [Unreleased]` in `CHANGELOG.md` to a new `## [X.Y.Z] - YYYY-MM-DD` section. Update the link references at the bottom of the file (the `[Unreleased]` compare link and the new `[X.Y.Z]` tag link).
+2. Bump `version` in `package.json` to the new semver — `src/server.ts` reads the version at runtime from `package.json`.
+3. Run `npm run build` and commit the version bump + changelog update together.
+4. Create an annotated git tag whose message is the same `## [X.Y.Z]` block from `CHANGELOG.md`. The publish workflow validates that this section exists in `CHANGELOG.md` before publishing.
 
 ```
 git tag -a v0.2.0 -m "$(cat <<'EOF'
@@ -66,6 +69,8 @@ EOF
 )"
 git push origin v0.2.0
 ```
+
+5. Pushing the tag triggers the publish workflow, which validates the changelog, runs tests, publishes to npm + GHCR, and auto-creates a GitHub Release from the tag annotation.
 
 Sections to include: **Added**, **Changed**, **Deprecated**, **Removed**, **Fixed**, **Security**. Omit empty sections.
 
