@@ -16,6 +16,8 @@
     "build": "tsc && chmod +x dist/index.js",
     "prepublishOnly": "npm run build",
     "dev": "dotenv -e .env -- tsx src/index.ts",
+    "format": "biome format --write src/",
+    "lint": "biome check src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts"

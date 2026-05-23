@@ -26,6 +26,9 @@ jobs:
       - name: Audit dependencies (production only)
         run: npm audit --audit-level=moderate --omit=dev
 
+      - name: Lint (Biome)
+        run: npx biome ci src/
+
       - run: npx tsc --noEmit
 
       - run: npm test
