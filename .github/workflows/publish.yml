@@ -69,3 +69,18 @@ jobs:
           tags: |
             ghcr.io/daften/fireflyiii-mcp:${{ steps.version.outputs.version }}
             ghcr.io/daften/fireflyiii-mcp:latest
+
+  release:
+    needs: [publish-npm, publish-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release from tag annotation
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: false
