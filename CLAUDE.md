@@ -13,7 +13,7 @@ Users can query their finances in natural language through Claude, getting answe
 ## Tech Stack
 
 - **Language:** TypeScript (ESM modules, strict mode)
-- **Runtime:** Node.js 22+ with tsx for development
+- **Runtime:** Node.js 20+ with tsx for development
 - **MCP SDK:** `@modelcontextprotocol/sdk` v1.29.0+
 - **Validation:** Zod for input schemas (inline in each tool file)
 - **Testing:** Vitest for unit and integration tests
@@ -406,7 +406,7 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 ## Releasing a New Version
 
-1. Bump `version` in `package.json` **and** `src/server.ts` (it is hardcoded there).
+1. Bump `version` in `package.json` only — `src/server.ts` reads the version at runtime from `package.json`.
 2. Run `npm run build` and commit the bump.
 3. Create an annotated tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry listing every change since the previous tag (Added / Changed / Deprecated / Removed / Fixed / Security — omit empty sections).
 4. Push the tag: `git push origin v<version>` — this triggers the publish workflow.
