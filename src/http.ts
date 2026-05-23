@@ -53,7 +53,7 @@ export function createOAuthHandler(
 
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
       const metadata = {
-        issuer: fireflyUrl,
+        issuer: baseUrl,
         // Point both endpoints at our proxy so we can substitute redirect_uri transparently.
         authorization_endpoint: `${baseUrl}/oauth/authorize`,
         token_endpoint: `${baseUrl}/oauth/token`,

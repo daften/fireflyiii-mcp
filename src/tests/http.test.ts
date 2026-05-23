@@ -66,7 +66,7 @@ describe('createOAuthHandler — metadata endpoint', () => {
 
     expect(res.statusCode).toBe(200);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
-    expect(parsed.issuer).toBe('https://firefly.example.com');
+    expect(parsed.issuer).toBe('http://127.0.0.1:3000');
     // Both OAuth endpoints are served by our proxy so we can substitute redirect_uri transparently.
     expect(parsed.authorization_endpoint).toBe('http://127.0.0.1:3000/oauth/authorize');
     expect(parsed.token_endpoint).toBe('http://127.0.0.1:3000/oauth/token');
@@ -708,6 +708,7 @@ describe('createOAuthHandler — MCP_BASE_URL override', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.issuer).toBe('https://mcp.example.com');
     expect(parsed.authorization_endpoint).toBe('https://mcp.example.com/oauth/authorize');
     expect(parsed.token_endpoint).toBe('https://mcp.example.com/oauth/token');
     expect(parsed.registration_endpoint).toBe('https://mcp.example.com/oauth/register');
