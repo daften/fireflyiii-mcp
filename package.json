@@ -9,6 +9,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     ".env.example"
   ],
@@ -37,6 +38,10 @@
     "claude"
   ],
   "homepage": "https://github.com/daften/fireflyiii-mcp",
+  "author": "Dieter Blomme <dieterblomme@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/daften/fireflyiii-mcp/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.22.0"
