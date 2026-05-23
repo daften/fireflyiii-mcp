@@ -28,3 +28,6 @@ coverage/
 # Editor
 .vscode/settings.json
 .idea/
+
+# Internal planning docs — kept locally but not tracked
+docs/superpowers/
