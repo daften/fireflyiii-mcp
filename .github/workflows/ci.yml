@@ -8,12 +8,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    name: test (node ${{ matrix.node-version }})
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
         run: for i in 1 2 3; do npm ci && break || sleep 5; done
