@@ -7,6 +7,20 @@
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that connects Claude to your [Firefly III](https://www.firefly-iii.org) personal finance instance. Ask Claude questions about your finances in natural language.
 
+## What you can ask Claude
+
+Once configured, you can ask things like:
+
+- *"How much did I spend on groceries last month?"*
+- *"Show me my budget status for this month."*
+- *"Find any duplicate transactions in the last 30 days."*
+- *"Set up a piggy bank for my vacation fund with a €2000 target."*
+- *"What were my biggest expense categories this year?"*
+
+Claude handles the translation to Firefly III API calls — you get answers in plain English.
+
+---
+
 Choose your setup method:
 
 | Method | Transport | Best for |
