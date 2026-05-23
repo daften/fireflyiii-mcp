@@ -43,7 +43,7 @@ These are skipped in CI; run them manually before submitting changes to API-call
 
 ## Releasing a new version
 
-1. Bump `version` in `package.json` and `src/server.ts` to the new semver.
+1. Bump `version` in `package.json` to the new semver — `src/server.ts` reads the version at runtime from `package.json`.
 2. Run `npm run build` and commit the version bump.
 3. Create an annotated git tag whose message is a [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) entry covering every change since the previous tag:
 
