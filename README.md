@@ -34,7 +34,7 @@ Choose your setup method:
 
 ## Option 1: npm package — stdio (simplest)
 
-**Requires:** Node.js 20+, a Firefly III Personal Access Token (Profile → OAuth → Personal Access Tokens).
+**Requires:** Node.js 20+, a Firefly III Personal Access Token (Options → Remote access and tokens → Create new token).
 
 Add to your Claude MCP config (`.claude/mcp.json` or Claude Desktop `claude_desktop_config.json`):
 
@@ -65,7 +65,7 @@ HTTP mode uses OAuth (Authorization Code + PKCE) instead of a Personal Access To
 
 ### Step 1: Register an OAuth client in Firefly III
 
-Go to **Profile → OAuth → OAuth Clients → Create New Client**:
+Go to **Options → Remote access and tokens → Create New Client**:
 
 | Field | Value |
 |-------|-------|

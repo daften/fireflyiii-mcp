@@ -27,13 +27,13 @@ Users can query their finances in natural language through Claude, getting answe
 **stdio transport:**
 ```
 FIREFLY_URL       String, required. Base URL of Firefly III instance (no trailing slash).
-FIREFLY_TOKEN     String, required. Personal Access Token from Firefly III Profile → OAuth → Personal Access Tokens.
+FIREFLY_TOKEN     String, required. Personal Access Token from Firefly III Options → Remote access and tokens → Create new token.
 ```
 
 **HTTP transport:**
 ```
 FIREFLY_URL                String, required. Base URL of Firefly III instance (no trailing slash).
-FIREFLY_OAUTH_CLIENT_ID    String, required. OAuth client ID from Firefly III Profile → OAuth → Clients.
+FIREFLY_OAUTH_CLIENT_ID    String, required. OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client.
 MCP_BASE_URL               String, required when not listening on loopback. Public base URL of this server.
 ```
 
