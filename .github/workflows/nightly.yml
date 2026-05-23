@@ -5,9 +5,13 @@ on:
     - cron: '0 2 * * *'   # 02:00 UTC every night
   workflow_dispatch:        # allow manual trigger
 
+permissions: {}
+
 jobs:
   integration:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
 
