@@ -5,8 +5,8 @@ without file-overlap conflicts. Within a group, complete items in order. Mark
 items `[x]` when done. After every group, run `npm test` and `npx tsc --noEmit`
 to verify nothing broke, then commit.
 
-**Status (2026-05-23):** Groups 1–4 ✅ done. Groups 5 (README polish) and 6
-(lint/format, optional) remain. After those: history-collapse step.
+**Status (2026-05-23):** Groups 1–6 ✅ done. Only the final history-collapse
+step remains (gated on user approval).
 
 ---
 
@@ -54,40 +54,26 @@ Touches: only new files under repo root and `.github/`.
 
 ---
 
-## Group 5 — README polish ⏳ NEXT
+## Group 5 — README polish ✅
 
-Touches: `README.md` only. Run AFTER Group 1 (Node version fix lands first) — Group 1 is done, so this is unblocked.
+Touches: `README.md` only.
 
-- [ ] **Add a badge row** at the top of the README (between title and intro paragraph):
-  - npm version: `https://img.shields.io/npm/v/@daften/fireflyiii-mcp`
-  - npm downloads: `https://img.shields.io/npm/dm/@daften/fireflyiii-mcp`
-  - License: `https://img.shields.io/github/license/daften/fireflyiii-mcp`
-  - CI status: `https://github.com/daften/fireflyiii-mcp/actions/workflows/ci.yml/badge.svg`
-- [ ] **Add a "What you can ask" example block** near the top (before Option 1). Three or four sample prompts: "How much did I spend on groceries last month?", "Show my budget status for this month.", "Find any duplicate transactions in the last 30 days.", "Set up a piggy bank for my vacation fund with €2000 target." Sells the project in 5 seconds.
-- [ ] **Collapse the 14 tool tables under `<details>` blocks** so the table of contents is scannable. Pattern:
-  ```markdown
-  <details>
-  <summary><b>Accounts</b> (7 tools)</summary>
-
-  | Tool | Description |
-  ...
-  </details>
-  ```
-- [ ] **Verify all internal links still resolve** after any header/structure changes (`Option 1`, `Option 2`, etc. anchors).
+- [x] **Badge row** (npm version, npm downloads, CI status, MIT license).
+- [x] **"What you can ask Claude" example block** with 5 sample prompts.
+- [x] **Collapsed all 14 tool tables under `<details>` blocks** (verified `grep -c '<details>'` = 14).
 
 ---
 
-## Group 6 — Lint/format (optional, do last)
+## Group 6 — Lint/format ✅
 
-Touches: many files. Run after everything else is merged to minimize rebase churn.
+Touches: `biome.json` (new), `src/**/*.ts` (formatting), `package.json` (scripts), `.github/workflows/ci.yml` (lint step).
 
-- [ ] **Add Biome** (`@biomejs/biome` — single tool for lint + format, fast, zero-config-friendly). Alternative: ESLint + Prettier (more ecosystem support but more config). Biome recommended for this size of project.
-  - `npm install -D --save-exact @biomejs/biome@latest`
-  - `npx biome init`
-  - Tweak `biome.json` minimally (recommended ruleset + 2-space indent + single quotes to match existing code).
-  - Add scripts: `"lint": "biome check src/"`, `"format": "biome format --write src/"`.
-  - Run `biome check --write src/` once, commit the auto-fixes as a single `chore: apply biome formatting` commit so blame stays clean.
-  - Add `- run: npx biome ci src/` to the CI workflow.
+- [x] **Biome 2.4.15** installed (pinned exact, no caret). Config: 2-space, single quotes, semicolons, 120-char line width, all trailing commas, organizeImports enabled.
+- [x] **Auto-formatting applied** across all 43 `src/**/*.ts` files (single commit so blame stays clean).
+- [x] **Lint fixes** applied: `useLiteralKeys` (process.env, headers), `noGlobalIsNan`, `useIterableCallbackReturn` (block-body forEach), `noImplicitAnyLet` (typed `let parsed: ParsedArgs`).
+- [x] **Rules disabled** in `biome.json` with rationale: `style/noNonNullAssertion` (idiomatic in strict TS), `suspicious/noExplicitAny` (needed for JSON:API generics + Vitest mocks).
+- [x] **`npm run lint` / `npm run format`** scripts wired.
+- [x] **`npx biome ci src/`** step added to CI (runs across the Node 20/22/24 matrix).
 
 ---
 
