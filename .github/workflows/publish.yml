@@ -14,8 +14,6 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -37,18 +35,6 @@ jobs:
             exit 1
           fi
           echo "Changelog section has content."
-
-      - name: List commits since previous tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          PREV=$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1)
-          if [ -n "$PREV" ]; then
-            echo "Commits since ${PREV}:"
-            git log "${PREV}..HEAD" --oneline
-          else
-            echo "No previous tag found — showing last 20 commits:"
-            git log --oneline -20
-          fi
 
       - run: npm ci
 
