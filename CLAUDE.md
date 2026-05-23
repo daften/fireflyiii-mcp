@@ -13,7 +13,7 @@ Users can query their finances in natural language through Claude, getting answe
 ## Tech Stack
 
 - **Language:** TypeScript (ESM modules, strict mode)
-- **Runtime:** Node.js 22+ with tsx for development
+- **Runtime:** Node.js 20+ with tsx for development
 - **MCP SDK:** `@modelcontextprotocol/sdk` v1.29.0+
 - **Validation:** Zod for input schemas (inline in each tool file)
 - **Testing:** Vitest for unit and integration tests
