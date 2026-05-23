@@ -71,12 +71,12 @@ Go to **Options → Remote access and tokens → Create New Client**:
 |-------|-------|
 | **Name** | Anything, e.g. `Claude MCP` |
 | **Redirect URL** | `http://127.0.0.1:3000/oauth/callback` |
-| **Confidential** | **Uncheck this box** |
+| **Keep a secret?** | **Uncheck this box** |
 
 Save and copy the **Client ID** (you do not need the secret).
 
-> **Why uncheck Confidential?**  
-> Confidential clients require a secret stored securely on a server. PKCE-based flows use a code verifier instead, which is safe for clients (like Claude) that cannot securely store a secret. Unchecking "Confidential" creates a *public client* — the correct choice here.
+> **Why uncheck "Keep a secret?"?**  
+> Confidential clients require a secret stored securely on a server. PKCE-based flows use a code verifier instead, which is safe for clients (like Claude) that cannot securely store a secret. Unchecking this creates a *public client* — the correct choice here.
 
 > **Why this specific redirect URL?**  
 > Claude uses a random port for its OAuth callback (e.g. `http://localhost:61234/callback`), but Firefly III requires an exact URI match. This server acts as an OAuth proxy: it intercepts the request, substitutes its own stable callback URL (`http://127.0.0.1:3000/oauth/callback`), and forwards the authorization code back to Claude's real callback. Register this URL once and never touch it again.
@@ -130,7 +130,7 @@ Same as Option 2, Step 1, but use your container's public URL as the redirect UR
 | Field | Value |
 |-------|-------|
 | **Redirect URL** | `https://mcp.example.com/oauth/callback` |
-| **Confidential** | **Uncheck** |
+| **Keep a secret?** | **Uncheck** |
 
 Replace `https://mcp.example.com` with your actual `MCP_BASE_URL`.
 
