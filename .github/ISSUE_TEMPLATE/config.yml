@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Firefly III bug or question
+    url: https://github.com/firefly-iii/firefly-iii/issues
+    about: Issues with Firefly III itself (not the MCP server) belong upstream.
+  - name: Firefly III community
+    url: https://github.com/orgs/firefly-iii/discussions
+    about: General Firefly III questions and discussion.
+  - name: MCP protocol questions
+    url: https://github.com/modelcontextprotocol/specification/discussions
+    about: Questions about the Model Context Protocol itself.

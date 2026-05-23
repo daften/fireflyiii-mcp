@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a new tool or capability
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature. A good request explains the user-facing need and points to the relevant Firefly III API endpoint.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What's missing?
+      description: What would you like to ask Claude that you currently can't?
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: Firefly III API endpoint(s)
+      description: Which endpoint(s) does this map to? Link the OpenAPI spec section if you can — https://api-docs.firefly-iii.org/
+      placeholder: e.g. GET /api/v1/budgets/{id}/transactions
+    validations:
+      required: false
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: Why is this valuable? Who would use it and when?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I checked the existing tool list in the README and the feature isn't already implemented.
+          required: true
+        - label: I searched existing feature-request issues.
+          required: true

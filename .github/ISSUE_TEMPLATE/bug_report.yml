@@ -1,0 +1,90 @@
+name: Bug report
+description: Report a bug in the Firefly III MCP server
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill out the fields below to help us reproduce.
+
+  - type: input
+    id: firefly-version
+    attributes:
+      label: Firefly III version
+      description: e.g. 6.5.5
+      placeholder: 6.5.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: MCP install method
+      options:
+        - npm (npx)
+        - npm (global install)
+        - Docker
+        - git checkout / source
+    validations:
+      required: true
+
+  - type: input
+    id: mcp-version
+    attributes:
+      label: MCP server version
+      description: The npm version, Docker tag, or git SHA you're running.
+      placeholder: e.g. 0.1.0, ghcr.io/daften/fireflyiii-mcp:0.1.0, or a7b3c2e
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - stdio
+        - http
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Configure the MCP server with ...
+        2. Ask Claude to ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Server stderr output, Claude logs, or any error messages. Redact tokens before pasting.
+      render: shell
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I verified this isn't a Firefly III bug by reproducing the same operation in Firefly III's own web UI.
+          required: true
