@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-### Changed
+## [0.1.1] - 2026-05-23
 
 ### Fixed
+- Insight filter query params now use clean keys (brackets stripped from `[]`-suffixed params).
+- OAuth metadata `issuer` now correctly reflects `baseUrl` per RFC 8414.
+
+### Security
+- Base Docker image upgraded from `node:20-alpine` to `node:24-alpine`, resolving 11 HIGH CVEs.
+- `GITHUB_TOKEN` permissions restricted to least-privilege across all GitHub Actions workflows.
+
+### Docs
+- Fixed OAuth client field name ("Keep a secret?") in README.
+- Fixed Firefly III navigation path for Personal Access Tokens and OAuth clients in README.
 
 ## [0.1.0] - 2026-05-23
 
@@ -24,5 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daften/fireflyiii-mcp/releases/tag/v0.1.0
