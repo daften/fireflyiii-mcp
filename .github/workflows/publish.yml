@@ -28,8 +28,8 @@ jobs:
             exit 1
           fi
           echo "Found CHANGELOG entry for v${VERSION}"
-          # Verify the section has actual content (not just empty headers)
-          SECTION=$(awk "/^## \[${VERSION}\]/,/^## \[/" CHANGELOG.md | grep -v "^## \[" | grep -v "^$" | grep -v "^### ")
+          # Verify the section has actual content (not just empty sub-headers)
+          SECTION=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found && /[^[:space:]]/" CHANGELOG.md | grep -v "^### ")
           if [ -z "$SECTION" ]; then
             echo "::error file=CHANGELOG.md::Section ## [${VERSION}] exists but has no entries. Fill in the changelog before tagging."
             exit 1
