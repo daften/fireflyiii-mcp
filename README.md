@@ -1,6 +1,25 @@
 # Firefly III MCP Server
 
+[![npm version](https://img.shields.io/npm/v/@daften/fireflyiii-mcp.svg)](https://www.npmjs.com/package/@daften/fireflyiii-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@daften/fireflyiii-mcp.svg)](https://www.npmjs.com/package/@daften/fireflyiii-mcp)
+[![CI](https://github.com/daften/fireflyiii-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/daften/fireflyiii-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that connects Claude to your [Firefly III](https://www.firefly-iii.org) personal finance instance. Ask Claude questions about your finances in natural language.
+
+## What you can ask Claude
+
+Once configured, you can ask things like:
+
+- *"How much did I spend on groceries last month?"*
+- *"Show me my budget status for this month."*
+- *"Find any duplicate transactions in the last 30 days."*
+- *"Set up a piggy bank for my vacation fund with a €2000 target."*
+- *"What were my biggest expense categories this year?"*
+
+Claude handles the translation to Firefly III API calls — you get answers in plain English.
+
+---
 
 Choose your setup method:
 
@@ -228,6 +247,10 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 ## Available Tools
 
 ### Accounts
+
+<details>
+<summary><b>7 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_accounts` | List all accounts, filterable by type |
@@ -238,7 +261,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_account_transactions` | Get all transactions for a specific account, filterable by type and date range |
 | `search_accounts` | Search accounts by name, IBAN, or account number |
 
+</details>
+
 ### Transactions
+
+<details>
+<summary><b>8 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_transactions` | List transactions with filters (account, date, type) |
@@ -250,7 +279,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `bulk_update_transactions` | Update multiple transactions at once using a search query |
 | `delete_transaction` | Delete a transaction. This action cannot be undone. |
 
+</details>
+
 ### Budgets
+
+<details>
+<summary><b>12 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_budgets` | List all budgets with spent/available amounts |
@@ -266,7 +301,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_budget_transactions` | Get all transactions assigned to a specific budget |
 | `get_transactions_without_budget` | Get transactions that have no budget assigned |
 
+</details>
+
 ### Categories
+
+<details>
+<summary><b>5 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_categories` | List all categories |
@@ -275,7 +316,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `update_category` | Update an existing category |
 | `delete_category` | Delete a category. This action cannot be undone. |
 
+</details>
+
 ### Bills
+
+<details>
+<summary><b>5 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_bills` | List all bills with next expected match date |
@@ -284,7 +331,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `delete_bill` | Delete a bill. This action cannot be undone. |
 | `get_bill_transactions` | Get all transactions linked to a specific bill |
 
+</details>
+
 ### Piggy Banks
+
+<details>
+<summary><b>7 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_piggy_banks` | List all piggy banks with current/target amounts |
@@ -295,7 +348,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_piggy_bank_event` | Add a deposit or withdrawal event to a piggy bank |
 | `delete_piggy_bank_event` | Delete a piggy bank event. This action cannot be undone. |
 
+</details>
+
 ### Recurring Transactions
+
+<details>
+<summary><b>7 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_recurring` | List all recurring transaction rules |
@@ -306,7 +365,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_recurrence_transactions` | Get transactions created by a recurring transaction rule |
 | `trigger_recurrence` | Manually fire a recurring rule to create its transaction immediately |
 
+</details>
+
 ### Automation Rules
+
+<details>
+<summary><b>15 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_rule_groups` | List all rule groups |
@@ -325,7 +390,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `test_rule` | Dry-run a single rule and return matching transactions (no changes applied) |
 | `get_rule_group_rules` | Get all rules belonging to a specific rule group |
 
+</details>
+
 ### Attachments
+
+<details>
+<summary><b>7 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_attachments` | List all file attachments |
@@ -336,7 +407,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `upload_attachment` | Upload base64-encoded file content for an existing attachment record (step 2 of 2) |
 | `download_attachment` | Download the raw content of an attachment as text |
 
+</details>
+
 ### Tags & Reports
+
+<details>
+<summary><b>37 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_tags` | List all tags |
@@ -377,7 +454,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_insight_transfers_by_asset` | Transfer insights grouped by asset account |
 | `get_insight_transfers_total` | Total transfer amount for a date range |
 
+</details>
+
 ### Currencies
+
+<details>
+<summary><b>8 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_currencies` | List all currencies configured in Firefly III |
@@ -389,7 +472,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `set_primary_currency` | Set a currency as the primary/default currency |
 | `delete_currency` | Delete a currency. This action cannot be undone. |
 
+</details>
+
 ### Data Export
+
+<details>
+<summary><b>9 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `export_transactions` | Export all transactions as CSV (supports date filters) |
@@ -402,7 +491,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `export_rules` | Export all rules as CSV |
 | `export_piggy_banks` | Export all piggy banks as CSV |
 
+</details>
+
 ### Object Groups
+
+<details>
+<summary><b>7 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_object_groups` | List all object groups (used to organise accounts and piggy banks) |
@@ -413,7 +508,13 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `get_object_group_bills` | Get all bills in a specific object group |
 | `get_object_group_piggy_banks` | Get all piggy banks in a specific object group |
 
+</details>
+
 ### Transaction Links
+
+<details>
+<summary><b>6 tools</b> — click to expand</summary>
+
 | Tool | Description |
 |------|-------------|
 | `get_link_types` | List available transaction link types (Related, Refund, Paid, etc.) |
@@ -422,6 +523,8 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `create_transaction_link` | Create a link between two transactions |
 | `update_transaction_link` | Update an existing transaction link |
 | `delete_transaction_link` | Delete a transaction link. This action cannot be undone. |
+
+</details>
 
 ## Filtering Tools
 
