@@ -511,7 +511,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Expense Insights by Bill',
       description: 'Get expense totals grouped by bill for a date range.',
       endpoint: '/insight/expense/bill',
-      filterKey: 'bills[]',
+      filterKey: 'bills',
       filterDesc: 'Filter to specific bill IDs',
     },
     {
@@ -519,7 +519,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Expense Insights by Budget',
       description: 'Get expense totals grouped by budget for a date range.',
       endpoint: '/insight/expense/budget',
-      filterKey: 'budgets[]',
+      filterKey: 'budgets',
       filterDesc: 'Filter to specific budget IDs',
     },
     {
@@ -527,7 +527,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Expense Insights by Tag',
       description: 'Get expense totals grouped by tag for a date range.',
       endpoint: '/insight/expense/tag',
-      filterKey: 'tags[]',
+      filterKey: 'tags',
       filterDesc: 'Filter to specific tag IDs',
     },
     {
@@ -535,7 +535,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Expense Insights by Asset Account',
       description: 'Get expense totals grouped by asset account for a date range.',
       endpoint: '/insight/expense/asset',
-      filterKey: 'assets[]',
+      filterKey: 'assets',
       filterDesc: 'Filter to specific asset account IDs',
     },
     {
@@ -543,7 +543,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Expense Insights by Expense Account',
       description: 'Get expense totals grouped by expense account for a date range.',
       endpoint: '/insight/expense/expense',
-      filterKey: 'accounts[]',
+      filterKey: 'accounts',
       filterDesc: 'Filter to specific expense account IDs',
     },
     {
@@ -557,7 +557,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Income Insights by Revenue Account',
       description: 'Get income totals grouped by revenue account for a date range.',
       endpoint: '/insight/income/revenue',
-      filterKey: 'revenue[]',
+      filterKey: 'revenue',
       filterDesc: 'Filter to specific revenue account IDs',
     },
     {
@@ -565,7 +565,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Income Insights by Tag',
       description: 'Get income totals grouped by tag for a date range.',
       endpoint: '/insight/income/tag',
-      filterKey: 'tags[]',
+      filterKey: 'tags',
       filterDesc: 'Filter to specific tag IDs',
     },
     {
@@ -573,7 +573,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Income Insights by Asset Account',
       description: 'Get income totals grouped by asset account for a date range.',
       endpoint: '/insight/income/asset',
-      filterKey: 'assets[]',
+      filterKey: 'assets',
       filterDesc: 'Filter to specific asset account IDs',
     },
     {
@@ -587,7 +587,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Transfer Insights by Category',
       description: 'Get transfer totals grouped by category for a date range.',
       endpoint: '/insight/transfer/category',
-      filterKey: 'categories[]',
+      filterKey: 'categories',
       filterDesc: 'Filter to specific category IDs',
     },
     {
@@ -595,7 +595,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Transfer Insights by Tag',
       description: 'Get transfer totals grouped by tag for a date range.',
       endpoint: '/insight/transfer/tag',
-      filterKey: 'tags[]',
+      filterKey: 'tags',
       filterDesc: 'Filter to specific tag IDs',
     },
     {
@@ -603,7 +603,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Get Transfer Insights by Asset Account',
       description: 'Get transfer totals grouped by asset account for a date range.',
       endpoint: '/insight/transfer/asset',
-      filterKey: 'assets[]',
+      filterKey: 'assets',
       filterDesc: 'Filter to specific asset account IDs',
     },
     {
@@ -636,7 +636,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
         const { start, end, ...rest } = params as { start: string; end: string; [k: string]: unknown };
         const filters: Record<string, string[]> = {};
         for (const [k, v] of Object.entries(rest)) {
-          if (Array.isArray(v)) filters[k] = v as string[];
+          if (Array.isArray(v)) filters[`${k}[]`] = v as string[];
         }
         return fetchInsightGrouped(client, endpoint, start, end, Object.keys(filters).length ? filters : undefined);
       },
