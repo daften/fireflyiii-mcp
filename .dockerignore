@@ -1,7 +1,29 @@
+# Build artifacts and dependencies
 node_modules
-.env
 dist
+*.tsbuildinfo
+
+# Local config and secrets
+.env
+.env.test
+.env.test.example
+
+# VCS and CI metadata
 .git
-docs
+.github/
+.claude/
+
+# Tests
 src/tests
 *.test.ts
+
+# Docs and project meta (not needed at runtime)
+docs
+CLAUDE.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md
+SUPPORT.md
+
+# Tooling config
+biome.json
