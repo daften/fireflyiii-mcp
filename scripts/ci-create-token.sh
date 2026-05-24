@@ -22,6 +22,7 @@ done
 
 # Create a test user and PAT via artisan tinker.
 # Output is prefixed with TOKEN: so we can strip any Tinker noise.
+# Handles both Passport (->accessToken) and Sanctum (->plainTextToken) token APIs.
 RAW=$(docker exec "$CONTAINER" php artisan tinker --execute="
 \$user = new \App\Models\User([
     'email'    => 'ci@localhost.test',
@@ -30,8 +31,9 @@ RAW=$(docker exec "$CONTAINER" php artisan tinker --execute="
 ]);
 \$user->save();
 try { \$user->assignRole('owner'); } catch (\Throwable \$e) {}
-echo 'TOKEN:' . \$user->createToken('CI Integration Test')->accessToken;
-" 2>/dev/null)
+\$token = \$user->createToken('CI Integration Test');
+echo 'TOKEN:' . (\$token->plainTextToken ?? \$token->accessToken ?? '');
+" 2>&1)
 
 TOKEN=$(echo "$RAW" | grep -o 'TOKEN:.*' | sed 's/TOKEN://')
 
