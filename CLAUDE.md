@@ -1,8 +1,8 @@
-# Firefly III MCP Server — Project Documentation
+# MCP server for Firefly III — Project Documentation
 
 ## Project Overview
 
-**Firefly III MCP** is a TypeScript implementation of an MCP (Model Context Protocol) server that bridges Claude Code to a running Firefly III personal finance instance. This is a greenfield, open-source project (MIT license).
+**MCP server for Firefly III** is a TypeScript implementation of an MCP (Model Context Protocol) server that bridges Claude Code to a running Firefly III personal finance instance. This is a greenfield, open-source project (MIT license).
 
 Users can query their finances in natural language through Claude, getting answers about accounts, transactions, budgets, categories, bills, piggy banks, and financial insights without writing queries themselves.
 

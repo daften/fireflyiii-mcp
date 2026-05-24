@@ -2,7 +2,7 @@
 
 ## Scope
 
-This policy covers the **Firefly III MCP Server** (`@daften/fireflyiii-mcp`) only. Vulnerabilities in Firefly III itself should be reported to the [Firefly III project](https://github.com/firefly-iii/firefly-iii/security).
+This policy covers the **MCP server for Firefly III** (`@daften/fireflyiii-mcp`) only. Vulnerabilities in Firefly III itself should be reported to the [Firefly III project](https://github.com/firefly-iii/firefly-iii/security).
 
 This server handles OAuth tokens and personal financial data, so coordinated disclosure is appreciated.
 

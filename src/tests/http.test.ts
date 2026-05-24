@@ -454,7 +454,7 @@ describe('createOAuthHandler — Bearer guard', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(401);
-    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="Firefly III MCP"');
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="MCP server for Firefly III"');
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 

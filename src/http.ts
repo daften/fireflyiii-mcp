@@ -200,7 +200,7 @@ export function createOAuthHandler(
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) {
       res.writeHead(401, {
-        'WWW-Authenticate': 'Bearer resource="Firefly III MCP"',
+        'WWW-Authenticate': 'Bearer resource="MCP server for Firefly III"',
         'Content-Type': 'application/json',
       });
       res.end(JSON.stringify({ error: 'unauthorized', error_description: 'Bearer token required' }));
@@ -305,7 +305,7 @@ export async function startHttpServer(
     process.stderr.write(`HTTP server error: ${err}\n`);
   });
 
-  process.stdout.write(`Firefly III MCP server listening on http://${host}:${port}\n`);
+  process.stdout.write(`MCP server for Firefly III listening on http://${host}:${port}\n`);
   if (moved) {
     process.stdout.write(`(port ${requestedPort} was in use — moved up automatically)\n`);
   }

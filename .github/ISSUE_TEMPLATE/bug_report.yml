@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a bug in the Firefly III MCP server
+description: Report a bug in the MCP server for Firefly III
 labels: [bug]
 body:
   - type: markdown
