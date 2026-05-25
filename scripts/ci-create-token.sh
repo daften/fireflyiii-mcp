@@ -78,6 +78,12 @@ rm -f "$PHP_TMP"
 RAW=$(docker exec "$CONTAINER" php /tmp/ci-create-user.php 2>&1)
 docker exec "$CONTAINER" rm -f /tmp/ci-create-user.php 2>/dev/null || true
 
+# Firefly III 6.x requires every user to belong to a user group.
+# Direct user creation (without the normal registration flow) skips that —
+# this correction command creates the missing group membership.
+echo "Creating user group membership …" >&2
+docker exec "$CONTAINER" php artisan correction:create-group-memberships >&2
+
 TOKEN=$(echo "$RAW" | grep -o 'TOKEN:.*' | sed 's/TOKEN://')
 
 if [ -z "$TOKEN" ]; then
