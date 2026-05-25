@@ -16,12 +16,17 @@
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
     "prepublishOnly": "npm run build",
+    "prepare": "simple-git-hooks",
     "dev": "dotenv -e .env -- tsx src/index.ts",
     "format": "biome format --write src/",
     "lint": "biome check src/",
+    "check": "biome ci src/ && tsc --noEmit && vitest run",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npm run check"
   },
   "publishConfig": {
     "access": "public"
@@ -50,6 +55,7 @@
     "@biomejs/biome": "2.4.15",
     "@types/node": "^25.9.1",
     "dotenv-cli": "^11.0.0",
+    "simple-git-hooks": "^2.13.1",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"

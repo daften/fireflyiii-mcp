@@ -5,12 +5,7 @@ import { fetchBudgets } from '../tools/budgets.js';
 import { fetchCategories } from '../tools/categories.js';
 import { fetchCurrencies } from '../tools/currencies.js';
 import { fetchSummary, fetchTags } from '../tools/reports.js';
-import {
-  createTransaction,
-  deleteTransaction,
-  fetchTransaction,
-  fetchTransactions,
-} from '../tools/transactions.js';
+import { createTransaction, deleteTransaction, fetchTransaction, fetchTransactions } from '../tools/transactions.js';
 
 const SKIP = !process.env.FIREFLY_INTEGRATION;
 
