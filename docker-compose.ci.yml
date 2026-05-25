@@ -1,6 +1,6 @@
 services:
   firefly:
-    image: fireflyiii/core:version-6.5.5
+    image: fireflyiii/core:latest
     container_name: fireflyiii-ci
     environment:
       # Fixed key for ephemeral CI use only — not a secret.
