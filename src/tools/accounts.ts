@@ -33,6 +33,7 @@ export async function createAccount(
   params: {
     name: string;
     type: 'asset' | 'expense' | 'revenue' | 'liability';
+    account_role?: 'defaultAsset' | 'sharedAsset' | 'savingAsset' | 'ccAsset' | 'cashWalletAsset';
     currency_code?: string;
     iban?: string;
     opening_balance?: string;
@@ -140,6 +141,10 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       inputSchema: {
         name: z.string().describe('Account name'),
         type: z.enum(['asset', 'expense', 'revenue', 'liability']).describe('Account type'),
+        account_role: z
+          .enum(['defaultAsset', 'sharedAsset', 'savingAsset', 'ccAsset', 'cashWalletAsset'])
+          .optional()
+          .describe('Role for asset accounts (required when type is asset)'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         iban: z.string().optional().describe('IBAN number'),
         opening_balance: z.string().optional().describe('Opening balance as a number string'),
