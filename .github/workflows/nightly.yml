@@ -29,6 +29,7 @@ jobs:
         id: firefly-token
         run: |
           TOKEN=$(bash scripts/ci-create-token.sh http://localhost:8080)
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Run integration tests

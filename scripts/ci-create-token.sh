@@ -46,7 +46,7 @@ done
 # Create the Passport personal access client.
 echo "Creating Passport personal access client …" >&2
 docker exec "$CONTAINER" php artisan passport:client \
-  --personal --name="CI Token Client" --no-interaction
+  --personal --name="CI Token Client" --no-interaction >&2
 
 # Write a PHP bootstrap script to a temp file on the host, copy it into the
 # container, execute it, then remove it.  Avoids docker exec -i stdin issues.
@@ -86,6 +86,4 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-# Mask the token in Actions logs before printing.
-echo "::add-mask::$TOKEN"
 echo "$TOKEN"
