@@ -56,6 +56,22 @@ export async function deleteCategory(client: FireflyClient, id: string): Promise
   return { deleted: true, id };
 }
 
+let cachedCategories: UnwrappedList | null = null;
+let lastCategoriesFetch = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute TTL
+
+async function getCachedCategories(client: FireflyClient): Promise<UnwrappedList> {
+  const now = Date.now();
+  if (!cachedCategories || now - lastCategoriesFetch > CACHE_TTL_MS) {
+    console.error('[Autocomplete Cache] Fetching categories from API...');
+    cachedCategories = await fetchCategories(client, { limit: 100 });
+    lastCategoriesFetch = now;
+  } else {
+    console.error('[Autocomplete Cache] Using cached categories.');
+  }
+  return cachedCategories;
+}
+
 export function registerCategoryTools(server: McpServer, client: FireflyClient): void {
   defineTool(
     server,
@@ -79,7 +95,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
     async (value) => {
       console.error(`[Autocomplete] Category search input: "${value}"`);
       try {
-        const categories = await fetchCategories(client, { limit: 100 });
+        const categories = await getCachedCategories(client);
         const suggestions = categories.data
           .map((c) => `${c.id} (${c.name ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()));

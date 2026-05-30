@@ -93,6 +93,22 @@ export async function searchAccounts(
   return unwrapList(response);
 }
 
+let cachedAccounts: UnwrappedList | null = null;
+let lastAccountsFetch = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute TTL
+
+async function getCachedAccounts(client: FireflyClient): Promise<UnwrappedList> {
+  const now = Date.now();
+  if (!cachedAccounts || now - lastAccountsFetch > CACHE_TTL_MS) {
+    console.error('[Autocomplete Cache] Fetching accounts from API...');
+    cachedAccounts = await fetchAccounts(client, { limit: 100 });
+    lastAccountsFetch = now;
+  } else {
+    console.error('[Autocomplete Cache] Using cached accounts.');
+  }
+  return cachedAccounts;
+}
+
 export function registerAccountTools(server: McpServer, client: FireflyClient): void {
   defineTool(
     server,
@@ -125,7 +141,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     async (value) => {
       console.error(`[Autocomplete] Account search input: "${value}"`);
       try {
-        const accounts = await fetchAccounts(client, { limit: 100 });
+        const accounts = await getCachedAccounts(client);
         const suggestions = accounts.data
           .map((a) => `${a.id} (${a.name ?? ''} - ${a.type ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()));

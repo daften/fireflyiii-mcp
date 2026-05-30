@@ -145,6 +145,22 @@ export async function fetchTransactionsWithoutBudget(
   return unwrapList(response);
 }
 
+let cachedBudgets: UnwrappedList | null = null;
+let lastBudgetsFetch = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute TTL
+
+async function getCachedBudgets(client: FireflyClient): Promise<UnwrappedList> {
+  const now = Date.now();
+  if (!cachedBudgets || now - lastBudgetsFetch > CACHE_TTL_MS) {
+    console.error('[Autocomplete Cache] Fetching budgets from API...');
+    cachedBudgets = await fetchBudgets(client, { limit: 100 });
+    lastBudgetsFetch = now;
+  } else {
+    console.error('[Autocomplete Cache] Using cached budgets.');
+  }
+  return cachedBudgets;
+}
+
 export function registerBudgetTools(server: McpServer, client: FireflyClient): void {
   defineTool(
     server,
@@ -167,7 +183,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
     async (value) => {
       console.error(`[Autocomplete] Budget search input: "${value}"`);
       try {
-        const budgets = await fetchBudgets(client, { limit: 100 });
+        const budgets = await getCachedBudgets(client);
         const suggestions = budgets.data
           .map((b) => `${b.id} (${b.name ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
