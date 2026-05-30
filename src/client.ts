@@ -25,6 +25,29 @@ function parseFieldErrors(body: string): string | null {
   return null;
 }
 
+/**
+ * Extract a filename from a Content-Disposition header. Handles the RFC 5987
+ * extended form (`filename*=UTF-8''…`, percent-decoded) and the plain
+ * `filename=` form (quoted or unquoted, used verbatim). Returns "file" when no
+ * usable filename is present. `decodeURIComponent` is applied only to the
+ * extended form — a plain filename containing a literal "%" must not be decoded.
+ */
+export function parseContentDispositionFilename(header: string | null | undefined): string {
+  if (!header) return 'file';
+  const extended = header.match(/filename\*=(?:[\w-]+'[^']*')?([^;]+)/i);
+  if (extended?.[1]) {
+    const raw = extended[1].trim().replace(/^["']|["']$/g, '');
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw; // malformed percent-encoding — fall back to the raw value
+    }
+  }
+  const plain = header.match(/filename=("([^"]*)"|([^;]+))/i);
+  const value = (plain?.[2] ?? plain?.[3] ?? '').trim();
+  return value || 'file';
+}
+
 export function formatError(err: unknown): string {
   if (err instanceof FireflyError) {
     if (err.status === 400) {
@@ -161,12 +184,7 @@ export class FireflyClient {
     const arrayBuffer = await response.arrayBuffer();
     const data = Buffer.from(arrayBuffer);
     const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
-    const contentDisposition = response.headers.get('Content-Disposition') ?? '';
-    let filename = 'file';
-    const match = contentDisposition.match(/filename\*?=(?:utf-8'')?["']?([^"';]+)["']?/i);
-    if (match?.[1]) {
-      filename = decodeURIComponent(match[1]);
-    }
+    const filename = parseContentDispositionFilename(response.headers.get('Content-Disposition'));
     return { data, contentType, filename };
   }
 }
