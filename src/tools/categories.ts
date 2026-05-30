@@ -101,7 +101,8 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
         const categories = await getCachedCategories(client);
         const suggestions = categories.data
           .map((c) => `${c.id} (${c.name ?? ''})`)
-          .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
+          .slice(0, 100);
         console.error(`[Autocomplete] Category suggestions found: ${suggestions.length}`);
         return suggestions;
       } catch (err) {

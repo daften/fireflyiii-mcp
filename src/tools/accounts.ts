@@ -152,7 +152,8 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
         const accounts = await getCachedAccounts(client);
         const suggestions = accounts.data
           .map((a) => `${a.id} (${a.name ?? ''} - ${a.type ?? ''})`)
-          .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
+          .slice(0, 100);
         console.error(`[Autocomplete] Account suggestions found: ${suggestions.length}`);
         return suggestions;
       } catch (err) {

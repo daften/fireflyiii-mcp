@@ -189,7 +189,8 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
         const budgets = await getCachedBudgets(client);
         const suggestions = budgets.data
           .map((b) => `${b.id} (${b.name ?? ''})`)
-          .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
+          .slice(0, 100);
         console.error(`[Autocomplete] Budget suggestions found: ${suggestions.length}`);
         return suggestions;
       } catch (err) {
