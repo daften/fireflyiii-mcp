@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseArgs } from '../args.js';
 
 describe('parseArgs — filter flags', () => {
@@ -73,5 +73,70 @@ describe('parseArgs — existing flags still work', () => {
 
   it('throws on invalid --port value', () => {
     expect(() => parseArgs(['--port', 'abc'])).toThrow(/--port must be/i);
+  });
+});
+
+describe('parseArgs — environment variables fallbacks', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    delete process.env.MCP_PRESET;
+    delete process.env.MCP_GROUPS;
+    delete process.env.MCP_READ_ONLY;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('falls back to MCP_PRESET when --preset is omitted', () => {
+    process.env.MCP_PRESET = 'minimal';
+    const result = parseArgs([]);
+    expect(result.filterOptions.preset).toBe('minimal');
+  });
+
+  it('CLI --preset overrides MCP_PRESET', () => {
+    process.env.MCP_PRESET = 'minimal';
+    const result = parseArgs(['--preset', 'default']);
+    expect(result.filterOptions.preset).toBe('default');
+  });
+
+  it('falls back to MCP_GROUPS when --groups is omitted', () => {
+    process.env.MCP_GROUPS = 'rules,recurring';
+    const result = parseArgs([]);
+    expect(result.filterOptions.groups).toEqual(['rules', 'recurring']);
+  });
+
+  it('CLI --groups overrides MCP_GROUPS', () => {
+    process.env.MCP_GROUPS = 'rules,recurring';
+    const result = parseArgs(['--groups', 'accounts']);
+    expect(result.filterOptions.groups).toEqual(['accounts']);
+  });
+
+  it('falls back to MCP_READ_ONLY when --read-only is omitted', () => {
+    process.env.MCP_READ_ONLY = 'true';
+    const result = parseArgs([]);
+    expect(result.filterOptions.readOnly).toBe(true);
+  });
+
+  it('CLI --read-only takes precedence even if MCP_READ_ONLY is false/unset', () => {
+    process.env.MCP_READ_ONLY = 'false';
+    const result = parseArgs(['--read-only']);
+    expect(result.filterOptions.readOnly).toBe(true);
+  });
+
+  it('throws on invalid MCP_PRESET', () => {
+    process.env.MCP_PRESET = 'nonexistent';
+    expect(() => parseArgs([])).toThrow(/unknown preset/i);
+  });
+
+  it('throws on invalid MCP_GROUPS', () => {
+    process.env.MCP_GROUPS = 'accounts,fakething';
+    expect(() => parseArgs([])).toThrow(/unknown group.*fakething/i);
+  });
+
+  it('throws if both CLI preset and env groups are provided', () => {
+    process.env.MCP_GROUPS = 'accounts';
+    expect(() => parseArgs(['--preset', 'default'])).toThrow(/cannot use both --preset and --groups/i);
   });
 });

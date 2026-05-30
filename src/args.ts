@@ -57,6 +57,30 @@ export function parseArgs(args: string[]): ParsedArgs {
     }
   }
 
+  if (preset === undefined && process.env.MCP_PRESET) {
+    const val = process.env.MCP_PRESET.trim();
+    if (!(val in PRESETS)) {
+      throw new Error(`Unknown preset "${val}" from MCP_PRESET. Valid presets: ${Object.keys(PRESETS).join(', ')}`);
+    }
+    preset = val as PresetName;
+  }
+
+  if (groups === undefined && process.env.MCP_GROUPS) {
+    const parts = process.env.MCP_GROUPS.split(',')
+      .map((g) => g.trim())
+      .filter(Boolean);
+    for (const g of parts) {
+      if (!(TOOL_GROUPS as readonly string[]).includes(g)) {
+        throw new Error(`Unknown group "${g}" from MCP_GROUPS. Valid groups: ${TOOL_GROUPS.join(', ')}`);
+      }
+    }
+    groups = parts as ToolGroup[];
+  }
+
+  if (!readOnly && process.env.MCP_READ_ONLY === 'true') {
+    readOnly = true;
+  }
+
   if (preset !== undefined && groups !== undefined) {
     throw new Error('Cannot use both --preset and --groups. Choose one.');
   }
