@@ -244,6 +244,26 @@ Connect Claude as in Option 2, Step 3.
 
 The server exposes `GET /.well-known/oauth-authorization-server` (no auth required) which returns RFC 8414 metadata. MCP clients use this to discover OAuth endpoints automatically — no manual OAuth configuration needed in the client.
 
+---
+
+## Experimental Autocomplete Prompts
+
+The server implements native **MCP Prompts** with **experimental autocomplete (completions)** support for common parameters (accounts, budgets, and categories). This allows you to select resources via interactive dropdowns instead of guessing numeric database IDs.
+
+> [!WARNING]
+> **Client Compatibility Notice:** The MCP specification does not support autocomplete on regular tool arguments directly. Therefore, autocomplete is implemented using standard MCP Prompts. This feature is **highly experimental** and depends heavily on your MCP client's capabilities:
+> * **Supported:** This is fully supported in advanced agentic clients like **Claude Code** (which renders Prompt dropdown completions during interactive form-filling).
+> * **Not Supported:** Standard chat interfaces like the **Claude Desktop App** do not currently support rendering autocomplete dropdowns for MCP Prompts.
+
+### Available Prompts
+* **`account-transactions`**: Fetches transaction records for a specific account. Features full in-memory, case-insensitive autocomplete matching across assets, expenses (merchants/contacts like `"Dieter"`), revenues, and liabilities (pre-cached and limited to the top 100 results for instant rendering).
+* **`budget-transactions`**: Fetches transaction records for a specific budget.
+* **`category-transactions`**: Fetches transactions matching a specific spending category.
+
+To trigger them in a supported client like Claude Code, click the **`+`** icon, select the prompt (e.g. `account-transactions`), and start typing to filter and select your account instantly.
+
+---
+
 ## Available Tools
 
 ### Accounts

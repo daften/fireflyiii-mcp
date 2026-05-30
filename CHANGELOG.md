@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Nightly integration tests run automatically against a live Firefly III instance (latest release) via GitHub Actions, covering the transform layer, six tool groups (accounts, transactions, budgets, categories, currencies, tags, summary), and full account and transaction CRUD cycles.
-- Add autocompletion support for account, budget, and category parameters using the MCP Completion API.
+- [Experimental] Add autocompletion support for account, budget, and category parameters using the MCP Completion API. Note: Standard tool argument completions are not supported by the MCP specification directly, so this is implemented via native Prompts (`category-transactions`, `account-transactions`, `budget-transactions`). This is supported primarily by clients that support Prompt argument autocomplete (such as Claude Code) and may not function in other MCP clients.
 
 ### Fixed
 - `create_account` now accepts `account_role`, which Firefly III requires when creating asset accounts.

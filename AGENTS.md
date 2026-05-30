@@ -156,6 +156,24 @@ rules, recurring, attachments, currencies, exports, object-groups, transaction-l
 
 ---
 
+## Experimental Autocomplete Prompts
+
+The server implements standard **MCP Prompts** with **experimental autocomplete (completions)** support for common parameters (`account`, `budget`, and `category`) to avoid using numeric database IDs directly.
+
+> [!WARNING]
+> **Client Compatibility Warning:** Standard tool argument autocomplete is not supported by the MCP specification directly. Therefore, autocomplete is implemented using standard MCP Prompts. This feature is highly experimental and depends heavily on MCP client support (supported in **Claude Code**, but not in the standard **Claude Desktop App**).
+
+### Prompts Implemented
+* **`account-transactions`**: Fetches transactions for an account. Auto-completes from a single, unified `type=all` request (capped at 1,000 items and limited to 100 suggestions per rendering, fully cached in memory for 1 minute TTL).
+* **`budget-transactions`**: Fetches transactions for a specific budget.
+* **`category-transactions`**: Fetches transactions for a specific category.
+
+### Completion Schema Pattern
+Using Zod schema properties wrapped in `completable()` from `@modelcontextprotocol/sdk/server/completable.js`.
+Autocomplete handlers are fully pre-cached in memory with a 60-second TTL and Promise-level caching to prevent network request races during rapid typing.
+
+---
+
 ## Tool Pattern
 
 Each tool file follows a consistent three-part structure.
