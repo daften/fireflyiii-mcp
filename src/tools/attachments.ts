@@ -58,8 +58,16 @@ export async function uploadAttachment(
   return { uploaded: true, id };
 }
 
-export async function downloadAttachment(client: FireflyClient, id: string): Promise<string> {
-  return client.getText(`/attachments/${id}/download`);
+export async function downloadAttachment(
+  client: FireflyClient,
+  id: string,
+): Promise<{ content_base64: string; contentType: string; filename: string }> {
+  const { data, contentType, filename } = await client.getBinary(`/attachments/${id}/download`);
+  return {
+    content_base64: data.toString('base64'),
+    contentType,
+    filename,
+  };
 }
 
 export function registerAttachmentTools(server: McpServer, client: FireflyClient): void {
@@ -181,7 +189,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
     {
       title: 'Download Attachment',
       description:
-        'Download the raw content of an attachment as text. Useful for reading receipts or notes. Use get_attachments to find valid IDs.',
+        'Download a file attachment (such as an invoice, PDF, or image receipt) by its ID. Returns the filename, MIME content type, and the file data encoded as a Base64 string. Use get_attachments to find valid IDs.',
       inputSchema: {
         id: z.string().describe('Attachment ID'),
       },

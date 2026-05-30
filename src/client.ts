@@ -146,4 +146,27 @@ export class FireflyClient {
     });
     return response.text();
   }
+
+  async getBinary(
+    path: string,
+    params?: QueryParams,
+  ): Promise<{ data: Buffer; contentType: string; filename: string }> {
+    const response = await this.rawFetch(this.buildUrl(path, params), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.getToken()}`,
+        Accept: '*/*',
+      },
+    });
+    const arrayBuffer = await response.arrayBuffer();
+    const data = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
+    const contentDisposition = response.headers.get('Content-Disposition') ?? '';
+    let filename = 'file';
+    const match = contentDisposition.match(/filename\*?=(?:utf-8'')?["']?([^"';]+)["']?/i);
+    if (match?.[1]) {
+      filename = decodeURIComponent(match[1]);
+    }
+    return { data, contentType, filename };
+  }
 }

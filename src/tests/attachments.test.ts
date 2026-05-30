@@ -142,14 +142,22 @@ describe('uploadAttachment', () => {
 });
 
 describe('downloadAttachment', () => {
-  it('calls getText on /attachments/:id/download', async () => {
+  it('calls getBinary on /attachments/:id/download and returns base64 content with metadata', async () => {
     const mockFull = {
       ...mockClient,
-      getText: vi.fn().mockResolvedValueOnce('receipt content'),
+      getBinary: vi.fn().mockResolvedValueOnce({
+        data: Buffer.from('receipt content'),
+        contentType: 'application/pdf',
+        filename: 'receipt.pdf',
+      }),
     } as unknown as FireflyClient;
     const result = await downloadAttachment(mockFull, '7');
-    expect(mockFull.getText).toHaveBeenCalledWith('/attachments/7/download');
-    expect(result).toBe('receipt content');
+    expect(mockFull.getBinary).toHaveBeenCalledWith('/attachments/7/download');
+    expect(result).toEqual({
+      content_base64: Buffer.from('receipt content').toString('base64'),
+      contentType: 'application/pdf',
+      filename: 'receipt.pdf',
+    });
   });
 });
 

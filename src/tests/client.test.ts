@@ -254,6 +254,34 @@ describe('FireflyClient write methods', () => {
     );
   });
 
+  it('getBinary returns buffer and metadata from headers', async () => {
+    const headers = new Headers({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="receipt.pdf"',
+    });
+    const body = new Uint8Array([1, 2, 3, 4]);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status: 200, headers }));
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    const result = await client.getBinary('/attachments/7/download');
+    expect(result.data).toEqual(Buffer.from(body));
+    expect(result.contentType).toBe('application/pdf');
+    expect(result.filename).toBe('receipt.pdf');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://firefly.example.com/api/v1/attachments/7/download',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('getBinary fallback values for headers', async () => {
+    const body = new Uint8Array([1, 2, 3, 4]);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status: 200 }));
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    const result = await client.getBinary('/attachments/7/download');
+    expect(result.data).toEqual(Buffer.from(body));
+    expect(result.contentType).toBe('application/octet-stream');
+    expect(result.filename).toBe('file');
+  });
+
   it('serializes string[] params as repeated query params', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('csv data', { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'my-token');
