@@ -139,4 +139,47 @@ describe('parseArgs — environment variables fallbacks', () => {
     process.env.MCP_GROUPS = 'accounts';
     expect(() => parseArgs(['--preset', 'default'])).toThrow(/cannot use both --preset and --groups/i);
   });
+
+  it('throws if both CLI groups and env preset are provided', () => {
+    process.env.MCP_PRESET = 'default';
+    expect(() => parseArgs(['--groups', 'accounts'])).toThrow(/cannot use both --preset and --groups/i);
+  });
+
+  it('accepts MCP_READ_ONLY=1 as truthy', () => {
+    process.env.MCP_READ_ONLY = '1';
+    expect(parseArgs([]).filterOptions.readOnly).toBe(true);
+  });
+
+  it('accepts MCP_READ_ONLY=TRUE case-insensitively', () => {
+    process.env.MCP_READ_ONLY = 'TRUE';
+    expect(parseArgs([]).filterOptions.readOnly).toBe(true);
+  });
+
+  it('ignores non-truthy MCP_READ_ONLY values', () => {
+    process.env.MCP_READ_ONLY = 'yes';
+    expect(parseArgs([]).filterOptions.readOnly).toBeUndefined();
+  });
+
+  it('trims surrounding whitespace in MCP_PRESET', () => {
+    process.env.MCP_PRESET = '  minimal  ';
+    expect(parseArgs([]).filterOptions.preset).toBe('minimal');
+  });
+
+  it('trims whitespace around MCP_GROUPS entries', () => {
+    process.env.MCP_GROUPS = ' rules , recurring ';
+    expect(parseArgs([]).filterOptions.groups).toEqual(['rules', 'recurring']);
+  });
+
+  it('treats an empty/separator-only MCP_GROUPS as unset', () => {
+    process.env.MCP_GROUPS = ' , ';
+    expect(parseArgs([]).filterOptions.groups).toBeUndefined();
+  });
+
+  it('combines MCP_PRESET and MCP_READ_ONLY', () => {
+    process.env.MCP_PRESET = 'default';
+    process.env.MCP_READ_ONLY = 'true';
+    const result = parseArgs([]);
+    expect(result.filterOptions.preset).toBe('default');
+    expect(result.filterOptions.readOnly).toBe(true);
+  });
 });
