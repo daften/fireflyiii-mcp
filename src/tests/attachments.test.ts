@@ -4,6 +4,7 @@ import {
   createAttachment,
   deleteAttachment,
   downloadAttachment,
+  downloadAttachmentContent,
   fetchAttachment,
   fetchAttachments,
   registerAttachmentTools,
@@ -142,14 +143,55 @@ describe('uploadAttachment', () => {
 });
 
 describe('downloadAttachment', () => {
-  it('calls getText on /attachments/:id/download', async () => {
+  it('calls getBinary on /attachments/:id/download and returns base64 content with metadata', async () => {
     const mockFull = {
       ...mockClient,
-      getText: vi.fn().mockResolvedValueOnce('receipt content'),
+      getBinary: vi.fn().mockResolvedValueOnce({
+        data: Buffer.from('receipt content'),
+        contentType: 'application/pdf',
+        filename: 'receipt.pdf',
+      }),
     } as unknown as FireflyClient;
     const result = await downloadAttachment(mockFull, '7');
-    expect(mockFull.getText).toHaveBeenCalledWith('/attachments/7/download');
-    expect(result).toBe('receipt content');
+    expect(mockFull.getBinary).toHaveBeenCalledWith('/attachments/7/download');
+    expect(result).toEqual({
+      content_base64: Buffer.from('receipt content').toString('base64'),
+      content_type: 'application/pdf',
+      filename: 'receipt.pdf',
+    });
+  });
+});
+
+describe('downloadAttachmentContent', () => {
+  it('returns a native image block for image attachments', () => {
+    const result = downloadAttachmentContent({
+      content_base64: 'YWJj',
+      content_type: 'image/png',
+      filename: 'receipt.png',
+    });
+    expect(result).toEqual({ content: [{ type: 'image', data: 'YWJj', mimeType: 'image/png' }] });
+  });
+
+  it('strips Content-Type parameters when choosing the image MIME type', () => {
+    const result = downloadAttachmentContent({
+      content_base64: 'YWJj',
+      content_type: 'image/jpeg; charset=binary',
+      filename: 'photo.jpg',
+    });
+    expect(result).toEqual({ content: [{ type: 'image', data: 'YWJj', mimeType: 'image/jpeg' }] });
+  });
+
+  it('returns a text block with metadata for non-image attachments', () => {
+    const result = downloadAttachmentContent({
+      content_base64: 'YWJj',
+      content_type: 'application/pdf',
+      filename: 'receipt.pdf',
+    });
+    expect(result.content[0]).toMatchObject({ type: 'text' });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('filename: receipt.pdf');
+    expect(text).toContain('content_type: application/pdf');
+    expect(text).toContain('content_base64: YWJj');
   });
 });
 
@@ -167,6 +209,28 @@ describe('handler smoke — attachments', () => {
     const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
     registerAttachmentTools(server, client);
     const result = await handlers.get('get_attachments')!({});
+    expect(result).toMatchObject({ isError: true });
+  });
+
+  it('download_attachment handler returns an image block for image attachments', async () => {
+    const { server, handlers } = createMockServer();
+    const client = {
+      getBinary: vi.fn().mockResolvedValueOnce({
+        data: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+        contentType: 'image/png',
+        filename: 'receipt.png',
+      }),
+    } as unknown as FireflyClient;
+    registerAttachmentTools(server, client);
+    const result = await handlers.get('download_attachment')!({ id: '7' });
+    expect(result).toMatchObject({ content: [{ type: 'image', mimeType: 'image/png' }] });
+  });
+
+  it('download_attachment handler returns isError on failure', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { getBinary: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    registerAttachmentTools(server, client);
+    const result = await handlers.get('download_attachment')!({ id: '7' });
     expect(result).toMatchObject({ isError: true });
   });
 });

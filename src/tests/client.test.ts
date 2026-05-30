@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FireflyClient, FireflyError, formatError } from '../client.js';
+import { FireflyClient, FireflyError, formatError, parseContentDispositionFilename } from '../client.js';
 
 describe('FireflyClient', () => {
   beforeEach(() => {
@@ -254,6 +254,44 @@ describe('FireflyClient write methods', () => {
     );
   });
 
+  it('getBinary returns buffer and metadata from headers', async () => {
+    const headers = new Headers({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="receipt.pdf"',
+    });
+    const body = new Uint8Array([1, 2, 3, 4]);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status: 200, headers }));
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    const result = await client.getBinary('/attachments/7/download');
+    expect(result.data).toEqual(Buffer.from(body));
+    expect(result.contentType).toBe('application/pdf');
+    expect(result.filename).toBe('receipt.pdf');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://firefly.example.com/api/v1/attachments/7/download',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('getBinary fallback values for headers', async () => {
+    const body = new Uint8Array([1, 2, 3, 4]);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status: 200 }));
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    const result = await client.getBinary('/attachments/7/download');
+    expect(result.data).toEqual(Buffer.from(body));
+    expect(result.contentType).toBe('application/octet-stream');
+    expect(result.filename).toBe('file');
+  });
+
+  it('getBinary preserves non-text bytes through base64 round-trip', async () => {
+    // Bytes that are NOT valid UTF-8 — the original getText()-based code corrupted these.
+    const body = new Uint8Array([0xff, 0xfe, 0x00, 0x80, 0x7f]);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status: 200 }));
+    const client = new FireflyClient('https://firefly.example.com', 'my-token');
+    const result = await client.getBinary('/attachments/7/download');
+    expect(Uint8Array.from(result.data)).toEqual(body);
+    expect(Buffer.from(result.data.toString('base64'), 'base64')).toEqual(Buffer.from(body));
+  });
+
   it('serializes string[] params as repeated query params', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('csv data', { status: 200 }));
     const client = new FireflyClient('https://firefly.example.com', 'my-token');
@@ -306,5 +344,44 @@ describe('formatError — updated cases', () => {
     expect(err.message).not.toContain('secret=abc');
     expect(err.message).not.toContain('?page=1');
     expect(err.message).toContain('/api/v1/accounts');
+  });
+});
+
+describe('parseContentDispositionFilename', () => {
+  it('returns "file" when the header is absent', () => {
+    expect(parseContentDispositionFilename(null)).toBe('file');
+    expect(parseContentDispositionFilename(undefined)).toBe('file');
+  });
+
+  it('parses a plain quoted filename', () => {
+    expect(parseContentDispositionFilename('attachment; filename="receipt.pdf"')).toBe('receipt.pdf');
+  });
+
+  it('parses an unquoted filename and stops at the next parameter', () => {
+    expect(parseContentDispositionFilename('attachment; filename=receipt.pdf; size=123')).toBe('receipt.pdf');
+  });
+
+  it('does not throw and does not decode a literal "%" in a plain filename', () => {
+    expect(parseContentDispositionFilename('attachment; filename="50%_off_invoice.pdf"')).toBe('50%_off_invoice.pdf');
+  });
+
+  it('preserves a quoted filename that contains a semicolon', () => {
+    expect(parseContentDispositionFilename('attachment; filename="a;b.pdf"')).toBe('a;b.pdf');
+  });
+
+  it('percent-decodes the RFC 5987 extended form', () => {
+    expect(parseContentDispositionFilename("attachment; filename*=UTF-8''%E2%82%AC%20receipt.pdf")).toBe(
+      '€ receipt.pdf',
+    );
+  });
+
+  it('prefers the extended form over the plain form when both are present', () => {
+    expect(
+      parseContentDispositionFilename('attachment; filename="fallback.pdf"; filename*=UTF-8\'\'real%20name.pdf'),
+    ).toBe('real name.pdf');
+  });
+
+  it('falls back to the raw value when the extended form is malformed', () => {
+    expect(parseContentDispositionFilename("attachment; filename*=UTF-8''bad%name.pdf")).toBe('bad%name.pdf');
   });
 });
