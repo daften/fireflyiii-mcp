@@ -425,8 +425,10 @@ After every meaningful work step, commit with:
 git add [files...]
 git commit -m "[type]: [subject]
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+Co-Authored-By: [Agent model used] <noreply@anthropic.com>"
 ```
+
+Include a `Co-Authored-By` trailer naming the specific model that authored the work (e.g. `Claude Opus 4.8`, `Claude Sonnet 4.6`), so attribution reflects whichever agent made the commit.
 
 **Commit types:**
 - `feat:` New tool or feature
