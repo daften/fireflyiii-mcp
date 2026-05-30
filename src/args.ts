@@ -8,6 +8,36 @@ export interface ParsedArgs {
   filterOptions: ToolFilterOptions;
 }
 
+/**
+ * Validate a preset name from either a CLI flag or an environment variable.
+ * `source` is appended to the error message (e.g. " from MCP_PRESET") to make
+ * misconfiguration easy to trace; pass "" for CLI flags.
+ */
+function validatePreset(val: string, source = ''): PresetName {
+  if (!(val in PRESETS)) {
+    throw new Error(`Unknown preset "${val}"${source}. Valid presets: ${Object.keys(PRESETS).join(', ')}`);
+  }
+  return val as PresetName;
+}
+
+/**
+ * Parse a comma-separated group list from a CLI flag or environment variable.
+ * Whitespace and empty entries are ignored; an unknown group throws. Returns
+ * an empty array when the input contains no usable group names.
+ */
+function parseGroups(raw: string, source = ''): ToolGroup[] {
+  const parts = raw
+    .split(',')
+    .map((g) => g.trim())
+    .filter(Boolean);
+  for (const g of parts) {
+    if (!(TOOL_GROUPS as readonly string[]).includes(g)) {
+      throw new Error(`Unknown group "${g}"${source}. Valid groups: ${TOOL_GROUPS.join(', ')}`);
+    }
+  }
+  return parts as ToolGroup[];
+}
+
 export function parseArgs(args: string[]): ParsedArgs {
   let transport: 'stdio' | 'http' = 'stdio';
   let host = '127.0.0.1';
@@ -36,25 +66,30 @@ export function parseArgs(args: string[]): ParsedArgs {
       port = parsed;
       portWasExplicit = true;
     } else if (arg === '--preset' && args[i + 1]) {
-      const val = args[++i];
-      if (!(val in PRESETS)) {
-        throw new Error(`Unknown preset "${val}". Valid presets: ${Object.keys(PRESETS).join(', ')}`);
-      }
-      preset = val as PresetName;
+      preset = validatePreset(args[++i]);
     } else if (arg === '--groups' && args[i + 1]) {
-      const parts = args[++i]
-        .split(',')
-        .map((g) => g.trim())
-        .filter(Boolean);
-      for (const g of parts) {
-        if (!(TOOL_GROUPS as readonly string[]).includes(g)) {
-          throw new Error(`Unknown group "${g}". Valid groups: ${TOOL_GROUPS.join(', ')}`);
-        }
-      }
-      groups = parts as ToolGroup[];
+      groups = parseGroups(args[++i]);
     } else if (arg === '--read-only') {
       readOnly = true;
     }
+  }
+
+  // Environment-variable fallbacks. CLI flags always take precedence: each is
+  // consulted only when the corresponding flag was omitted.
+  if (preset === undefined && process.env.MCP_PRESET?.trim()) {
+    preset = validatePreset(process.env.MCP_PRESET.trim(), ' from MCP_PRESET');
+  }
+
+  if (groups === undefined && process.env.MCP_GROUPS) {
+    const parsed = parseGroups(process.env.MCP_GROUPS, ' from MCP_GROUPS');
+    // An empty/whitespace-only value (e.g. "," or "  ") is treated as unset
+    // rather than "select no groups", which would silently register no tools.
+    if (parsed.length > 0) groups = parsed;
+  }
+
+  if (!readOnly) {
+    const flag = process.env.MCP_READ_ONLY?.trim().toLowerCase();
+    if (flag === 'true' || flag === '1') readOnly = true;
   }
 
   if (preset !== undefined && groups !== undefined) {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseArgs } from '../args.js';
 
 describe('parseArgs — filter flags', () => {
@@ -73,5 +73,113 @@ describe('parseArgs — existing flags still work', () => {
 
   it('throws on invalid --port value', () => {
     expect(() => parseArgs(['--port', 'abc'])).toThrow(/--port must be/i);
+  });
+});
+
+describe('parseArgs — environment variables fallbacks', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    delete process.env.MCP_PRESET;
+    delete process.env.MCP_GROUPS;
+    delete process.env.MCP_READ_ONLY;
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('falls back to MCP_PRESET when --preset is omitted', () => {
+    process.env.MCP_PRESET = 'minimal';
+    const result = parseArgs([]);
+    expect(result.filterOptions.preset).toBe('minimal');
+  });
+
+  it('CLI --preset overrides MCP_PRESET', () => {
+    process.env.MCP_PRESET = 'minimal';
+    const result = parseArgs(['--preset', 'default']);
+    expect(result.filterOptions.preset).toBe('default');
+  });
+
+  it('falls back to MCP_GROUPS when --groups is omitted', () => {
+    process.env.MCP_GROUPS = 'rules,recurring';
+    const result = parseArgs([]);
+    expect(result.filterOptions.groups).toEqual(['rules', 'recurring']);
+  });
+
+  it('CLI --groups overrides MCP_GROUPS', () => {
+    process.env.MCP_GROUPS = 'rules,recurring';
+    const result = parseArgs(['--groups', 'accounts']);
+    expect(result.filterOptions.groups).toEqual(['accounts']);
+  });
+
+  it('falls back to MCP_READ_ONLY when --read-only is omitted', () => {
+    process.env.MCP_READ_ONLY = 'true';
+    const result = parseArgs([]);
+    expect(result.filterOptions.readOnly).toBe(true);
+  });
+
+  it('CLI --read-only takes precedence even if MCP_READ_ONLY is false/unset', () => {
+    process.env.MCP_READ_ONLY = 'false';
+    const result = parseArgs(['--read-only']);
+    expect(result.filterOptions.readOnly).toBe(true);
+  });
+
+  it('throws on invalid MCP_PRESET', () => {
+    process.env.MCP_PRESET = 'nonexistent';
+    expect(() => parseArgs([])).toThrow(/unknown preset/i);
+  });
+
+  it('throws on invalid MCP_GROUPS', () => {
+    process.env.MCP_GROUPS = 'accounts,fakething';
+    expect(() => parseArgs([])).toThrow(/unknown group.*fakething/i);
+  });
+
+  it('throws if both CLI preset and env groups are provided', () => {
+    process.env.MCP_GROUPS = 'accounts';
+    expect(() => parseArgs(['--preset', 'default'])).toThrow(/cannot use both --preset and --groups/i);
+  });
+
+  it('throws if both CLI groups and env preset are provided', () => {
+    process.env.MCP_PRESET = 'default';
+    expect(() => parseArgs(['--groups', 'accounts'])).toThrow(/cannot use both --preset and --groups/i);
+  });
+
+  it('accepts MCP_READ_ONLY=1 as truthy', () => {
+    process.env.MCP_READ_ONLY = '1';
+    expect(parseArgs([]).filterOptions.readOnly).toBe(true);
+  });
+
+  it('accepts MCP_READ_ONLY=TRUE case-insensitively', () => {
+    process.env.MCP_READ_ONLY = 'TRUE';
+    expect(parseArgs([]).filterOptions.readOnly).toBe(true);
+  });
+
+  it('ignores non-truthy MCP_READ_ONLY values', () => {
+    process.env.MCP_READ_ONLY = 'yes';
+    expect(parseArgs([]).filterOptions.readOnly).toBeUndefined();
+  });
+
+  it('trims surrounding whitespace in MCP_PRESET', () => {
+    process.env.MCP_PRESET = '  minimal  ';
+    expect(parseArgs([]).filterOptions.preset).toBe('minimal');
+  });
+
+  it('trims whitespace around MCP_GROUPS entries', () => {
+    process.env.MCP_GROUPS = ' rules , recurring ';
+    expect(parseArgs([]).filterOptions.groups).toEqual(['rules', 'recurring']);
+  });
+
+  it('treats an empty/separator-only MCP_GROUPS as unset', () => {
+    process.env.MCP_GROUPS = ' , ';
+    expect(parseArgs([]).filterOptions.groups).toBeUndefined();
+  });
+
+  it('combines MCP_PRESET and MCP_READ_ONLY', () => {
+    process.env.MCP_PRESET = 'default';
+    process.env.MCP_READ_ONLY = 'true';
+    const result = parseArgs([]);
+    expect(result.filterOptions.preset).toBe('default');
+    expect(result.filterOptions.readOnly).toBe(true);
   });
 });

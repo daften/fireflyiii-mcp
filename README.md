@@ -147,6 +147,21 @@ docker run \
 
 `MCP_BASE_URL` is the externally reachable URL of your container — used to build OAuth redirect URIs. If omitted the server falls back to the `Host` request header, which is unreliable behind a reverse proxy.
 
+To limit which tools the container exposes (e.g. to save context or run read-only), add the filtering environment variables — there are no CLI flags to pass in Docker, so these are the way to configure it:
+
+```bash
+docker run \
+  -e FIREFLY_URL=https://your-firefly-instance.example.com \
+  -e FIREFLY_OAUTH_CLIENT_ID=your-client-id \
+  -e MCP_BASE_URL=https://mcp.example.com \
+  -e MCP_PRESET=default \
+  -e MCP_READ_ONLY=true \
+  -p 3000:3000 \
+  ghcr.io/daften/fireflyiii-mcp:latest
+```
+
+See [Filtering Tools](#filtering-tools) for the full list of presets, groups, and the precedence rules.
+
 Or with docker-compose (copy `docker-compose.yml` from the repo):
 
 ```bash
@@ -590,6 +605,38 @@ node dist/index.js --groups rules --read-only
 ```
 
 Without any filter flags the server registers all 140 tools (equivalent to `--preset full`).
+
+### Environment variable equivalents
+
+Each filter flag has an environment-variable fallback, which is convenient for the npm/stdio and Docker setups where there is no natural place to pass CLI flags. A CLI flag always takes precedence over its environment variable.
+
+| Variable | Equivalent flag | Example |
+|----------|-----------------|---------|
+| `MCP_PRESET` | `--preset <name>` | `MCP_PRESET=default` |
+| `MCP_GROUPS` | `--groups <list>` | `MCP_GROUPS=accounts,transactions` |
+| `MCP_READ_ONLY` | `--read-only` | `MCP_READ_ONLY=true` (also accepts `1`) |
+
+As with the flags, `MCP_PRESET` and `MCP_GROUPS` are mutually exclusive.
+
+In a stdio MCP client config:
+
+```jsonc
+"env": {
+  "FIREFLY_URL": "https://your-firefly-instance.example.com",
+  "FIREFLY_TOKEN": "your-personal-access-token-here",
+  "MCP_PRESET": "default",
+  "MCP_READ_ONLY": "true"
+}
+```
+
+In Docker — where there are no CLI flags to pass — set them as container environment variables, either via `docker run -e MCP_PRESET=default …` (see [Docker setup](#option-3-docker--http-self-hosted)) or in `docker-compose.yml`, which already forwards them from your shell or `.env` file:
+
+```yaml
+environment:
+  MCP_PRESET: ${MCP_PRESET:-}
+  MCP_GROUPS: ${MCP_GROUPS:-}
+  MCP_READ_ONLY: ${MCP_READ_ONLY:-}
+```
 
 ---
 
