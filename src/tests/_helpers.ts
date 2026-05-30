@@ -8,6 +8,9 @@ export function createMockServer(): { server: McpServer; handlers: Map<string, H
     registerTool(_name: string, _config: unknown, handler: Handler) {
       handlers.set(_name, handler);
     },
+    registerPrompt(_name: string, _config: unknown, _cb: unknown) {
+      // mock prompt registration
+    },
   };
   return { server: server as unknown as McpServer, handlers };
 }

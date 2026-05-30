@@ -263,4 +263,30 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
         limit: limit as number | undefined,
       }),
   );
+
+  server.registerPrompt(
+    'account-transactions',
+    {
+      title: 'Get Transactions by Account',
+      description: 'Get transactions for a specific account with autocomplete.',
+      argsSchema: {
+        account: accountIdSchema,
+      },
+    },
+    async ({ account }) => {
+      const id = parseId(account as string);
+      return {
+        description: `Get transactions for account ID ${id}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Show me the recent transactions for account ID "${id}".`,
+            },
+          },
+        ],
+      };
+    },
+  );
 }

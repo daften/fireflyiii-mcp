@@ -157,4 +157,30 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
     },
     ({ id }) => deleteCategory(client, parseId(id as string)),
   );
+
+  server.registerPrompt(
+    'category-transactions',
+    {
+      title: 'Get Transactions by Category',
+      description: 'Get transactions for a specific category with autocomplete.',
+      argsSchema: {
+        category: categoryIdSchema,
+      },
+    },
+    async ({ category }) => {
+      const id = parseId(category as string);
+      return {
+        description: `Get transactions for category ID ${id}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Show me the recent transactions for category ID "${id}".`,
+            },
+          },
+        ],
+      };
+    },
+  );
 }

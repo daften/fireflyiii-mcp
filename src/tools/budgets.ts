@@ -380,4 +380,30 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
     },
     (params) => fetchTransactionsWithoutBudget(client, params as Parameters<typeof fetchTransactionsWithoutBudget>[1]),
   );
+
+  server.registerPrompt(
+    'budget-transactions',
+    {
+      title: 'Get Transactions by Budget',
+      description: 'Get transactions for a specific budget with autocomplete.',
+      argsSchema: {
+        budget: budgetIdSchema,
+      },
+    },
+    async ({ budget }) => {
+      const id = parseId(budget as string);
+      return {
+        description: `Get transactions for budget ID ${id}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Show me the recent transactions for budget ID "${id}".`,
+            },
+          },
+        ],
+      };
+    },
+  );
 }
