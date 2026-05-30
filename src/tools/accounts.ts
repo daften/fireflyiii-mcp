@@ -123,12 +123,16 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
   const accountIdSchema = completable(
     z.string().describe('Account ID — use get_accounts to find valid IDs'),
     async (value) => {
+      console.error(`[Autocomplete] Account search input: "${value}"`);
       try {
         const accounts = await fetchAccounts(client, { limit: 100 });
-        return accounts.data
+        const suggestions = accounts.data
           .map((a) => `${a.id} (${a.name ?? ''} - ${a.type ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
-      } catch {
+        console.error(`[Autocomplete] Account suggestions found: ${suggestions.length}`);
+        return suggestions;
+      } catch (err) {
+        console.error('[Autocomplete Error - Account]:', err);
         return [];
       }
     },

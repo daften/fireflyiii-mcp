@@ -77,12 +77,16 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
   const categoryIdSchema = completable(
     z.string().describe('Category ID — use get_categories to find valid IDs'),
     async (value) => {
+      console.error(`[Autocomplete] Category search input: "${value}"`);
       try {
         const categories = await fetchCategories(client, { limit: 100 });
-        return categories.data
+        const suggestions = categories.data
           .map((c) => `${c.id} (${c.name ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
-      } catch {
+        console.error(`[Autocomplete] Category suggestions found: ${suggestions.length}`);
+        return suggestions;
+      } catch (err) {
+        console.error('[Autocomplete Error - Category]:', err);
         return [];
       }
     },

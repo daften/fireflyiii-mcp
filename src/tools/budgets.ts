@@ -165,12 +165,16 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
   const budgetIdSchema = completable(
     z.string().describe('Budget ID — use get_budgets to find valid IDs'),
     async (value) => {
+      console.error(`[Autocomplete] Budget search input: "${value}"`);
       try {
         const budgets = await fetchBudgets(client, { limit: 100 });
-        return budgets.data
+        const suggestions = budgets.data
           .map((b) => `${b.id} (${b.name ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
-      } catch {
+        console.error(`[Autocomplete] Budget suggestions found: ${suggestions.length}`);
+        return suggestions;
+      } catch (err) {
+        console.error('[Autocomplete Error - Budget]:', err);
         return [];
       }
     },
