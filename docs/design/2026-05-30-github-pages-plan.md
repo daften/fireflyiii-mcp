@@ -6,7 +6,7 @@
 
 **Architecture:** VitePress lives in `docs/` at the project root with its own config. Content is Markdown adapted from the existing `README.md`, `AGENTS.md`, and `CONTRIBUTING.md`. GitHub Actions builds and deploys to the `gh-pages` branch on every push to `main`.
 
-**Tech Stack:** VitePress (latest 1.x), Node 20, `peaceiris/actions-gh-pages@v4`, GitHub Pages
+**Tech Stack:** VitePress (latest 1.x), Node 24, `peaceiris/actions-gh-pages@v4`, GitHub Pages
 
 ---
 
@@ -50,7 +50,25 @@ npm install -D vitepress
 
 Expected: VitePress added to `devDependencies` in `package.json`, `package-lock.json` updated.
 
-- [ ] **Step 2: Add docs scripts to `package.json`**
+- [ ] **Step 2: Verify docs are excluded from npm and Docker packaging**
+
+**npm:** The `files` array in `package.json` is `["dist", "README.md", "CHANGELOG.md", "LICENSE", ".env.example"]`. `docs/` is not listed, so it will never be included in the published package. VitePress as a devDependency is also excluded from the published package (`npm publish` omits devDependencies). No changes needed.
+
+**Docker:** `.dockerignore` already contains `docs` (excludes the entire directory from the build context). The runtime stage uses `npm ci --omit=dev`, so VitePress is never installed in the image. No changes needed.
+
+Confirm both by running:
+
+```bash
+# Preview what npm publish would include (dry run — nothing is published)
+npm pack --dry-run 2>&1 | grep -E "^npm notice"
+# docs/ should NOT appear in the file list
+
+# Confirm .dockerignore has docs covered
+grep "^docs" .dockerignore
+# Expected output: docs
+```
+
+- [ ] **Step 4: Add docs scripts to `package.json`**
 
 Add to the `"scripts"` block (after the existing `"test:integration"` line):
 
@@ -60,7 +78,7 @@ Add to the `"scripts"` block (after the existing `"test:integration"` line):
 "docs:preview": "vitepress preview docs"
 ```
 
-- [ ] **Step 3: Exclude VitePress build dirs from git**
+- [ ] **Step 5: Exclude VitePress build dirs from git**
 
 Add two lines to `.gitignore` (after the existing `dist/` line):
 
@@ -69,7 +87,7 @@ docs/.vitepress/dist
 docs/.vitepress/cache
 ```
 
-- [ ] **Step 4: Create `docs/.vitepress/config.ts`**
+- [ ] **Step 6: Create `docs/.vitepress/config.ts`**
 
 ```typescript
 import { defineConfig } from 'vitepress'
@@ -134,7 +152,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 5: Verify the dev server starts**
+- [ ] **Step 7: Verify the dev server starts**
 
 ```bash
 npm run docs:dev
@@ -144,7 +162,7 @@ Expected: output includes `vitepress v1.x.x` and `Local: http://localhost:5173/f
 
 Stop the server with `Ctrl+C`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add package.json package-lock.json .gitignore docs/.vitepress/config.ts
@@ -1263,7 +1281,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
