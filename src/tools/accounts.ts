@@ -1,3 +1,4 @@
+import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { FireflyClient } from '../client.js';
@@ -11,7 +12,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import { dateSchema, defineTool, parseId } from './_helpers.js';
 
 export async function fetchAccounts(
   client: FireflyClient,
@@ -119,6 +120,20 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       }),
   );
 
+  const accountIdSchema = completable(
+    z.string().describe('Account ID — use get_accounts to find valid IDs'),
+    async (value) => {
+      try {
+        const accounts = await fetchAccounts(client, { limit: 100 });
+        return accounts.data
+          .map((a) => `${a.id} (${a.name ?? ''} - ${a.type ?? ''})`)
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
+      } catch {
+        return [];
+      }
+    },
+  );
+
   defineTool(
     server,
     'get_account',
@@ -126,10 +141,10 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       title: 'Get Account',
       description:
         'Get a single Firefly III account by its numeric ID, including the current balance. Use get_accounts to find valid account IDs.',
-      inputSchema: { id: z.string().describe('Account ID') },
+      inputSchema: { id: accountIdSchema },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchAccount(client, id as string),
+    ({ id }) => fetchAccount(client, parseId(id as string)),
   );
 
   defineTool(
@@ -165,7 +180,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       description:
         'Update an existing account in Firefly III. Only fields provided will be changed. Use get_account to confirm the ID.',
       inputSchema: {
-        id: z.string().describe('Account ID — use get_accounts to find valid IDs'),
+        id: accountIdSchema,
         name: z.string().optional().describe('Account name'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         iban: z.string().optional().describe('IBAN number'),
@@ -177,7 +192,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateAccount(client, id as string, params as Parameters<typeof updateAccount>[2]),
+    ({ id, ...params }) => updateAccount(client, parseId(id as string), params as Parameters<typeof updateAccount>[2]),
   );
 
   defineTool(
@@ -187,10 +202,10 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       title: 'Delete Account',
       description:
         'Permanently delete an account from Firefly III. **This action cannot be undone.** Accounts with linked transactions cannot be deleted. Use get_account to confirm before deleting.',
-      inputSchema: { id: z.string().describe('Account ID — use get_accounts to find valid IDs') },
+      inputSchema: { id: accountIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteAccount(client, id as string),
+    ({ id }) => deleteAccount(client, parseId(id as string)),
   );
 
   defineTool(
@@ -200,7 +215,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       title: 'Get Account Transactions',
       description: 'Get all transactions for a specific account. Use get_accounts to find valid account IDs.',
       inputSchema: {
-        id: z.string().describe('Account ID'),
+        id: accountIdSchema,
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         type: z
@@ -213,7 +228,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, type, page, limit }) =>
-      fetchAccountTransactions(client, id as string, {
+      fetchAccountTransactions(client, parseId(id as string), {
         start: start as string | undefined,
         end: end as string | undefined,
         type: type as string | undefined,

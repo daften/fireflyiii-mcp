@@ -1,3 +1,4 @@
+import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { FireflyClient } from '../client.js';
@@ -11,7 +12,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import { dateSchema, defineTool, parseId } from './_helpers.js';
 
 export async function fetchCategories(
   client: FireflyClient,
@@ -73,6 +74,20 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       fetchCategories(client, { page: page as number | undefined, limit: limit as number | undefined }),
   );
 
+  const categoryIdSchema = completable(
+    z.string().describe('Category ID — use get_categories to find valid IDs'),
+    async (value) => {
+      try {
+        const categories = await fetchCategories(client, { limit: 100 });
+        return categories.data
+          .map((c) => `${c.id} (${c.name ?? ''})`)
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()));
+      } catch {
+        return [];
+      }
+    },
+  );
+
   defineTool(
     server,
     'get_category_transactions',
@@ -81,7 +96,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       description:
         'Get all transactions belonging to a specific Firefly III category. Optionally filter by date range (YYYY-MM-DD). Use get_categories to find valid category IDs.',
       inputSchema: {
-        categoryId: z.string().describe('Category ID — use get_categories to find valid IDs'),
+        categoryId: categoryIdSchema,
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
@@ -90,7 +105,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       annotations: READ_ANNOTATIONS,
     },
     ({ categoryId, start, end, page, limit }) =>
-      fetchCategoryTransactions(client, categoryId as string, {
+      fetchCategoryTransactions(client, parseId(categoryId as string), {
         start: start as string | undefined,
         end: end as string | undefined,
         page: page as number | undefined,
@@ -121,13 +136,13 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       description:
         'Update an existing category in Firefly III. Only fields provided will be changed. Use get_categories to find valid category IDs.',
       inputSchema: {
-        id: z.string().describe('Category ID — use get_categories to find valid IDs'),
+        id: categoryIdSchema,
         name: z.string().optional().describe('Category name'),
         notes: z.string().optional().describe('Notes'),
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateCategory(client, id as string, params as { name?: string; notes?: string }),
+    ({ id, ...params }) => updateCategory(client, parseId(id as string), params as { name?: string; notes?: string }),
   );
 
   defineTool(
@@ -137,9 +152,9 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       title: 'Delete Category',
       description:
         'Permanently delete a category from Firefly III. **This action cannot be undone.** Transactions in this category will become uncategorised. Use get_categories to confirm the ID.',
-      inputSchema: { id: z.string().describe('Category ID — use get_categories to find valid IDs') },
+      inputSchema: { id: categoryIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteCategory(client, id as string),
+    ({ id }) => deleteCategory(client, parseId(id as string)),
   );
 }
