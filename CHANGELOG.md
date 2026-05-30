@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-30
+
 ### Added
 - Nightly integration tests run automatically against a live Firefly III instance (latest release) via GitHub Actions, covering the transform layer, six tool groups (accounts, transactions, budgets, categories, currencies, tags, summary), and full account and transaction CRUD cycles.
 - [Experimental] Add autocompletion support for account, budget, and category parameters using the MCP Completion API. Note: Standard tool argument completions are not supported by the MCP specification directly, so this is implemented via native Prompts (`category-transactions`, `account-transactions`, `budget-transactions`). This is supported primarily by clients that support Prompt argument autocomplete (such as Claude Code) and may not function in other MCP clients. Suggestions are cached in memory (60s TTL) and scoped per authenticated user, so the cache is safe under multi-user HTTP/OAuth deployments. Set `FIREFLY_DEBUG=true` for verbose autocomplete tracing on stderr.
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daften/fireflyiii-mcp/releases/tag/v0.1.0

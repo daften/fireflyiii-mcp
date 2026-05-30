@@ -58,7 +58,14 @@ jobs:
 
       - run: npm ci
 
-      - run: npm publish --provenance
+      - name: Publish to npm (skip if this version already exists)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@daften/fireflyiii-mcp@${VERSION}" version > /dev/null 2>&1; then
+            echo "v${VERSION} is already published to npm; skipping publish (idempotent re-run)."
+          else
+            npm publish --provenance
+          fi
 
   publish-docker:
     needs: test
