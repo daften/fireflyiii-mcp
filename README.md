@@ -256,9 +256,11 @@ The server implements native **MCP Prompts** with **experimental autocomplete (c
 > * **Not Supported:** Standard chat interfaces like the **Claude Desktop App** do not currently support rendering autocomplete dropdowns for MCP Prompts.
 
 ### Available Prompts
-* **`account-transactions`**: Fetches transaction records for a specific account. Features full in-memory, case-insensitive autocomplete matching across assets, expenses (merchants/contacts like `"Dieter"`), revenues, and liabilities (pre-cached and limited to the top 100 results for instant rendering).
+* **`account-transactions`**: Fetches transaction records for a specific account. Case-insensitive autocomplete matching across assets, expenses (merchants/contacts like `"Dieter"`), revenues, and liabilities.
 * **`budget-transactions`**: Fetches transaction records for a specific budget.
 * **`category-transactions`**: Fetches transactions matching a specific spending category.
+
+Suggestions are pre-fetched (up to 1,000 records) and cached in memory for 60 seconds, returning the top 100 matches per keystroke for instant rendering. The cache is scoped per authenticated user, so it is safe under multi-user HTTP/OAuth deployments. Set `FIREFLY_DEBUG=true` to log autocomplete activity to stderr.
 
 To trigger them in a supported client like Claude Code, click the **`+`** icon, select the prompt (e.g. `account-transactions`), and start typing to filter and select your account instantly.
 

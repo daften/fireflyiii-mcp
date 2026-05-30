@@ -39,6 +39,11 @@ MCP_BASE_URL               String, required when not listening on loopback. Publ
 
 In HTTP mode, the Bearer token is resolved per-request from the Authorization header (set by the MCP client after completing the OAuth flow). `FIREFLY_TOKEN` is not used in HTTP mode.
 
+**Optional (both transports):**
+```
+FIREFLY_DEBUG     Set to "true" or "1" to emit verbose autocomplete tracing to stderr. Off by default.
+```
+
 Store credentials in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
 
 ---
@@ -164,13 +169,15 @@ The server implements standard **MCP Prompts** with **experimental autocomplete 
 > **Client Compatibility Warning:** Standard tool argument autocomplete is not supported by the MCP specification directly. Therefore, autocomplete is implemented using standard MCP Prompts. This feature is highly experimental and depends heavily on MCP client support (supported in **Claude Code**, but not in the standard **Claude Desktop App**).
 
 ### Prompts Implemented
-* **`account-transactions`**: Fetches transactions for an account. Auto-completes from a single, unified `type=all` request (capped at 1,000 items and limited to 100 suggestions per rendering, fully cached in memory for 1 minute TTL).
+* **`account-transactions`**: Fetches transactions for an account. Auto-completes from a single unfiltered accounts request (all types).
 * **`budget-transactions`**: Fetches transactions for a specific budget.
 * **`category-transactions`**: Fetches transactions for a specific category.
 
+Each handler fetches up to `AUTOCOMPLETE_FETCH_LIMIT` (1,000) records and returns at most `AUTOCOMPLETE_MAX_SUGGESTIONS` (100) labels per keystroke.
+
 ### Completion Schema Pattern
 Using Zod schema properties wrapped in `completable()` from `@modelcontextprotocol/sdk/server/completable.js`.
-Autocomplete handlers are fully pre-cached in memory with a 60-second TTL and Promise-level caching to prevent network request races during rapid typing.
+Autocomplete handlers share one in-memory TTL cache (`createTtlCache` in `tools/_helpers.ts`, 60-second TTL, promise-level caching to collapse the request burst during rapid typing). The cache is **keyed per identity** via `FireflyClient.cacheKey()` (a hash of the bearer token) — in HTTP mode a single client serves every request, so an unkeyed cache would leak one user's data to another.
 
 ---
 
