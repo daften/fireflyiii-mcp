@@ -93,20 +93,23 @@ export async function searchAccounts(
   return unwrapList(response);
 }
 
-let cachedAccounts: UnwrappedList | null = null;
+let cachedAccountsPromise: Promise<UnwrappedList> | null = null;
 let lastAccountsFetch = 0;
 const CACHE_TTL_MS = 60_000; // 1 minute TTL
 
-async function getCachedAccounts(client: FireflyClient): Promise<UnwrappedList> {
+function getCachedAccounts(client: FireflyClient): Promise<UnwrappedList> {
   const now = Date.now();
-  if (!cachedAccounts || now - lastAccountsFetch > CACHE_TTL_MS) {
-    console.error('[Autocomplete Cache] Fetching accounts from API...');
-    cachedAccounts = await fetchAccounts(client, { limit: 100 });
+  if (!cachedAccountsPromise || now - lastAccountsFetch > CACHE_TTL_MS) {
+    console.error('[Autocomplete Cache] Initiating API fetch for accounts...');
+    cachedAccountsPromise = fetchAccounts(client, { limit: 100 }).catch((err) => {
+      cachedAccountsPromise = null;
+      throw err;
+    });
     lastAccountsFetch = now;
   } else {
-    console.error('[Autocomplete Cache] Using cached accounts.');
+    console.error('[Autocomplete Cache] Reusing existing promise/cache for accounts.');
   }
-  return cachedAccounts;
+  return cachedAccountsPromise;
 }
 
 export function registerAccountTools(server: McpServer, client: FireflyClient): void {
