@@ -12,9 +12,6 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    # Dependabot PRs run with a restricted GITHUB_TOKEN that cannot write
-    # security-events — skip here; the push-to-main trigger covers merged code.
-    if: github.actor != 'dependabot[bot]'
     permissions:
       security-events: write
       packages: read
