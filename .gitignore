@@ -5,6 +5,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# VitePress build output
+docs/.vitepress/dist
+docs/.vitepress/cache
+
 # Environment — never commit real secrets
 .env
 .env.local

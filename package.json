@@ -23,7 +23,10 @@
     "check": "biome ci src/ && tsc --noEmit && vitest run",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts"
+    "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "simple-git-hooks": {
     "pre-commit": "npm run check"
@@ -58,6 +61,7 @@
     "simple-git-hooks": "^2.13.1",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.7"
   },
   "engines": {
