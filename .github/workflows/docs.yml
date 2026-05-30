@@ -2,11 +2,11 @@ name: Deploy docs
 
 on:
   push:
-    branches: [main, feature/github-pages]
+    branches: [main]
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
