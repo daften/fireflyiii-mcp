@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `create_account` now accepts `account_role`, which Firefly III requires when creating asset accounts.
+- Fix binary attachment corruption in `download_attachment` tool by handling array buffer and returning structured Base64 payload.
 
 ## [0.1.1] - 2026-05-23
 
