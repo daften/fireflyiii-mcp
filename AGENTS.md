@@ -44,6 +44,13 @@ In HTTP mode, the Bearer token is resolved per-request from the Authorization he
 FIREFLY_DEBUG     Set to "true" or "1" to emit verbose autocomplete tracing to stderr. Off by default.
 ```
 
+**Tool-filtering fallbacks (both transports)** for the `--preset`/`--groups`/`--read-only` flags. The CLI flag always wins when both are set.
+```
+MCP_PRESET      String. Named preset; same values as --preset. Mutually exclusive with MCP_GROUPS.
+MCP_GROUPS      String. Comma-separated group names; same values as --groups. Empty/whitespace-only is treated as unset.
+MCP_READ_ONLY   "true" or "1" (case-insensitive, trimmed) enables read-only mode; any other value is ignored.
+```
+
 Store credentials in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
 
 ---
