@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Nightly integration tests run automatically against a live Firefly III instance (latest release) via GitHub Actions, covering the transform layer, six tool groups (accounts, transactions, budgets, categories, currencies, tags, summary), and full account and transaction CRUD cycles.
+- Add autocompletion support for account, budget, and category parameters using the MCP Completion API.
 
 ### Fixed
 - `create_account` now accepts `account_role`, which Firefly III requires when creating asset accounts.
