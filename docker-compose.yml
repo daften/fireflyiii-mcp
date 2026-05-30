@@ -11,4 +11,8 @@ services:
       FIREFLY_URL: ${FIREFLY_URL}
       FIREFLY_OAUTH_CLIENT_ID: ${FIREFLY_OAUTH_CLIENT_ID}
       MCP_BASE_URL: ${MCP_BASE_URL}
+      # Optional tool filtering (see README → Filtering Tools). Leave unset to load all 140 tools.
+      MCP_PRESET: ${MCP_PRESET:-}
+      MCP_GROUPS: ${MCP_GROUPS:-}
+      MCP_READ_ONLY: ${MCP_READ_ONLY:-}
     restart: unless-stopped
