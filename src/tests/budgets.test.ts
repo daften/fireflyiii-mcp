@@ -234,3 +234,28 @@ describe('handler smoke — budgets', () => {
     expect(result).toMatchObject({ isError: true });
   });
 });
+
+describe('budget-transactions prompt', () => {
+  it('registers the prompt and resolves budget arguments', async () => {
+    const { server, prompts } = createMockServer();
+    const client = {} as FireflyClient;
+    registerBudgetTools(server, client);
+
+    const promptHandler = prompts.get('budget-transactions');
+    expect(promptHandler).toBeDefined();
+
+    const result = await promptHandler!({ budget: '3 (Groceries)' });
+    expect(result).toEqual({
+      description: 'Get transactions for budget ID 3',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'Show me the recent transactions for budget ID "3".',
+          },
+        },
+      ],
+    });
+  });
+});

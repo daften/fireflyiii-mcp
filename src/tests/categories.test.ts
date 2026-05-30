@@ -120,3 +120,28 @@ describe('handler smoke — categories', () => {
     expect(result).toMatchObject({ isError: true });
   });
 });
+
+describe('category-transactions prompt', () => {
+  it('registers the prompt and resolves category arguments', async () => {
+    const { server, prompts } = createMockServer();
+    const client = {} as FireflyClient;
+    registerCategoryTools(server, client);
+
+    const promptHandler = prompts.get('category-transactions');
+    expect(promptHandler).toBeDefined();
+
+    const result = await promptHandler!({ category: '7 (Food)' });
+    expect(result).toEqual({
+      description: 'Get transactions for category ID 7',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'Show me the recent transactions for category ID "7".',
+          },
+        },
+      ],
+    });
+  });
+});

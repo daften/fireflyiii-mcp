@@ -187,3 +187,28 @@ describe('handler smoke — accounts', () => {
     expect(result).toMatchObject({ isError: true });
   });
 });
+
+describe('account-transactions prompt', () => {
+  it('registers the prompt and resolves account arguments', async () => {
+    const { server, prompts } = createMockServer();
+    const client = {} as FireflyClient;
+    registerAccountTools(server, client);
+
+    const promptHandler = prompts.get('account-transactions');
+    expect(promptHandler).toBeDefined();
+
+    const result = await promptHandler!({ account: '1 (Checking - asset)' });
+    expect(result).toEqual({
+      description: 'Get transactions for account ID 1',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'Show me the recent transactions for account ID "1".',
+          },
+        },
+      ],
+    });
+  });
+});
