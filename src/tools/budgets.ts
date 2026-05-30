@@ -1,3 +1,4 @@
+import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { FireflyClient } from '../client.js';
@@ -11,7 +12,15 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import {
+  AUTOCOMPLETE_FETCH_LIMIT,
+  AUTOCOMPLETE_MAX_SUGGESTIONS,
+  createTtlCache,
+  dateSchema,
+  debugLog,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 
 export async function fetchBudgets(
   client: FireflyClient,
@@ -144,6 +153,14 @@ export async function fetchTransactionsWithoutBudget(
   return unwrapList(response);
 }
 
+// Module-scoped so the cache survives across the stateless HTTP requests autocomplete fires;
+// keyed per identity inside the completion handler so one user never sees another's budgets.
+const budgetsCache = createTtlCache<UnwrappedList>();
+
+export function clearBudgetsCache(): void {
+  budgetsCache.clear();
+}
+
 export function registerBudgetTools(server: McpServer, client: FireflyClient): void {
   defineTool(
     server,
@@ -161,6 +178,27 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
     ({ page, limit }) => fetchBudgets(client, { page: page as number | undefined, limit: limit as number | undefined }),
   );
 
+  const budgetIdSchema = completable(
+    z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+    async (value) => {
+      debugLog(`[Autocomplete] Budget search input: "${value}"`);
+      try {
+        const budgets = await budgetsCache.get(client.cacheKey(), () =>
+          fetchBudgets(client, { limit: AUTOCOMPLETE_FETCH_LIMIT }),
+        );
+        const suggestions = budgets.data
+          .map((b) => `${b.id} (${b.name ?? ''})`)
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
+          .slice(0, AUTOCOMPLETE_MAX_SUGGESTIONS);
+        debugLog(`[Autocomplete] Budget suggestions found: ${suggestions.length}`);
+        return suggestions;
+      } catch (err) {
+        debugLog('[Autocomplete Error - Budget]:', err);
+        return [];
+      }
+    },
+  );
+
   defineTool(
     server,
     'get_budget_limits',
@@ -169,14 +207,14 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       description:
         'Get spending limits for a specific Firefly III budget, including how much has been spent against each limit. Optionally filter by date range (YYYY-MM-DD). Use get_budgets to find valid budget IDs.',
       inputSchema: {
-        budgetId: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+        budgetId: budgetIdSchema,
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
       },
       annotations: READ_ANNOTATIONS,
     },
     ({ budgetId, start, end }) =>
-      fetchBudgetLimits(client, budgetId as string, start as string | undefined, end as string | undefined),
+      fetchBudgetLimits(client, parseId(budgetId as string), start as string | undefined, end as string | undefined),
   );
 
   defineTool(
@@ -209,7 +247,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       description:
         'Update an existing budget in Firefly III. Only fields provided will be changed. Use get_budgets to find valid budget IDs.',
       inputSchema: {
-        id: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+        id: budgetIdSchema,
         name: z.string().optional().describe('Budget name'),
         active: z.boolean().optional().describe('Whether the budget is active'),
         auto_budget_type: z.enum(['reset', 'rollover', 'none']).optional().describe('Auto-budget type'),
@@ -222,7 +260,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateBudget(client, id as string, params as Parameters<typeof updateBudget>[2]),
+    ({ id, ...params }) => updateBudget(client, parseId(id as string), params as Parameters<typeof updateBudget>[2]),
   );
 
   defineTool(
@@ -232,10 +270,10 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       title: 'Delete Budget',
       description:
         'Permanently delete a budget from Firefly III. **This action cannot be undone.** Use get_budgets to confirm the ID before deleting.',
-      inputSchema: { id: z.string().describe('Budget ID — use get_budgets to find valid IDs') },
+      inputSchema: { id: budgetIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteBudget(client, id as string),
+    ({ id }) => deleteBudget(client, parseId(id as string)),
   );
 
   defineTool(
@@ -245,7 +283,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       title: 'Create Budget Limit',
       description: 'Create a spending limit for a budget in Firefly III for a specific date range.',
       inputSchema: {
-        budget_id: z.string().describe('Budget ID — use get_budgets to find valid IDs'),
+        budget_id: budgetIdSchema,
         start: dateSchema.describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.describe('End date (YYYY-MM-DD)'),
         amount: z.string().describe('Limit amount as a number string'),
@@ -258,7 +296,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       annotations: WRITE_ANNOTATIONS,
     },
     ({ budget_id, ...params }) =>
-      createBudgetLimit(client, budget_id as string, params as Parameters<typeof createBudgetLimit>[2]),
+      createBudgetLimit(client, parseId(budget_id as string), params as Parameters<typeof createBudgetLimit>[2]),
   );
 
   defineTool(
@@ -335,7 +373,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       title: 'Get Budget Transactions',
       description: 'Get all transactions linked to a specific budget. Use get_budgets to find valid budget IDs.',
       inputSchema: {
-        id: z.string().describe('Budget ID'),
+        id: budgetIdSchema,
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
@@ -344,11 +382,9 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, page, limit }) =>
-      fetchBudgetTransactions(
-        client,
-        id as string,
-        { start, end, page, limit } as Parameters<typeof fetchBudgetTransactions>[2],
-      ),
+      fetchBudgetTransactions(client, parseId(id as string), { start, end, page, limit } as Parameters<
+        typeof fetchBudgetTransactions
+      >[2]),
   );
 
   defineTool(
@@ -366,5 +402,31 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       annotations: READ_ANNOTATIONS,
     },
     (params) => fetchTransactionsWithoutBudget(client, params as Parameters<typeof fetchTransactionsWithoutBudget>[1]),
+  );
+
+  server.registerPrompt(
+    'budget-transactions',
+    {
+      title: 'Get Transactions by Budget',
+      description: 'Get transactions for a specific budget with autocomplete.',
+      argsSchema: {
+        budget: budgetIdSchema,
+      },
+    },
+    async ({ budget }) => {
+      const id = parseId(budget as string);
+      return {
+        description: `Get transactions for budget ID ${id}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Show me the recent transactions for budget ID "${id}".`,
+            },
+          },
+        ],
+      };
+    },
   );
 }

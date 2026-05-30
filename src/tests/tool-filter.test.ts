@@ -9,6 +9,7 @@ function createMockServer() {
     registerTool: vi.fn((name: string) => {
       registered.push(name);
     }),
+    registerPrompt: vi.fn(),
   } as unknown as McpServer;
   return { server, registered };
 }

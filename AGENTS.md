@@ -39,6 +39,11 @@ MCP_BASE_URL               String, required when not listening on loopback. Publ
 
 In HTTP mode, the Bearer token is resolved per-request from the Authorization header (set by the MCP client after completing the OAuth flow). `FIREFLY_TOKEN` is not used in HTTP mode.
 
+**Optional (both transports):**
+```
+FIREFLY_DEBUG     Set to "true" or "1" to emit verbose autocomplete tracing to stderr. Off by default.
+```
+
 Store credentials in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
 
 ---
@@ -153,6 +158,26 @@ rules, recurring, attachments, currencies, exports, object-groups, transaction-l
 ### Read-only proxy
 
 `makeReadOnlyProxy(server)` wraps the `McpServer` with a `Proxy` that silently drops any `registerTool` call whose name does not start with `get_`, `search_`, or `test_`. Applied when `--read-only` is passed.
+
+---
+
+## Experimental Autocomplete Prompts
+
+The server implements standard **MCP Prompts** with **experimental autocomplete (completions)** support for common parameters (`account`, `budget`, and `category`) to avoid using numeric database IDs directly.
+
+> [!WARNING]
+> **Client Compatibility Warning:** Standard tool argument autocomplete is not supported by the MCP specification directly. Therefore, autocomplete is implemented using standard MCP Prompts. This feature is highly experimental and depends heavily on MCP client support (supported in **Claude Code**, but not in the standard **Claude Desktop App**).
+
+### Prompts Implemented
+* **`account-transactions`**: Fetches transactions for an account. Auto-completes from a single unfiltered accounts request (all types).
+* **`budget-transactions`**: Fetches transactions for a specific budget.
+* **`category-transactions`**: Fetches transactions for a specific category.
+
+Each handler fetches up to `AUTOCOMPLETE_FETCH_LIMIT` (1,000) records and returns at most `AUTOCOMPLETE_MAX_SUGGESTIONS` (100) labels per keystroke.
+
+### Completion Schema Pattern
+Using Zod schema properties wrapped in `completable()` from `@modelcontextprotocol/sdk/server/completable.js`.
+Autocomplete handlers share one in-memory TTL cache (`createTtlCache` in `tools/_helpers.ts`, 60-second TTL, promise-level caching to collapse the request burst during rapid typing). The cache is **keyed per identity** via `FireflyClient.cacheKey()` (a hash of the bearer token) — in HTTP mode a single client serves every request, so an unkeyed cache would leak one user's data to another.
 
 ---
 
@@ -419,16 +444,19 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 ## Commits
 
-After every meaningful work step, commit with:
+After every meaningful work step, commit with a `Co-Authored-By` trailer reflecting the specific AI assistant model and design team that authored the change:
 
 ```bash
 git add [files...]
 git commit -m "[type]: [subject]
 
-Co-Authored-By: [Agent model used] <noreply@anthropic.com>"
+Co-Authored-By: [Agent model used] <[domain]>"
 ```
 
-Include a `Co-Authored-By` trailer naming the specific model that authored the work (e.g. `Claude Opus 4.8`, `Claude Sonnet 4.6`), so attribution reflects whichever agent made the commit.
+Use the correct developer attribution matching the model's originating company:
+* **Anthropic / Claude commits:** Use `noreply@anthropic.com` (e.g., `Co-Authored-By: Claude Sonnet 3.5 <noreply@anthropic.com>`)
+* **Google / Gemini commits:** Use `noreply@google.com` (e.g., `Co-Authored-By: Gemini 1.5 Pro <noreply@google.com>`)
+* **OpenAI / GPT commits:** Use `noreply@openai.com` (e.g., `Co-Authored-By: GPT-4o <noreply@openai.com>`)
 
 **Commit types:**
 - `feat:` New tool or feature

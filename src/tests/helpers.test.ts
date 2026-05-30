@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, it, vi } from 'vitest';
 import { FireflyError } from '../client.js';
-import { dateSchema, defineTool } from '../tools/_helpers.js';
+import { dateSchema, defineTool, parseId } from '../tools/_helpers.js';
 
 function makeServer() {
   let capturedHandler: ((args: Record<string, unknown>) => Promise<unknown>) | null = null;
@@ -73,5 +73,20 @@ describe('dateSchema', () => {
 
   it('rejects natural-language dates', () => {
     expect(() => dateSchema.parse('Jan 15 2026')).toThrow('Date must be YYYY-MM-DD');
+  });
+});
+
+describe('parseId', () => {
+  it('returns clean numeric string', () => {
+    expect(parseId('42')).toBe('42');
+  });
+
+  it('extracts leading numeric ID from rich label', () => {
+    expect(parseId('42 (Checking)')).toBe('42');
+    expect(parseId('5 (Groceries)')).toBe('5');
+  });
+
+  it('falls back to input if no leading numeric ID is found', () => {
+    expect(parseId('no-numbers')).toBe('no-numbers');
   });
 });

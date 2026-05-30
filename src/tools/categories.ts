@@ -1,3 +1,4 @@
+import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { FireflyClient } from '../client.js';
@@ -11,7 +12,15 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import {
+  AUTOCOMPLETE_FETCH_LIMIT,
+  AUTOCOMPLETE_MAX_SUGGESTIONS,
+  createTtlCache,
+  dateSchema,
+  debugLog,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 
 export async function fetchCategories(
   client: FireflyClient,
@@ -55,6 +64,14 @@ export async function deleteCategory(client: FireflyClient, id: string): Promise
   return { deleted: true, id };
 }
 
+// Module-scoped so the cache survives across the stateless HTTP requests autocomplete fires;
+// keyed per identity inside the completion handler so one user never sees another's categories.
+const categoriesCache = createTtlCache<UnwrappedList>();
+
+export function clearCategoriesCache(): void {
+  categoriesCache.clear();
+}
+
 export function registerCategoryTools(server: McpServer, client: FireflyClient): void {
   defineTool(
     server,
@@ -73,6 +90,27 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       fetchCategories(client, { page: page as number | undefined, limit: limit as number | undefined }),
   );
 
+  const categoryIdSchema = completable(
+    z.string().describe('Category ID — use get_categories to find valid IDs'),
+    async (value) => {
+      debugLog(`[Autocomplete] Category search input: "${value}"`);
+      try {
+        const categories = await categoriesCache.get(client.cacheKey(), () =>
+          fetchCategories(client, { limit: AUTOCOMPLETE_FETCH_LIMIT }),
+        );
+        const suggestions = categories.data
+          .map((c) => `${c.id} (${c.name ?? ''})`)
+          .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
+          .slice(0, AUTOCOMPLETE_MAX_SUGGESTIONS);
+        debugLog(`[Autocomplete] Category suggestions found: ${suggestions.length}`);
+        return suggestions;
+      } catch (err) {
+        debugLog('[Autocomplete Error - Category]:', err);
+        return [];
+      }
+    },
+  );
+
   defineTool(
     server,
     'get_category_transactions',
@@ -81,7 +119,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       description:
         'Get all transactions belonging to a specific Firefly III category. Optionally filter by date range (YYYY-MM-DD). Use get_categories to find valid category IDs.',
       inputSchema: {
-        categoryId: z.string().describe('Category ID — use get_categories to find valid IDs'),
+        categoryId: categoryIdSchema,
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
@@ -90,7 +128,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       annotations: READ_ANNOTATIONS,
     },
     ({ categoryId, start, end, page, limit }) =>
-      fetchCategoryTransactions(client, categoryId as string, {
+      fetchCategoryTransactions(client, parseId(categoryId as string), {
         start: start as string | undefined,
         end: end as string | undefined,
         page: page as number | undefined,
@@ -121,13 +159,13 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       description:
         'Update an existing category in Firefly III. Only fields provided will be changed. Use get_categories to find valid category IDs.',
       inputSchema: {
-        id: z.string().describe('Category ID — use get_categories to find valid IDs'),
+        id: categoryIdSchema,
         name: z.string().optional().describe('Category name'),
         notes: z.string().optional().describe('Notes'),
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateCategory(client, id as string, params as { name?: string; notes?: string }),
+    ({ id, ...params }) => updateCategory(client, parseId(id as string), params as { name?: string; notes?: string }),
   );
 
   defineTool(
@@ -137,9 +175,35 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       title: 'Delete Category',
       description:
         'Permanently delete a category from Firefly III. **This action cannot be undone.** Transactions in this category will become uncategorised. Use get_categories to confirm the ID.',
-      inputSchema: { id: z.string().describe('Category ID — use get_categories to find valid IDs') },
+      inputSchema: { id: categoryIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteCategory(client, id as string),
+    ({ id }) => deleteCategory(client, parseId(id as string)),
+  );
+
+  server.registerPrompt(
+    'category-transactions',
+    {
+      title: 'Get Transactions by Category',
+      description: 'Get transactions for a specific category with autocomplete.',
+      argsSchema: {
+        category: categoryIdSchema,
+      },
+    },
+    async ({ category }) => {
+      const id = parseId(category as string);
+      return {
+        description: `Get transactions for category ID ${id}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Show me the recent transactions for category ID "${id}".`,
+            },
+          },
+        ],
+      };
+    },
   );
 }

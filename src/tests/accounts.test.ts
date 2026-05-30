@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
+  clearAccountsCache,
   createAccount,
   deleteAccount,
   fetchAccount,
@@ -185,5 +186,119 @@ describe('handler smoke — accounts', () => {
     registerAccountTools(server, client);
     const result = await handlers.get('get_accounts')!({});
     expect(result).toMatchObject({ isError: true });
+  });
+});
+
+describe('account-transactions prompt', () => {
+  it('registers the prompt and resolves account arguments', async () => {
+    const { server, prompts } = createMockServer();
+    const client = {} as FireflyClient;
+    registerAccountTools(server, client);
+
+    const promptHandler = prompts.get('account-transactions');
+    expect(promptHandler).toBeDefined();
+
+    const result = await promptHandler!({ account: '1 (Checking - asset)' });
+    expect(result).toEqual({
+      description: 'Get transactions for account ID 1',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'Show me the recent transactions for account ID "1".',
+          },
+        },
+      ],
+    });
+  });
+});
+
+describe('accounts autocomplete completions', () => {
+  const multiFixture = {
+    data: [
+      {
+        id: '1',
+        type: 'accounts',
+        attributes: { name: 'Checking', type: 'asset', active: true },
+        links: {},
+      },
+      {
+        id: '2',
+        type: 'accounts',
+        attributes: { name: 'Dieter', type: 'expense', active: true },
+        links: {},
+      },
+      {
+        id: '3',
+        type: 'accounts',
+        attributes: { name: 'Salary', type: 'revenue', active: true },
+        links: {},
+      },
+    ],
+    meta: { pagination: { current_page: 1, total_pages: 1, total: 3 } },
+  };
+
+  // Returns the registered completion handler for the account-transactions prompt argument.
+  function getAccountComplete(client: FireflyClient): (value: string) => Promise<string[]> {
+    const { server, promptConfigs } = createMockServer();
+    registerAccountTools(server, client);
+    const prompt = promptConfigs.get('account-transactions');
+    expect(prompt).toBeDefined();
+    const accountField = (prompt as any).argsSchema?.account;
+    expect(accountField).toBeDefined();
+    const meta = (accountField as any)[Symbol.for('mcp.completable')];
+    expect(meta).toBeDefined();
+    expect(typeof meta.complete).toBe('function');
+    return meta.complete;
+  }
+
+  beforeEach(() => {
+    clearAccountsCache();
+  });
+
+  it('fetches all accounts (no type filter, limit 1000) and filters suggestions case-insensitively', async () => {
+    const client = { get: vi.fn(), cacheKey: () => 'test-key' } as unknown as FireflyClient;
+    const complete = getAccountComplete(client);
+
+    vi.mocked(client.get).mockResolvedValueOnce(multiFixture);
+
+    // Completion with 'Dieter' should find the expense account.
+    const results = await complete('Dieter');
+    expect(client.get).toHaveBeenCalledTimes(1);
+    expect(client.get).toHaveBeenCalledWith('/accounts', { limit: 1000 });
+    expect(results).toEqual(['2 (Dieter - expense)']);
+  });
+
+  it('scopes the cache per identity so a different token never reuses cached data', async () => {
+    const clientA = { get: vi.fn(), cacheKey: () => 'token-a' } as unknown as FireflyClient;
+    const clientB = { get: vi.fn(), cacheKey: () => 'token-b' } as unknown as FireflyClient;
+    const completeA = getAccountComplete(clientA);
+    const completeB = getAccountComplete(clientB);
+
+    vi.mocked(clientA.get).mockResolvedValueOnce(multiFixture);
+    vi.mocked(clientB.get).mockResolvedValueOnce({
+      data: [{ id: '9', type: 'accounts', attributes: { name: 'Bob', type: 'asset', active: true }, links: {} }],
+      meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+    });
+
+    expect(await completeA('Dieter')).toEqual(['2 (Dieter - expense)']);
+    // Different identity must trigger its own fetch, not reuse user A's cached accounts.
+    expect(await completeB('Bob')).toEqual(['9 (Bob - asset)']);
+    expect(clientA.get).toHaveBeenCalledTimes(1);
+    expect(clientB.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('evicts the cache on fetch failure so the next call re-fetches', async () => {
+    const client = { get: vi.fn(), cacheKey: () => 'test-key' } as unknown as FireflyClient;
+    const complete = getAccountComplete(client);
+
+    vi.mocked(client.get).mockRejectedValueOnce(new Error('Connection error'));
+    expect(await complete('')).toEqual([]);
+
+    // A failed fetch must not be cached: the next call retries and succeeds.
+    vi.mocked(client.get).mockResolvedValueOnce(multiFixture);
+    expect(await complete('Dieter')).toEqual(['2 (Dieter - expense)']);
+    expect(client.get).toHaveBeenCalledTimes(2);
   });
 });

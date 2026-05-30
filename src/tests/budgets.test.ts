@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
+  clearBudgetsCache,
   createBudget,
   createBudgetLimit,
   deleteBudget,
@@ -232,5 +233,53 @@ describe('handler smoke — budgets', () => {
     registerBudgetTools(server, client);
     const result = await handlers.get('get_budgets')!({});
     expect(result).toMatchObject({ isError: true });
+  });
+});
+
+describe('budget-transactions prompt', () => {
+  it('registers the prompt and resolves budget arguments', async () => {
+    const { server, prompts } = createMockServer();
+    const client = {} as FireflyClient;
+    registerBudgetTools(server, client);
+
+    const promptHandler = prompts.get('budget-transactions');
+    expect(promptHandler).toBeDefined();
+
+    const result = await promptHandler!({ budget: '3 (Groceries)' });
+    expect(result).toEqual({
+      description: 'Get transactions for budget ID 3',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'Show me the recent transactions for budget ID "3".',
+          },
+        },
+      ],
+    });
+  });
+});
+
+describe('budgets autocomplete completions', () => {
+  beforeEach(() => {
+    clearBudgetsCache();
+  });
+
+  it('fetches budgets with limit 1000 and filters suggestions case-insensitively', async () => {
+    const { server, promptConfigs } = createMockServer();
+    const client = { get: vi.fn(), cacheKey: () => 'test-key' } as unknown as FireflyClient;
+    registerBudgetTools(server, client);
+
+    const prompt = promptConfigs.get('budget-transactions');
+    const budgetField = (prompt as any).argsSchema?.budget;
+    const complete = (budgetField as any)[Symbol.for('mcp.completable')].complete as (v: string) => Promise<string[]>;
+
+    vi.mocked(client.get).mockResolvedValueOnce(listFixture);
+
+    const results = await complete('groc');
+    expect(client.get).toHaveBeenCalledTimes(1);
+    expect(client.get).toHaveBeenCalledWith('/budgets', { limit: 1000 });
+    expect(results).toEqual(['3 (Groceries)']);
   });
 });

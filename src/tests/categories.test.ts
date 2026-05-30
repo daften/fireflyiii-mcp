@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
+  clearCategoriesCache,
   createCategory,
   deleteCategory,
   fetchCategories,
@@ -118,5 +119,53 @@ describe('handler smoke — categories', () => {
     registerCategoryTools(server, client);
     const result = await handlers.get('get_categories')!({});
     expect(result).toMatchObject({ isError: true });
+  });
+});
+
+describe('category-transactions prompt', () => {
+  it('registers the prompt and resolves category arguments', async () => {
+    const { server, prompts } = createMockServer();
+    const client = {} as FireflyClient;
+    registerCategoryTools(server, client);
+
+    const promptHandler = prompts.get('category-transactions');
+    expect(promptHandler).toBeDefined();
+
+    const result = await promptHandler!({ category: '7 (Food)' });
+    expect(result).toEqual({
+      description: 'Get transactions for category ID 7',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: 'Show me the recent transactions for category ID "7".',
+          },
+        },
+      ],
+    });
+  });
+});
+
+describe('categories autocomplete completions', () => {
+  beforeEach(() => {
+    clearCategoriesCache();
+  });
+
+  it('fetches categories with limit 1000 and filters suggestions case-insensitively', async () => {
+    const { server, promptConfigs } = createMockServer();
+    const client = { get: vi.fn(), cacheKey: () => 'test-key' } as unknown as FireflyClient;
+    registerCategoryTools(server, client);
+
+    const prompt = promptConfigs.get('category-transactions');
+    const categoryField = (prompt as any).argsSchema?.category;
+    const complete = (categoryField as any)[Symbol.for('mcp.completable')].complete as (v: string) => Promise<string[]>;
+
+    vi.mocked(client.get).mockResolvedValueOnce(listFixture);
+
+    const results = await complete('food');
+    expect(client.get).toHaveBeenCalledTimes(1);
+    expect(client.get).toHaveBeenCalledWith('/categories', { limit: 1000 });
+    expect(results).toEqual(['7 (Food & Dining)']);
   });
 });
