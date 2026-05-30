@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
+  clearAccountsCache,
   createAccount,
   deleteAccount,
   fetchAccount,
@@ -210,5 +211,108 @@ describe('account-transactions prompt', () => {
         },
       ],
     });
+  });
+});
+
+describe('accounts autocomplete completions', () => {
+  const makeListFixture = (id: string, name: string, type: string) => ({
+    data: [
+      {
+        id,
+        type: 'accounts',
+        attributes: { name, type, active: true },
+        links: { self: `https://firefly.example.com/api/v1/accounts/${id}` },
+      },
+    ],
+    meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
+  });
+
+  beforeEach(() => {
+    clearAccountsCache();
+  });
+
+  it('fetches all 4 types in parallel, merges suggestions and handles filter matching', async () => {
+    const { server, promptConfigs } = createMockServer();
+    const client = {
+      get: vi.fn(),
+    } as unknown as FireflyClient;
+
+    registerAccountTools(server, client);
+
+    const prompt = promptConfigs.get('account-transactions');
+    expect(prompt).toBeDefined();
+
+    const accountField = (prompt as any).argsSchema?.account;
+    expect(accountField).toBeDefined();
+
+    const completableSymbol = Symbol.for('mcp.completable');
+    const meta = (accountField as any)[completableSymbol];
+    expect(meta).toBeDefined();
+    expect(typeof meta.complete).toBe('function');
+
+    // Mock client.get responses for asset, expense, revenue, liability in order
+    vi.mocked(client.get)
+      .mockResolvedValueOnce(makeListFixture('1', 'Checking', 'asset'))
+      .mockResolvedValueOnce(makeListFixture('2', 'Dieter', 'expense'))
+      .mockResolvedValueOnce(makeListFixture('3', 'Salary', 'revenue'))
+      .mockResolvedValueOnce(makeListFixture('4', 'Credit Card', 'liability'));
+
+    // Completion with 'Dieter' should find the expense account
+    const results = await meta.complete('Dieter');
+    expect(client.get).toHaveBeenCalledTimes(4);
+    expect(client.get).toHaveBeenNthCalledWith(1, '/accounts', { type: 'asset', limit: 100 });
+    expect(client.get).toHaveBeenNthCalledWith(2, '/accounts', { type: 'expense', limit: 100 });
+    expect(client.get).toHaveBeenNthCalledWith(3, '/accounts', { type: 'revenue', limit: 100 });
+    expect(client.get).toHaveBeenNthCalledWith(4, '/accounts', { type: 'liability', limit: 100 });
+
+    expect(results).toEqual(['2 (Dieter - expense)']);
+  });
+
+  it('gracefully handles one or more endpoint failures, merging the surviving account types', async () => {
+    const { server, promptConfigs } = createMockServer();
+    const client = {
+      get: vi.fn(),
+    } as unknown as FireflyClient;
+
+    registerAccountTools(server, client);
+
+    const prompt = promptConfigs.get('account-transactions');
+    const accountField = (prompt as any).argsSchema?.account;
+    const completableSymbol = Symbol.for('mcp.completable');
+    const meta = (accountField as any)[completableSymbol];
+
+    // Mock: first succeeds, second fails, third succeeds, fourth fails
+    vi.mocked(client.get)
+      .mockResolvedValueOnce(makeListFixture('1', 'Checking', 'asset'))
+      .mockRejectedValueOnce(new Error('API Error for Expense'))
+      .mockResolvedValueOnce(makeListFixture('3', 'Salary', 'revenue'))
+      .mockRejectedValueOnce(new Error('API Error for Liability'));
+
+    const results = await meta.complete('');
+    expect(results).toEqual(['1 (Checking - asset)', '3 (Salary - revenue)']);
+  });
+
+  it('throws error (evicting cache) if all four endpoint fetches fail', async () => {
+    const { server, promptConfigs } = createMockServer();
+    const client = {
+      get: vi.fn(),
+    } as unknown as FireflyClient;
+
+    registerAccountTools(server, client);
+
+    const prompt = promptConfigs.get('account-transactions');
+    const accountField = (prompt as any).argsSchema?.account;
+    const completableSymbol = Symbol.for('mcp.completable');
+    const meta = (accountField as any)[completableSymbol];
+
+    // All fail
+    vi.mocked(client.get)
+      .mockRejectedValueOnce(new Error('Error 1'))
+      .mockRejectedValueOnce(new Error('Error 2'))
+      .mockRejectedValueOnce(new Error('Error 3'))
+      .mockRejectedValueOnce(new Error('Error 4'));
+
+    const results = await meta.complete('');
+    expect(results).toEqual([]);
   });
 });

@@ -97,14 +97,39 @@ let cachedAccountsPromise: Promise<UnwrappedList> | null = null;
 let lastAccountsFetch = 0;
 const CACHE_TTL_MS = 60_000; // 1 minute TTL
 
+export function clearAccountsCache(): void {
+  cachedAccountsPromise = null;
+  lastAccountsFetch = 0;
+}
+
 function getCachedAccounts(client: FireflyClient): Promise<UnwrappedList> {
   const now = Date.now();
   if (!cachedAccountsPromise || now - lastAccountsFetch > CACHE_TTL_MS) {
-    console.error('[Autocomplete Cache] Initiating API fetch for accounts...');
-    cachedAccountsPromise = fetchAccounts(client, { limit: 100 }).catch((err) => {
-      cachedAccountsPromise = null;
-      throw err;
-    });
+    console.error('[Autocomplete Cache] Initiating API fetch for all account types...');
+    const types = ['asset', 'expense', 'revenue', 'liability'];
+    cachedAccountsPromise = Promise.all(
+      types.map((type) =>
+        fetchAccounts(client, { type, limit: 100 }).then(
+          (res) => ({ success: true as const, res }),
+          (err) => ({ success: false as const, err }),
+        ),
+      ),
+    )
+      .then((results) => {
+        const successful = results.filter((r) => r.success);
+        if (successful.length === 0 && results.length > 0) {
+          // If all failed, throw the first error so the cache isn't populated with an empty list
+          const firstErr = (results[0] as { success: false; err: unknown }).err;
+          throw firstErr;
+        }
+        const mergedData = results.flatMap((r) => (r.success ? r.res.data : []));
+        console.error(`[Autocomplete Cache] Successfully fetched and merged ${mergedData.length} accounts.`);
+        return { data: mergedData };
+      })
+      .catch((err) => {
+        cachedAccountsPromise = null;
+        throw err;
+      });
     lastAccountsFetch = now;
   } else {
     console.error('[Autocomplete Cache] Reusing existing promise/cache for accounts.');
