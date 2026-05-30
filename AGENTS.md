@@ -215,21 +215,18 @@ export async function fetchAccounts(
 
 ### 2. Register Function
 
-Each tool file exports a `registerXxxTools(server, client)` function that calls `server.registerTool()` for each tool it owns.
+Each tool file exports a `registerXxxTools(server, client)` function that calls `defineTool()` for each tool it owns. `defineTool` (`src/tools/_helpers.ts`) wraps `server.registerTool()` and supplies the `try/catch` + JSON serialization, so the handler just returns the fetch result. Annotation constants are imported from `./_annotations.js`.
 
 ```typescript
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { type FireflyClient, formatError } from '../client.js';
-
-const READ_ANNOTATIONS = {
-  readOnlyHint: true,
-  openWorldHint: true,
-  idempotentHint: true,
-} as const;
+import type { FireflyClient } from '../client.js';
+import { READ_ANNOTATIONS } from './_annotations.js';
+import { defineTool } from './_helpers.js';
 
 export function registerAccountTools(server: McpServer, client: FireflyClient): void {
-  server.registerTool(
+  defineTool(
+    server,
     'get_accounts',
     {
       title: 'Get Accounts',
@@ -243,17 +240,12 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
       annotations: READ_ANNOTATIONS,
     },
-    async ({ type, page, limit }) => {
-      try {
-        const result = await fetchAccounts(client, { type, page, limit });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-      }
-    }
+    ({ type, page, limit }) => fetchAccounts(client, { type, page, limit }),
   );
 }
 ```
+
+For tools that must emit native content blocks (e.g. `download_attachment` returning an `image`), use `defineContentTool` and return a ready-made `{ content: [...] }` result instead.
 
 ### 3. Wire into aggregator (`src/tools/index.ts`)
 
@@ -322,7 +314,7 @@ Write tools use:
 - Update: `{ openWorldHint: true, idempotentHint: true }`
 - Delete: `{ destructiveHint: true, openWorldHint: true }` — descriptions include "This action cannot be undone."
 
-Each tool file declares these constants locally (a planned refactor will lift them to `src/tools/_annotations.ts`).
+These constants live in `src/tools/_annotations.ts` (`READ_ANNOTATIONS`, `WRITE_ANNOTATIONS`, `UPDATE_ANNOTATIONS`, `DELETE_ANNOTATIONS`) and are imported by each tool file.
 
 ---
 
@@ -384,7 +376,7 @@ npm run dev -- --preset default          # Load only the default tool subset
    - Wire `registerXxxTools` inside `registerAllTools`.
    - Consider which presets it belongs in (`PRESETS` map in the same file).
 4. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
-5. **Update the tool table** in `README.md`.
+5. **Update the tool table** in `docs/reference/tools.md` (the canonical tool reference; the README links to it and no longer keeps its own table). If the total or a preset count changed, bump the hardcoded numbers — the total appears in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`; preset counts live in `docs/reference/filtering.md`.
 6. **Run `npm run build`** to verify the TypeScript compiles cleanly.
 
 Example — adding `get_account` (single account by ID):
@@ -399,7 +391,8 @@ export async function fetchAccount(client: FireflyClient, id: string): Promise<U
 }
 
 // in registerAccountTools():
-server.registerTool(
+defineTool(
+  server,
   'get_account',
   {
     title: 'Get Account',
@@ -407,14 +400,7 @@ server.registerTool(
     inputSchema: { id: z.string().describe('Account ID') },
     annotations: READ_ANNOTATIONS,
   },
-  async ({ id }) => {
-    try {
-      const result = await fetchAccount(client, id);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      return { content: [{ type: 'text' as const, text: formatError(err) }], isError: true };
-    }
-  }
+  ({ id }) => fetchAccount(client, id as string),
 );
 
 // src/tests/accounts.test.ts — use a JSON:API envelope fixture
@@ -478,7 +464,7 @@ Use the correct developer attribution matching the model's originating company:
 ## Security & Open Source
 
 - **No hardcoded secrets.** All credentials come from environment variables.
-- **Validate all input.** Use Zod schemas defined inline in each `server.registerTool()` call.
+- **Validate all input.** Use Zod schemas defined inline in each `defineTool()` call.
 - **Error handling.** Every tool handler wraps in try/catch and returns `{ isError: true }` on failure.
 - **Dependencies.** Keep them minimal and up-to-date.
 - **License.** MIT — include LICENSE file.
