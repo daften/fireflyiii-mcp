@@ -12,7 +12,15 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool, parseId } from './_helpers.js';
+import {
+  AUTOCOMPLETE_FETCH_LIMIT,
+  AUTOCOMPLETE_MAX_SUGGESTIONS,
+  createTtlCache,
+  dateSchema,
+  debugLog,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 
 export async function fetchCategories(
   client: FireflyClient,
@@ -56,23 +64,12 @@ export async function deleteCategory(client: FireflyClient, id: string): Promise
   return { deleted: true, id };
 }
 
-let cachedCategoriesPromise: Promise<UnwrappedList> | null = null;
-let lastCategoriesFetch = 0;
-const CACHE_TTL_MS = 60_000; // 1 minute TTL
+// Module-scoped so the cache survives across the stateless HTTP requests autocomplete fires;
+// keyed per identity inside the completion handler so one user never sees another's categories.
+const categoriesCache = createTtlCache<UnwrappedList>();
 
-function getCachedCategories(client: FireflyClient): Promise<UnwrappedList> {
-  const now = Date.now();
-  if (!cachedCategoriesPromise || now - lastCategoriesFetch > CACHE_TTL_MS) {
-    console.error('[Autocomplete Cache] Initiating API fetch for categories...');
-    cachedCategoriesPromise = fetchCategories(client, { limit: 100 }).catch((err) => {
-      cachedCategoriesPromise = null;
-      throw err;
-    });
-    lastCategoriesFetch = now;
-  } else {
-    console.error('[Autocomplete Cache] Reusing existing promise/cache for categories.');
-  }
-  return cachedCategoriesPromise;
+export function clearCategoriesCache(): void {
+  categoriesCache.clear();
 }
 
 export function registerCategoryTools(server: McpServer, client: FireflyClient): void {
@@ -96,17 +93,19 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
   const categoryIdSchema = completable(
     z.string().describe('Category ID — use get_categories to find valid IDs'),
     async (value) => {
-      console.error(`[Autocomplete] Category search input: "${value}"`);
+      debugLog(`[Autocomplete] Category search input: "${value}"`);
       try {
-        const categories = await getCachedCategories(client);
+        const categories = await categoriesCache.get(client.cacheKey(), () =>
+          fetchCategories(client, { limit: AUTOCOMPLETE_FETCH_LIMIT }),
+        );
         const suggestions = categories.data
           .map((c) => `${c.id} (${c.name ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
-          .slice(0, 100);
-        console.error(`[Autocomplete] Category suggestions found: ${suggestions.length}`);
+          .slice(0, AUTOCOMPLETE_MAX_SUGGESTIONS);
+        debugLog(`[Autocomplete] Category suggestions found: ${suggestions.length}`);
         return suggestions;
       } catch (err) {
-        console.error('[Autocomplete Error - Category]:', err);
+        debugLog('[Autocomplete Error - Category]:', err);
         return [];
       }
     },

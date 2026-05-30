@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { QueryParams } from './types.js';
 
 export class FireflyError extends Error {
@@ -57,6 +58,15 @@ export class FireflyClient {
 
   private getToken(): string {
     return typeof this.tokenResolver === 'function' ? this.tokenResolver() : this.tokenResolver;
+  }
+
+  /**
+   * Stable, non-reversible per-identity key derived from the current bearer token. Used to scope
+   * in-memory caches per user — essential in HTTP mode, where one client instance serves every
+   * request and the token is resolved per request from the async context.
+   */
+  cacheKey(): string {
+    return createHash('sha256').update(this.getToken()).digest('hex');
   }
 
   private buildUrl(path: string, params?: QueryParams): string {

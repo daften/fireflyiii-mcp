@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
+  clearBudgetsCache,
   createBudget,
   createBudgetLimit,
   deleteBudget,
@@ -257,5 +258,28 @@ describe('budget-transactions prompt', () => {
         },
       ],
     });
+  });
+});
+
+describe('budgets autocomplete completions', () => {
+  beforeEach(() => {
+    clearBudgetsCache();
+  });
+
+  it('fetches budgets with limit 1000 and filters suggestions case-insensitively', async () => {
+    const { server, promptConfigs } = createMockServer();
+    const client = { get: vi.fn(), cacheKey: () => 'test-key' } as unknown as FireflyClient;
+    registerBudgetTools(server, client);
+
+    const prompt = promptConfigs.get('budget-transactions');
+    const budgetField = (prompt as any).argsSchema?.budget;
+    const complete = (budgetField as any)[Symbol.for('mcp.completable')].complete as (v: string) => Promise<string[]>;
+
+    vi.mocked(client.get).mockResolvedValueOnce(listFixture);
+
+    const results = await complete('groc');
+    expect(client.get).toHaveBeenCalledTimes(1);
+    expect(client.get).toHaveBeenCalledWith('/budgets', { limit: 1000 });
+    expect(results).toEqual(['3 (Groceries)']);
   });
 });

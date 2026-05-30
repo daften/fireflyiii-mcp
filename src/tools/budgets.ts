@@ -12,7 +12,15 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool, parseId } from './_helpers.js';
+import {
+  AUTOCOMPLETE_FETCH_LIMIT,
+  AUTOCOMPLETE_MAX_SUGGESTIONS,
+  createTtlCache,
+  dateSchema,
+  debugLog,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 
 export async function fetchBudgets(
   client: FireflyClient,
@@ -145,23 +153,12 @@ export async function fetchTransactionsWithoutBudget(
   return unwrapList(response);
 }
 
-let cachedBudgetsPromise: Promise<UnwrappedList> | null = null;
-let lastBudgetsFetch = 0;
-const CACHE_TTL_MS = 60_000; // 1 minute TTL
+// Module-scoped so the cache survives across the stateless HTTP requests autocomplete fires;
+// keyed per identity inside the completion handler so one user never sees another's budgets.
+const budgetsCache = createTtlCache<UnwrappedList>();
 
-function getCachedBudgets(client: FireflyClient): Promise<UnwrappedList> {
-  const now = Date.now();
-  if (!cachedBudgetsPromise || now - lastBudgetsFetch > CACHE_TTL_MS) {
-    console.error('[Autocomplete Cache] Initiating API fetch for budgets...');
-    cachedBudgetsPromise = fetchBudgets(client, { limit: 100 }).catch((err) => {
-      cachedBudgetsPromise = null;
-      throw err;
-    });
-    lastBudgetsFetch = now;
-  } else {
-    console.error('[Autocomplete Cache] Reusing existing promise/cache for budgets.');
-  }
-  return cachedBudgetsPromise;
+export function clearBudgetsCache(): void {
+  budgetsCache.clear();
 }
 
 export function registerBudgetTools(server: McpServer, client: FireflyClient): void {
@@ -184,17 +181,19 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
   const budgetIdSchema = completable(
     z.string().describe('Budget ID — use get_budgets to find valid IDs'),
     async (value) => {
-      console.error(`[Autocomplete] Budget search input: "${value}"`);
+      debugLog(`[Autocomplete] Budget search input: "${value}"`);
       try {
-        const budgets = await getCachedBudgets(client);
+        const budgets = await budgetsCache.get(client.cacheKey(), () =>
+          fetchBudgets(client, { limit: AUTOCOMPLETE_FETCH_LIMIT }),
+        );
         const suggestions = budgets.data
           .map((b) => `${b.id} (${b.name ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
-          .slice(0, 100);
-        console.error(`[Autocomplete] Budget suggestions found: ${suggestions.length}`);
+          .slice(0, AUTOCOMPLETE_MAX_SUGGESTIONS);
+        debugLog(`[Autocomplete] Budget suggestions found: ${suggestions.length}`);
         return suggestions;
       } catch (err) {
-        console.error('[Autocomplete Error - Budget]:', err);
+        debugLog('[Autocomplete Error - Budget]:', err);
         return [];
       }
     },

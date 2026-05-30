@@ -12,14 +12,22 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool, parseId } from './_helpers.js';
+import {
+  AUTOCOMPLETE_FETCH_LIMIT,
+  AUTOCOMPLETE_MAX_SUGGESTIONS,
+  createTtlCache,
+  dateSchema,
+  debugLog,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 
 export async function fetchAccounts(
   client: FireflyClient,
   params: { type?: string; page?: number; limit?: number },
 ): Promise<UnwrappedList> {
   const query: QueryParams = { page: params.page, limit: params.limit };
-  if (params.type) query.type = params.type;
+  if (params.type && params.type !== 'all') query.type = params.type;
   const response = await client.get<JsonApiListResponse>('/accounts', query);
   return unwrapList(response);
 }
@@ -93,28 +101,12 @@ export async function searchAccounts(
   return unwrapList(response);
 }
 
-let cachedAccountsPromise: Promise<UnwrappedList> | null = null;
-let lastAccountsFetch = 0;
-const CACHE_TTL_MS = 60_000; // 1 minute TTL
+// Module-scoped so the cache survives across the stateless HTTP requests autocomplete fires;
+// keyed per identity inside the completion handler so one user never sees another's accounts.
+const accountsCache = createTtlCache<UnwrappedList>();
 
 export function clearAccountsCache(): void {
-  cachedAccountsPromise = null;
-  lastAccountsFetch = 0;
-}
-
-function getCachedAccounts(client: FireflyClient): Promise<UnwrappedList> {
-  const now = Date.now();
-  if (!cachedAccountsPromise || now - lastAccountsFetch > CACHE_TTL_MS) {
-    console.error('[Autocomplete Cache] Initiating API fetch for all accounts...');
-    cachedAccountsPromise = fetchAccounts(client, { type: 'all', limit: 1000 }).catch((err) => {
-      cachedAccountsPromise = null;
-      throw err;
-    });
-    lastAccountsFetch = now;
-  } else {
-    console.error('[Autocomplete Cache] Reusing existing promise/cache for accounts.');
-  }
-  return cachedAccountsPromise;
+  accountsCache.clear();
 }
 
 export function registerAccountTools(server: McpServer, client: FireflyClient): void {
@@ -147,17 +139,19 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
   const accountIdSchema = completable(
     z.string().describe('Account ID — use get_accounts to find valid IDs'),
     async (value) => {
-      console.error(`[Autocomplete] Account search input: "${value}"`);
+      debugLog(`[Autocomplete] Account search input: "${value}"`);
       try {
-        const accounts = await getCachedAccounts(client);
+        const accounts = await accountsCache.get(client.cacheKey(), () =>
+          fetchAccounts(client, { limit: AUTOCOMPLETE_FETCH_LIMIT }),
+        );
         const suggestions = accounts.data
           .map((a) => `${a.id} (${a.name ?? ''} - ${a.type ?? ''})`)
           .filter((label) => label.toLowerCase().includes(value.toLowerCase()))
-          .slice(0, 100);
-        console.error(`[Autocomplete] Account suggestions found: ${suggestions.length}`);
+          .slice(0, AUTOCOMPLETE_MAX_SUGGESTIONS);
+        debugLog(`[Autocomplete] Account suggestions found: ${suggestions.length}`);
         return suggestions;
       } catch (err) {
-        console.error('[Autocomplete Error - Account]:', err);
+        debugLog('[Autocomplete Error - Account]:', err);
         return [];
       }
     },
