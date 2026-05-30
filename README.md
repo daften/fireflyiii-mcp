@@ -405,7 +405,7 @@ The server exposes `GET /.well-known/oauth-authorization-server` (no auth requir
 | `update_attachment` | Update attachment metadata |
 | `delete_attachment` | Delete an attachment and its file data. This action cannot be undone. |
 | `upload_attachment` | Upload base64-encoded file content for an existing attachment record (step 2 of 2) |
-| `download_attachment` | Download the raw content of an attachment as text |
+| `download_attachment` | Download an attachment by ID; images are returned as a rendered image, other files as their filename, MIME type, and Base64 content |
 
 </details>
 

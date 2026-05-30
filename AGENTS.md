@@ -458,7 +458,7 @@ Include a `Co-Authored-By` trailer naming the specific model that authored the w
 - Use a single merged import from each module — avoid two `import` statements from the same path.
 - Test files are in `src/tests/` (flat, not a `unit/` subdirectory) and excluded from the build by `tsconfig.json`.
 - `dist/` is **gitignored** (not committed). Run `npm run build` to compile before running or deploying.
-- The MCP SDK handles serialization; just return plain objects from tool handlers.
+- The MCP SDK handles serialization; just return plain objects from tool handlers (via the `defineTool` helper, which JSON-stringifies the result into a text block). For tools that must emit native content blocks instead — e.g. `download_attachment` returns an `image` block for image attachments — use `defineContentTool` and return a ready-made `{ content: [...] }` result.
 - Firefly III API is REST; pagination is via query params (`limit`, `page`).
 - `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.
 - Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly.
