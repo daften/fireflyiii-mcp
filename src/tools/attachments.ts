@@ -10,7 +10,7 @@ import {
   unwrapSingle,
 } from '../transform.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { defineTool } from './_helpers.js';
+import { type ContentResult, defineContentTool, defineTool } from './_helpers.js';
 
 // ---- Attachment fetch + CRUD ----
 
@@ -58,15 +58,38 @@ export async function uploadAttachment(
   return { uploaded: true, id };
 }
 
-export async function downloadAttachment(
-  client: FireflyClient,
-  id: string,
-): Promise<{ content_base64: string; contentType: string; filename: string }> {
+export interface DownloadedAttachment {
+  content_base64: string;
+  content_type: string;
+  filename: string;
+}
+
+export async function downloadAttachment(client: FireflyClient, id: string): Promise<DownloadedAttachment> {
   const { data, contentType, filename } = await client.getBinary(`/attachments/${id}/download`);
   return {
     content_base64: data.toString('base64'),
-    contentType,
+    content_type: contentType,
     filename,
+  };
+}
+
+/**
+ * Map a downloaded attachment to an MCP result. Image attachments are returned
+ * as a native `image` content block so clients can render them; everything else
+ * is returned as a text block carrying the filename, MIME type, and Base64 data.
+ */
+export function downloadAttachmentContent(file: DownloadedAttachment): ContentResult {
+  const mimeType = file.content_type.split(';')[0].trim();
+  if (mimeType.startsWith('image/')) {
+    return { content: [{ type: 'image', data: file.content_base64, mimeType }] };
+  }
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `filename: ${file.filename}\ncontent_type: ${file.content_type}\ncontent_base64: ${file.content_base64}`,
+      },
+    ],
   };
 }
 
@@ -183,18 +206,18 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
     ({ id, content_base64 }) => uploadAttachment(client, id as string, Buffer.from(content_base64 as string, 'base64')),
   );
 
-  defineTool(
+  defineContentTool(
     server,
     'download_attachment',
     {
       title: 'Download Attachment',
       description:
-        'Download a file attachment (such as an invoice, PDF, or image receipt) by its ID. Returns the filename, MIME content type, and the file data encoded as a Base64 string. Use get_attachments to find valid IDs.',
+        'Download a file attachment (such as an invoice, PDF, or image receipt) by its ID. Image attachments are returned as a rendered image; other files are returned as their filename, MIME content type, and Base64-encoded content. Use get_attachments to find valid IDs.',
       inputSchema: {
         id: z.string().describe('Attachment ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => downloadAttachment(client, id as string),
+    async ({ id }) => downloadAttachmentContent(await downloadAttachment(client, id as string)),
   );
 }
