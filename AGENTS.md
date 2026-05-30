@@ -444,16 +444,19 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 ## Commits
 
-After every meaningful work step, commit with:
+After every meaningful work step, commit with a `Co-Authored-By` trailer reflecting the specific AI assistant model and design team that authored the change:
 
 ```bash
 git add [files...]
 git commit -m "[type]: [subject]
 
-Co-Authored-By: [Agent model used] <noreply@anthropic.com>"
+Co-Authored-By: [Agent model used] <[domain]>"
 ```
 
-Include a `Co-Authored-By` trailer naming the specific model that authored the work (e.g. `Claude Opus 4.8`, `Claude Sonnet 4.6`), so attribution reflects whichever agent made the commit.
+Use the correct developer attribution matching the model's originating company:
+* **Anthropic / Claude commits:** Use `noreply@anthropic.com` (e.g., `Co-Authored-By: Claude Sonnet 3.5 <noreply@anthropic.com>`)
+* **Google / Gemini commits:** Use `noreply@google.com` (e.g., `Co-Authored-By: Gemini 1.5 Pro <noreply@google.com>`)
+* **OpenAI / GPT commits:** Use `noreply@openai.com` (e.g., `Co-Authored-By: GPT-4o <noreply@openai.com>`)
 
 **Commit types:**
 - `feat:` New tool or feature
