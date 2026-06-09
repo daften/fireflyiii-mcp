@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README now states the Node.js 20+ requirement next to the setup options table.
 - Export tool descriptions mention the `text/csv` output format.
 
+### Fixed
+- `trigger_rule` and `trigger_rule_group` no longer fail with HTTP 415. They sent a bodyless POST, so the client omitted the `Content-Type: application/json` header and Firefly III rejected the request. They now send an empty `{}` JSON body (trigger parameters are read from the query string), matching the other parameterless POST tools.
+
 ## [0.2.0] - 2026-05-30
 
 ### Added
