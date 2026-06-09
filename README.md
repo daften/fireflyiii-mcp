@@ -33,6 +33,8 @@ Choose your setup method:
 | [Docker — HTTP](#option-3-docker--http-self-hosted) | HTTP + OAuth | Self-hosted on a server or home lab |
 | [Git checkout](#option-4-git-checkout-development) | stdio or HTTP | Contributing or local development |
 
+All options except Docker require **Node.js 20+**.
+
 ---
 
 ## Option 1: npm package — stdio (simplest)

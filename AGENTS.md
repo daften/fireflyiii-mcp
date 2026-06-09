@@ -8,6 +8,39 @@ Users can query their finances in natural language through Claude, getting answe
 
 **Current state:** 140 tools across 14 groups, full CRUD, stdio and HTTP/OAuth transports, tool filtering via `--preset`/`--groups`/`--read-only`.
 
+### Architecture at a glance
+
+```
+MCP client (Claude Code / Desktop / ...)
+        │
+        │  stdio                          HTTP (StreamableHTTP, stateless)
+        ▼                                 ▼
+  StdioServerTransport          OAuth proxy (src/http.ts)
+        │                         · /.well-known metadata, /oauth/{authorize,token,register,callback}
+        │                         · substitutes redirect_uri, Bearer guard
+        │                         · per-request token via AsyncLocalStorage
+        └────────────┬────────────┘
+                     ▼
+            McpServer (src/server.ts)
+                     │  registerAllTools (src/tools/index.ts)
+                     │  · TOOL_GROUPS / PRESETS filtering, read-only proxy
+                     ▼
+      Tool groups (src/tools/*.ts, 14 groups / 140 tools)
+        · defineTool wrapper: zod validation, error formatting (src/tools/_helpers.ts)
+        · autocomplete prompts with per-user TTL cache
+                     │
+                     ▼
+        FireflyClient (src/client.ts)
+        · Bearer auth, 30s timeout, FireflyError → friendly messages
+                     │
+                     ▼
+        Transform layer (src/transform.ts)
+        · unwraps JSON:API envelopes → flat objects + pagination
+                     │
+                     ▼
+            Firefly III REST API (/api/v1)
+```
+
 ---
 
 ## Tech Stack
