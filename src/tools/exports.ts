@@ -52,7 +52,7 @@ export function registerExportTools(server: McpServer, client: FireflyClient): v
       name,
       {
         title,
-        description: `Export all ${entity} as a CSV file. Returns raw CSV text.${hasDates ? ' Optionally filter by date range.' : ''}`,
+        description: `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv).${hasDates ? ' Optionally filter by date range.' : ''}`,
         inputSchema,
         annotations: READ_ANNOTATIONS,
       },
