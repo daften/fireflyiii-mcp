@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Test coverage reporting via `@vitest/coverage-v8`: new `npm run test:coverage` script, and CI now prints a coverage summary (Node 22 job).
+
 ## [0.2.0] - 2026-05-30
 
 ### Added
