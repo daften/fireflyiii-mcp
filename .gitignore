@@ -9,6 +9,10 @@ dist/
 docs/.vitepress/dist
 docs/.vitepress/cache
 
+# Local-only Docker Compose override (build from source, machine-specific tweaks)
+docker-compose.override.yml
+docker-compose.override.yaml
+
 # Environment — never commit real secrets
 .env
 .env.local

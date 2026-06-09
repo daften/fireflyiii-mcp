@@ -137,7 +137,7 @@ export async function triggerRuleGroup(
   if (params.start) query.start = params.start;
   if (params.end) query.end = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
-  await client.post<void>(`/rule-groups/${id}/trigger`, undefined, query);
+  await client.post<void>(`/rule-groups/${id}/trigger`, {}, query);
   return { triggered: true, id };
 }
 
@@ -150,7 +150,7 @@ export async function triggerRule(
   if (params.start) query.start = params.start;
   if (params.end) query.end = params.end;
   if (params.accounts?.length) query['accounts[]'] = params.accounts;
-  await client.post<void>(`/rules/${id}/trigger`, undefined, query);
+  await client.post<void>(`/rules/${id}/trigger`, {}, query);
   return { triggered: true, id };
 }
 
