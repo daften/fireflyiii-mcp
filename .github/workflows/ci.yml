@@ -38,6 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Needed by the coverage report action to post/update the sticky PR comment.
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
@@ -68,3 +70,8 @@ jobs:
           else
             npm test
           fi
+
+      - name: Report coverage on PR
+        # always() so the comment also appears (with red numbers) when tests fail.
+        if: always() && github.event_name == 'pull_request' && matrix.node-version == 22
+        uses: davelosert/vitest-coverage-report-action@v2

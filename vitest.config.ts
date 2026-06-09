@@ -7,7 +7,8 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**'],
       exclude: ['src/tests/**'],
-      reporter: ['text', 'lcov'],
+      // json-summary + json feed the PR coverage comment in CI (vitest-coverage-report-action)
+      reporter: ['text', 'lcov', 'json-summary', 'json'],
     },
   },
 });
