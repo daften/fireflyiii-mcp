@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Test coverage reporting via `@vitest/coverage-v8`: new `npm run test:coverage` script, and CI posts a sticky coverage comment on every PR (via `vitest-coverage-report-action`, Node 22 job) in addition to the log summary.
+
 ### Docs
 - New "Architecture at a glance" diagram in AGENTS.md showing the path from MCP client through transports, tool registration, the HTTP client, and the transform layer to the Firefly III API.
 - README now states the Node.js 20+ requirement next to the setup options table.
