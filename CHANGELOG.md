@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Test coverage reporting via `@vitest/coverage-v8`: new `npm run test:coverage` script, and CI posts a sticky coverage comment on every PR (via `vitest-coverage-report-action`, Node 22 job) in addition to the log summary.
+- `MCP_ALLOWED_REDIRECT_PREFIXES` is now documented in `.env.example` and the environment variable reference (extra allowed OAuth `redirect_uri` prefixes; loopback-only by default).
 
 ### Docs
 - New "Architecture at a glance" diagram in AGENTS.md showing the path from MCP client through transports, tool registration, the HTTP client, and the transform layer to the Firefly III API.
@@ -17,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `trigger_rule` and `trigger_rule_group` no longer fail with HTTP 415. They sent a bodyless POST, so the client omitted the `Content-Type: application/json` header and Firefly III rejected the request. They now send an empty `{}` JSON body (trigger parameters are read from the query string), matching the other parameterless POST tools.
-
+- Abandoned OAuth flows are now evicted by a periodic background sweep (every 10 minutes) instead of only when new authorize/callback traffic arrives, preventing slow memory growth on long-running HTTP servers.
 ## [0.2.0] - 2026-05-30
 
 ### Added

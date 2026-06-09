@@ -16,6 +16,7 @@ Store credentials in a `.env` file (gitignored). Copy `.env.example` from the re
 | `FIREFLY_URL` | Yes | Base URL of your Firefly III instance. No trailing slash. |
 | `FIREFLY_OAUTH_CLIENT_ID` | Yes | OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client. |
 | `MCP_BASE_URL` | Required when not on loopback | Public base URL of this server. Used to build OAuth redirect URIs. Required when hosting on a server; omit for local `127.0.0.1` setups. |
+| `MCP_ALLOWED_REDIRECT_PREFIXES` | No | Comma-separated list of extra allowed `redirect_uri` prefixes for the OAuth flow. By default only loopback redirect URIs (`http://127.0.0.1:`, `http://localhost:`, `http://[::1]:`) are accepted. Add a prefix only for clients with a non-loopback callback URL (e.g. `https://claude.ai/api/mcp/auth_callback`) — each prefix widens where authorization codes may be sent, so keep it as narrow as possible. |
 
 In HTTP mode, `FIREFLY_TOKEN` is not used. The Bearer token is resolved per-request from the `Authorization` header after the OAuth flow.
 

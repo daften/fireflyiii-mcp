@@ -47,6 +47,11 @@ export function createOAuthHandler(
     }
   }
 
+  // Lazy eviction above only runs on authorize/callback traffic, so flows abandoned mid-auth
+  // would otherwise sit in memory indefinitely on a quiet long-running server. unref() keeps
+  // the timer from holding the process open.
+  setInterval(evictExpiredFlows, FLOW_TTL_MS).unref();
+
   return async (req, res) => {
     const baseUrl =
       (process.env.MCP_BASE_URL?.trim().replace(/\/$/, '') || null) ?? `http://${req.headers.host ?? '127.0.0.1:3000'}`;
