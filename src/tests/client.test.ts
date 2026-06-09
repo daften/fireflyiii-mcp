@@ -174,6 +174,21 @@ describe('FireflyClient write methods', () => {
     expect(result).toEqual(responseData);
   });
 
+  it('post() sets Content-Type: application/json and serializes an empty {} body', async () => {
+    // Regression: a bodyless trigger POST must still carry Content-Type so Firefly does not 415.
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    await client.post('/rule-groups/1/trigger', {}, { start: '2026-01-01' });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/rule-groups/1/trigger?start=2026-01-01'),
+      expect.objectContaining({
+        method: 'POST',
+        body: '{}',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      }),
+    );
+  });
+
   it('put() sends PUT with JSON body and returns parsed response', async () => {
     const body = { name: 'Updated' };
     const responseData = { data: { id: '1', type: 'accounts', attributes: { name: 'Updated' }, links: {} } };
