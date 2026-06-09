@@ -83,7 +83,7 @@ defineTool(
     },
     annotations: READ_ANNOTATIONS,
   },
-  ({ id }) => fetchMyThing(client, id as string),
+  ({ id }) => fetchMyThing(client, id), // args are typed from inputSchema — no casts needed
 )
 ```
 

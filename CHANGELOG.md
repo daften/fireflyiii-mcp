@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `trigger_rule` and `trigger_rule_group` no longer fail with HTTP 415. They sent a bodyless POST, so the client omitted the `Content-Type: application/json` header and Firefly III rejected the request. They now send an empty `{}` JSON body (trigger parameters are read from the query string), matching the other parameterless POST tools.
 
+### Changed
+- Tool handlers are now fully type-safe: `defineTool`/`defineContentTool` infer handler argument types from the tool's Zod `inputSchema`, removing ~200 `as` casts across all tool files. Biome's `noExplicitAny` rule is re-enabled, and the `@modelcontextprotocol/sdk` minimum is raised to `^1.29.0` (already required by the lockfile) for its zod v4-aware types. No runtime behavior change.
+
 ## [0.2.0] - 2026-05-30
 
 ### Added

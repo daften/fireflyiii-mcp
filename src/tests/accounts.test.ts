@@ -245,9 +245,11 @@ describe('accounts autocomplete completions', () => {
     registerAccountTools(server, client);
     const prompt = promptConfigs.get('account-transactions');
     expect(prompt).toBeDefined();
-    const accountField = (prompt as any).argsSchema?.account;
+    const accountField = (prompt as { argsSchema?: Record<string, unknown> }).argsSchema?.account;
     expect(accountField).toBeDefined();
-    const meta = (accountField as any)[Symbol.for('mcp.completable')];
+    const meta = (accountField as Record<symbol, { complete: (value: string) => Promise<string[]> }>)[
+      Symbol.for('mcp.completable')
+    ];
     expect(meta).toBeDefined();
     expect(typeof meta.complete).toBe('function');
     return meta.complete;
