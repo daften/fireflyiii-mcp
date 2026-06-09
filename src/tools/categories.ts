@@ -87,8 +87,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchCategories(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchCategories(client, { page: page, limit: limit }),
   );
 
   const categoryIdSchema = completable(
@@ -129,11 +128,11 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       annotations: READ_ANNOTATIONS,
     },
     ({ categoryId, start, end, page, limit }) =>
-      fetchCategoryTransactions(client, parseId(categoryId as string), {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchCategoryTransactions(client, parseId(categoryId), {
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -149,7 +148,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createCategory(client, params as { name: string; notes?: string }),
+    (params) => createCategory(client, params),
   );
 
   defineTool(
@@ -166,7 +165,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateCategory(client, parseId(id as string), params as { name?: string; notes?: string }),
+    ({ id, ...params }) => updateCategory(client, parseId(id), params),
   );
 
   defineTool(
@@ -179,7 +178,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       inputSchema: { id: categoryIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteCategory(client, parseId(id as string)),
+    ({ id }) => deleteCategory(client, parseId(id)),
   );
 
   server.registerPrompt(
@@ -192,7 +191,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       },
     },
     async ({ category }) => {
-      const id = parseId(category as string);
+      const id = parseId(category);
       return {
         description: `Get transactions for category ID ${id}`,
         messages: [

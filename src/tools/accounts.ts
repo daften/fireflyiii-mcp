@@ -148,9 +148,9 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     },
     ({ type, page, limit }) =>
       fetchAccounts(client, {
-        type: type as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        type: type,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -185,7 +185,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       inputSchema: { id: accountIdSchema },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchAccount(client, parseId(id as string)),
+    ({ id }) => fetchAccount(client, parseId(id)),
   );
 
   defineTool(
@@ -239,7 +239,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createAccount(client, params as Parameters<typeof createAccount>[1]),
+    (params) => createAccount(client, params),
   );
 
   defineTool(
@@ -293,7 +293,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateAccount(client, parseId(id as string), params as Parameters<typeof updateAccount>[2]),
+    ({ id, ...params }) => updateAccount(client, parseId(id), params),
   );
 
   defineTool(
@@ -306,7 +306,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       inputSchema: { id: accountIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteAccount(client, parseId(id as string)),
+    ({ id }) => deleteAccount(client, parseId(id)),
   );
 
   defineTool(
@@ -329,12 +329,12 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, type, page, limit }) =>
-      fetchAccountTransactions(client, parseId(id as string), {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        type: type as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchAccountTransactions(client, parseId(id), {
+        start: start,
+        end: end,
+        type: type,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -358,10 +358,10 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     },
     ({ query, field, page, limit }) =>
       searchAccounts(client, {
-        query: query as string,
-        field: field as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        query: query,
+        field: field,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -375,7 +375,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
     },
     async ({ account }) => {
-      const id = parseId(account as string);
+      const id = parseId(account);
       return {
         description: `Get transactions for account ID ${id}`,
         messages: [

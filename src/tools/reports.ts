@@ -157,7 +157,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) => fetchTags(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchTags(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -177,11 +177,11 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       annotations: READ_ANNOTATIONS,
     },
     ({ tag, start, end, page, limit }) =>
-      fetchTagTransactions(client, tag as string, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchTagTransactions(client, tag, {
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -199,8 +199,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end, currency_code }) =>
-      fetchSummary(client, start as string, end as string, currency_code as string | undefined),
+    ({ start, end, currency_code }) => fetchSummary(client, start, end, currency_code),
   );
 
   defineTool(
@@ -216,7 +215,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightExpenses(client, start as string, end as string),
+    ({ start, end }) => fetchInsightExpenses(client, start, end),
   );
 
   defineTool(
@@ -232,7 +231,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightIncome(client, start as string, end as string),
+    ({ start, end }) => fetchInsightIncome(client, start, end),
   );
 
   defineTool(
@@ -248,7 +247,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createTag(client, params as { tag: string; date?: string; description?: string }),
+    (params) => createTag(client, params),
   );
 
   defineTool(
@@ -266,8 +265,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) =>
-      updateTag(client, id as string, params as { tag?: string; date?: string; description?: string }),
+    ({ id, ...params }) => updateTag(client, id, params),
   );
 
   defineTool(
@@ -280,7 +278,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       inputSchema: { id: z.string().describe('Tag ID — use get_tags to find valid IDs') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteTag(client, id as string),
+    ({ id }) => deleteTag(client, id),
   );
 
   defineTool(
@@ -296,7 +294,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-bill', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-bill', start, end),
   );
 
   defineTool(
@@ -312,7 +310,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-budget', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-budget', start, end),
   );
 
   defineTool(
@@ -328,7 +326,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-category', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-category', start, end),
   );
 
   defineTool(
@@ -344,7 +342,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-tag', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/expense/no-tag', start, end),
   );
 
   defineTool(
@@ -360,7 +358,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/income/no-category', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/income/no-category', start, end),
   );
 
   defineTool(
@@ -376,7 +374,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/income/no-tag', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/income/no-tag', start, end),
   );
 
   defineTool(
@@ -392,7 +390,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/transfer/no-category', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/transfer/no-category', start, end),
   );
 
   defineTool(
@@ -408,7 +406,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end }) => fetchInsightNoX(client, '/insight/transfer/no-tag', start as string, end as string),
+    ({ start, end }) => fetchInsightNoX(client, '/insight/transfer/no-tag', start, end),
   );
 
   defineTool(
@@ -437,8 +435,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ start, end, currency_code }) =>
-      fetchNetWorth(client, start as string, end as string, currency_code as string | undefined),
+    ({ start, end, currency_code }) => fetchNetWorth(client, start, end, currency_code),
   );
 
   const CHART_ENDPOINTS: Record<string, { title: string; description: string; endpoint: string }> = {
@@ -477,7 +474,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
         },
         annotations: READ_ANNOTATIONS,
       },
-      ({ start, end }) => fetchChart(client, endpoint, start as string, end as string),
+      ({ start, end }) => fetchChart(client, endpoint, start, end),
     );
   }
 
@@ -495,7 +492,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ from, to, date }) => fetchExchangeRate(client, from as string, to as string, date as string | undefined),
+    ({ from, to, date }) => fetchExchangeRate(client, from, to, date),
   );
 
   const INSIGHT_GROUPED_TOOLS: Array<{

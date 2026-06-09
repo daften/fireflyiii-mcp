@@ -238,8 +238,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchRuleGroups(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchRuleGroups(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -253,7 +252,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchRuleGroup(client, id as string),
+    ({ id }) => fetchRuleGroup(client, id),
   );
 
   defineTool(
@@ -271,9 +270,9 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
     },
     ({ title, description, active }) =>
       createRuleGroup(client, {
-        title: title as string,
-        description: description as string | undefined,
-        active: active as boolean | undefined,
+        title: title,
+        description: description,
+        active: active,
       }),
   );
 
@@ -293,10 +292,10 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: UPDATE_ANNOTATIONS,
     },
     ({ id, title, description, active }) =>
-      updateRuleGroup(client, id as string, {
-        title: title as string | undefined,
-        description: description as string | undefined,
-        active: active as boolean | undefined,
+      updateRuleGroup(client, id, {
+        title: title,
+        description: description,
+        active: active,
       }),
   );
 
@@ -312,7 +311,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteRuleGroup(client, id as string),
+    ({ id }) => deleteRuleGroup(client, id),
   );
 
   // ---- Rule tools ----
@@ -329,7 +328,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) => fetchRules(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchRules(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -343,7 +342,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchRule(client, id as string),
+    ({ id }) => fetchRule(client, id),
   );
 
   defineTool(
@@ -375,15 +374,15 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
     },
     ({ title, rule_group_id, trigger, triggers, actions, description, active, strict, stop_processing }) =>
       createRule(client, {
-        title: title as string,
-        rule_group_id: rule_group_id as string,
-        trigger: trigger as string,
-        triggers: triggers as RuleTriggerInput[],
-        actions: actions as RuleActionInput[],
-        description: description as string | undefined,
-        active: active as boolean | undefined,
-        strict: strict as boolean | undefined,
-        stop_processing: stop_processing as boolean | undefined,
+        title: title,
+        rule_group_id: rule_group_id,
+        trigger: trigger,
+        triggers: triggers,
+        actions: actions,
+        description: description,
+        active: active,
+        strict: strict,
+        stop_processing: stop_processing,
       }),
   );
 
@@ -409,16 +408,16 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: UPDATE_ANNOTATIONS,
     },
     ({ id, title, rule_group_id, trigger, triggers, actions, description, active, strict, stop_processing }) =>
-      updateRule(client, id as string, {
-        title: title as string | undefined,
-        rule_group_id: rule_group_id as string | undefined,
-        trigger: trigger as string | undefined,
-        triggers: triggers as RuleTriggerInput[] | undefined,
-        actions: actions as RuleActionInput[] | undefined,
-        description: description as string | undefined,
-        active: active as boolean | undefined,
-        strict: strict as boolean | undefined,
-        stop_processing: stop_processing as boolean | undefined,
+      updateRule(client, id, {
+        title: title,
+        rule_group_id: rule_group_id,
+        trigger: trigger,
+        triggers: triggers,
+        actions: actions,
+        description: description,
+        active: active,
+        strict: strict,
+        stop_processing: stop_processing,
       }),
   );
 
@@ -434,7 +433,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteRule(client, id as string),
+    ({ id }) => deleteRule(client, id),
   );
 
   // ---- Trigger and test tools ----
@@ -454,9 +453,9 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: READ_ANNOTATIONS,
     },
     ({ id, page, limit }) =>
-      fetchRuleGroupRules(client, id as string, {
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchRuleGroupRules(client, id, {
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -476,10 +475,10 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: { openWorldHint: true },
     },
     ({ id, start, end, accounts }) =>
-      triggerRuleGroup(client, id as string, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        accounts: accounts as number[] | undefined,
+      triggerRuleGroup(client, id, {
+        start: start,
+        end: end,
+        accounts: accounts,
       }),
   );
 
@@ -498,10 +497,10 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: { openWorldHint: true },
     },
     ({ id, start, end, accounts }) =>
-      triggerRule(client, id as string, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        accounts: accounts as number[] | undefined,
+      triggerRule(client, id, {
+        start: start,
+        end: end,
+        accounts: accounts,
       }),
   );
 
@@ -528,12 +527,12 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, accounts, search_limit, triggered_limit }) =>
-      testRuleGroup(client, id as string, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        accounts: accounts as number[] | undefined,
-        search_limit: search_limit as number | undefined,
-        triggered_limit: triggered_limit as number | undefined,
+      testRuleGroup(client, id, {
+        start: start,
+        end: end,
+        accounts: accounts,
+        search_limit: search_limit,
+        triggered_limit: triggered_limit,
       }),
   );
 
@@ -560,12 +559,12 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, accounts, search_limit, triggered_limit }) =>
-      testRule(client, id as string, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        accounts: accounts as number[] | undefined,
-        search_limit: search_limit as number | undefined,
-        triggered_limit: triggered_limit as number | undefined,
+      testRule(client, id, {
+        start: start,
+        end: end,
+        accounts: accounts,
+        search_limit: search_limit,
+        triggered_limit: triggered_limit,
       }),
   );
 }
