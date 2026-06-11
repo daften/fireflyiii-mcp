@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-11
+
 ### Added
 - Test coverage reporting via `@vitest/coverage-v8`: new `npm run test:coverage` script, and CI posts a sticky coverage comment on every PR (via `vitest-coverage-report-action`, Node 22 job) in addition to the log summary.
 
 ### Docs
+- New VitePress documentation site published to GitHub Pages, with guides (stdio, HTTP/OAuth, Docker, git checkout), reference pages (tools, filtering, autocomplete, env vars), and contributing pages. The README is slimmed to a quickstart that links to the site.
 - New "Architecture at a glance" diagram in AGENTS.md showing the path from MCP client through transports, tool registration, the HTTP client, and the transform layer to the Firefly III API.
 - README now states the Node.js 20+ requirement next to the setup options table.
 - Export tool descriptions mention the `text/csv` output format.
@@ -54,7 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daften/fireflyiii-mcp/releases/tag/v0.1.0
