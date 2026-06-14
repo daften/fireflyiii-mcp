@@ -80,6 +80,17 @@ Your MCP client downloads and starts the server automatically on first use. No s
 
 ---
 
+## Nightly builds (unstable)
+
+Want to test unreleased changes from `main`? A nightly build is published automatically each night that `main` has changed. **These are unstable and not recommended for production.**
+
+- **npm:** `npm install @daften/fireflyiii-mcp@nightly` (or `npx @daften/fireflyiii-mcp@nightly`)
+- **Docker:** `docker pull ghcr.io/daften/fireflyiii-mcp:nightly`
+
+A normal install (no tag) always resolves to the latest tagged release — `@latest` on npm and `:latest` on Docker are never moved to a nightly. To go back to a stable build, reinstall without the `@nightly` / `:nightly` tag.
+
+---
+
 ## Experimental Autocomplete Prompts
 
 → See [Autocomplete prompts](https://daften.github.io/fireflyiii-mcp/reference/autocomplete) in the docs.

@@ -466,6 +466,18 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 4. Create an annotated git tag whose message is the same `## [X.Y.Z]` block from `CHANGELOG.md`. The publish workflow validates that this section exists before publishing.
 5. Push the tag: `git push origin v<version>` — this triggers the publish workflow, which validates the changelog, runs tests, publishes to npm + GHCR, and auto-creates a GitHub Release from the tag annotation.
 
+### Nightly builds
+
+`.github/workflows/nightly-release.yml` runs on a cron (`0 3 * * *` UTC) and on manual `workflow_dispatch` (with an optional `force` input). A `guard` job publishes only when `main`'s HEAD differs from the commit the rolling `nightly` git tag points at, so it builds only on nights `main` changed.
+
+When it publishes it:
+- runs lint/typecheck/tests, then computes a prerelease version `<next-patch>-nightly.<UTCstamp>` (in-CI only, never committed);
+- publishes to npm under the **`nightly`** dist-tag (`npm publish --tag nightly`) — the `latest` dist-tag is never touched;
+- pushes Docker tags `:nightly` and `:nightly-YYYYMMDD` to `ghcr.io` — `:latest` is never touched;
+- force-moves the `nightly` git tag to HEAD and updates a GitHub pre-release (`prerelease: true`, `make_latest: false`).
+
+This is independent of `publish.yml` (tagged releases) and of `nightly.yml` (Firefly III integration tests).
+
 ---
 
 ## Commits
