@@ -3,12 +3,83 @@ name: Publish
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'           # tagged release -> "release" channel
+  schedule:
+    - cron: '0 3 * * *'   # 03:00 UTC nightly -> "nightly" channel
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Nightly: publish even if main has not changed since the last nightly'
+        type: boolean
+        default: false
 
 permissions: {}
 
 jobs:
-  test:
+  # Resolve which channel this run is (release vs nightly) and all the
+  # channel-specific values the downstream jobs need. A tag push is a release;
+  # schedule / manual dispatch is a nightly (guarded so it only builds when main
+  # changed since the rolling `nightly` tag).
+  setup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      channel: ${{ steps.resolve.outputs.channel }}
+      should_publish: ${{ steps.resolve.outputs.should_publish }}
+      version: ${{ steps.resolve.outputs.version }}
+      npm_tag: ${{ steps.resolve.outputs.npm_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve channel and version
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Tag push -> release. Version comes from the tag; npm 'latest' dist-tag.
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "channel=release" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "Release channel: v$VERSION"
+          else
+            # schedule / workflow_dispatch -> nightly. Prerelease version, 'nightly' dist-tag.
+            NEXT=$(node -p "const [a,b,c]=require('./package.json').version.split('.').map(Number); [a,b,c+1].join('.')")
+            STAMP=$(date -u +%Y%m%dT%H%M)
+            VERSION="${NEXT}-nightly.${STAMP}"
+            echo "channel=nightly" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "npm_tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "Nightly channel: $VERSION"
+            # Change-guard: publish only if HEAD differs from the rolling nightly tag.
+            HEAD_SHA=$(git rev-parse HEAD)
+            if [ "${{ github.event.inputs.force }}" = "true" ]; then
+              echo "force=true requested; publishing."
+              echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            else
+              if git rev-parse -q --verify refs/tags/nightly >/dev/null; then
+                LAST_SHA=$(git rev-list -n 1 nightly)
+              else
+                LAST_SHA=""
+              fi
+              echo "HEAD=$HEAD_SHA  last_nightly=${LAST_SHA:-<none>}"
+              if [ -n "$LAST_SHA" ] && [ "$HEAD_SHA" = "$LAST_SHA" ]; then
+                echo "main unchanged since last nightly; skipping publish."
+                echo "should_publish=false" >> "$GITHUB_OUTPUT"
+              else
+                echo "main changed (or no prior nightly); will publish."
+                echo "should_publish=true" >> "$GITHUB_OUTPUT"
+              fi
+            fi
+          fi
+
+  verify:
+    needs: setup
+    if: needs.setup.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,9 +91,9 @@ jobs:
           node-version: 24
 
       - name: Validate CHANGELOG entry exists for this tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.setup.outputs.channel == 'release'
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ needs.setup.outputs.version }}"
           if ! grep -E "^## \[${VERSION}\]" CHANGELOG.md > /dev/null; then
             echo "::error file=CHANGELOG.md::No '## [${VERSION}]' section found in CHANGELOG.md. Add a release entry before tagging."
             exit 1
@@ -43,7 +114,7 @@ jobs:
       - run: npm test
 
   publish-npm:
-    needs: test
+    needs: [setup, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,17 +129,21 @@ jobs:
 
       - run: npm ci
 
+      - name: Set nightly version (in-CI only, not committed)
+        if: needs.setup.outputs.channel == 'nightly'
+        run: npm version "${{ needs.setup.outputs.version }}" --no-git-tag-version
+
       - name: Publish to npm (skip if this version already exists)
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if npm view "@daften/fireflyiii-mcp@${VERSION}" version > /dev/null 2>&1; then
             echo "v${VERSION} is already published to npm; skipping publish (idempotent re-run)."
           else
-            npm publish --provenance
+            npm publish --provenance --tag "${{ needs.setup.outputs.npm_tag }}"
           fi
 
   publish-docker:
-    needs: test
+    needs: [setup, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -89,16 +164,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Release pushes semver + latest; nightly pushes only nightly tags. The
+      # `enable` flag selects per channel so neither leaks into the other.
       - name: Docker tags + labels
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/daften/fireflyiii-mcp
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest
+            type=semver,pattern={{version}},enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=raw,value=nightly,enable=${{ needs.setup.outputs.channel == 'nightly' }}
+            type=raw,value=nightly-{{date 'YYYYMMDD'}},enable=${{ needs.setup.outputs.channel == 'nightly' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
@@ -110,7 +189,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   release:
-    needs: [publish-npm, publish-docker]
+    needs: [setup, verify, publish-npm, publish-docker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,6 +199,32 @@ jobs:
           fetch-depth: 0
 
       - name: Create GitHub Release from tag annotation
+        if: needs.setup.outputs.channel == 'release'
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: false
+
+      - name: Move rolling nightly tag to HEAD
+        if: needs.setup.outputs.channel == 'nightly'
+        run: |
+          git tag -f nightly
+          git push -f origin refs/tags/nightly
+
+      - name: Create/update nightly pre-release
+        if: needs.setup.outputs.channel == 'nightly'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: nightly
+          target_commitish: ${{ github.sha }}
+          name: "Nightly ${{ needs.setup.outputs.version }}"
+          prerelease: true
+          make_latest: false
+          body: |
+            Automated nightly build of `main`. **Unstable — for testing unreleased changes.**
+
+            - Version: `${{ needs.setup.outputs.version }}`
+            - Commit: ${{ github.sha }}
+            - npm: `npm install @daften/fireflyiii-mcp@nightly`
+            - Docker: `docker pull ghcr.io/daften/fireflyiii-mcp:nightly`
+
+            > Default installs (`@latest` / `:latest`) are unaffected and continue to point at the most recent tagged release.
