@@ -55,6 +55,9 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",
     "@types/node": "^25.9.1",

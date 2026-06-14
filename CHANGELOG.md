@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Upgraded the docs toolchain from `vitepress@1.6.4` to `vitepress@2.0.0-alpha.17`, which moves the docs build onto Vite 7. This resolves two Dependabot alerts in `devDependencies`: a path-traversal in Vite's optimized-deps `.map` handling (`vite ≤6.4.1`) and an esbuild dev-server request issue (`esbuild ≤0.24.2`). vitepress 2 is still pre-release but is required to reach a Vite version compatible with the patched esbuild; the version is pinned exactly and the docs build is verified.
+- Pinned `esbuild` to `^0.28.1` across the whole `devDependencies` tree via an `overrides` entry, closing the remaining two Dependabot alerts: a high-severity binary-integrity / RCE-via-`NPM_CONFIG_REGISTRY` issue (`esbuild <0.28.1`) and a Windows dev-server file-read issue (`esbuild ≥0.27.3 <0.28.1`). `npm audit` now reports 0 vulnerabilities. The override only takes effect once on Vite 7 (above), since esbuild 0.28.1 is incompatible with the Vite 5 that vitepress 1.x used.
 
 ## [0.2.1] - 2026-06-11
 
