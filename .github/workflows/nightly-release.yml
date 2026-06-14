@@ -165,6 +165,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly
+          target_commitish: ${{ github.sha }}
           name: "Nightly ${{ needs.verify.outputs.version }}"
           prerelease: true
           make_latest: false
