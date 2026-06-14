@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nightly release workflow (`.github/workflows/nightly-release.yml`): on nights `main` changes, publishes an unstable prerelease to npm (`nightly` dist-tag), Docker (`ghcr.io/daften/fireflyiii-mcp:nightly`), and a GitHub pre-release. Default installs (`@latest` / `:latest`) are never affected. Install unreleased changes via `@daften/fireflyiii-mcp@nightly`.
+- Nightly builds: on nights `main` changes, the `publish.yml` workflow now also publishes an unstable prerelease to npm (`nightly` dist-tag), Docker (`ghcr.io/daften/fireflyiii-mcp:nightly`), and a GitHub pre-release. Release and nightly share one workflow file so they share the single npm trusted-publisher (OIDC) configuration. Default installs (`@latest` / `:latest`) are never affected. Install unreleased changes via `@daften/fireflyiii-mcp@nightly`.
 
 ### Security
 - Upgraded the docs toolchain from `vitepress@1.6.4` to `vitepress@2.0.0-alpha.17`, which moves the docs build onto Vite 7. This resolves two Dependabot alerts in `devDependencies`: a path-traversal in Vite's optimized-deps `.map` handling (`vite ≤6.4.1`) and an esbuild dev-server request issue (`esbuild ≤0.24.2`). vitepress 2 is still pre-release but is required to reach a Vite version compatible with the patched esbuild; the version is pinned exactly and the docs build is verified.

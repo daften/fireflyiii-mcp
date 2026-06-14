@@ -468,15 +468,20 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 ### Nightly builds
 
-`.github/workflows/nightly-release.yml` runs on a cron (`0 3 * * *` UTC) and on manual `workflow_dispatch` (with an optional `force` input). A `guard` job publishes only when `main`'s HEAD differs from the commit the rolling `nightly` git tag points at, so it builds only on nights `main` changed.
+Nightly publishing lives in the **same `publish.yml` workflow** as tagged releases — deliberately, because npm trusted publishing (OIDC) allows only one trusted-publisher workflow file per package, so both channels must publish from `publish.yml` to share that config (no `NPM_TOKEN` needed). A `setup` job resolves the *channel* per run:
 
-When it publishes it:
-- runs lint/typecheck/tests, then computes a prerelease version `<next-patch>-nightly.<UTCstamp>` (in-CI only, never committed);
-- publishes to npm under the **`nightly`** dist-tag (`npm publish --tag nightly`) — the `latest` dist-tag is never touched;
+- **release** when triggered by a `v*` tag push (`github.event_name == 'push'`);
+- **nightly** when triggered by the `0 3 * * *` UTC cron or manual `workflow_dispatch` (with an optional `force` input).
+
+`setup` outputs `channel`, `should_publish`, `version`, and `npm_tag`; the downstream `verify` / `publish-npm` / `publish-docker` / `release` jobs are single-copy and parameterized by those outputs (Docker uses `metadata-action`'s per-tag `enable=` to select release vs nightly tags).
+
+For the nightly channel `setup` also runs the change-guard: it publishes only when `main`'s HEAD differs from the commit the rolling `nightly` git tag points at (so it builds only on nights `main` changed; `force=true` bypasses). A nightly run:
+- computes a prerelease version `<next-patch>-nightly.<UTCstamp>` (in-CI only, never committed);
+- publishes to npm under the **`nightly`** dist-tag — the `latest` dist-tag is never touched;
 - pushes Docker tags `:nightly` and `:nightly-YYYYMMDD` to `ghcr.io` — `:latest` is never touched;
 - force-moves the `nightly` git tag to HEAD and updates a GitHub pre-release (`prerelease: true`, `make_latest: false`).
 
-This is independent of `publish.yml` (tagged releases) and of `nightly.yml` (Firefly III integration tests).
+This is independent of `nightly.yml` (Firefly III integration tests), which is a separate workflow.
 
 ---
 
