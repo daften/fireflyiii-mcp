@@ -5,7 +5,7 @@ export default defineConfig({
   description:
     'Connect any MCP-compatible AI assistant to your Firefly III personal finance instance.',
   base: '/fireflyiii-mcp/',
-  srcExclude: ['design/**'],
+  srcExclude: ['design/**', 'superpowers/**'],
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/' },
@@ -23,6 +23,7 @@ export default defineConfig({
             { text: 'npm + HTTP/OAuth', link: '/guide/http-oauth' },
             { text: 'Docker + HTTP', link: '/guide/docker' },
             { text: 'Git checkout', link: '/guide/git-checkout' },
+            { text: 'Nightly builds', link: '/guide/nightly' },
           ],
         },
       ],

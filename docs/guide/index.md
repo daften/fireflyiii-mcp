@@ -19,6 +19,10 @@
 
 **Not sure which to pick?** Start with [npm — stdio](./stdio) — it's one config block and requires no server setup.
 
+## Nightly builds
+
+Want to test unreleased changes from `main`? Install a [nightly build](./nightly) via the `@nightly` (npm) or `:nightly` (Docker) tag. Nightlies are unstable — a normal install always gives you the latest tagged release.
+
 ## How it works
 
 The server exposes Firefly III's REST API as MCP tools. Your AI assistant calls these tools automatically when you ask finance-related questions. You never write API calls manually.
