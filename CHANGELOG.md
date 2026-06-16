@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Pinned the transitive `hono` dependency (pulled in by `@modelcontextprotocol/sdk`) to `^4.12.25` via an `overrides` entry, closing a high-severity advisory affecting `hono <=4.12.24` (GHSA-wwfh-h76j-fc44 and related). None of the flagged code paths (`serve-static` on Windows, the AWS Lambda / Lambda@Edge adapters, CORS middleware) are reachable from this server, which uses the raw Node `http` module — but the bump clears the `npm audit --audit-level=moderate` gate in CI. `npm audit` now reports 0 vulnerabilities.
+
 ## [0.2.2] - 2026-06-14
 
 ### Added

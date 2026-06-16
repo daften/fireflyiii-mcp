@@ -56,7 +56,8 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "hono": "^4.12.25"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
