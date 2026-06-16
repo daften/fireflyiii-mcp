@@ -5,6 +5,10 @@ Docker runs in HTTP mode only. Suitable for hosting on a server or home lab wher
 The container image is published to GitHub Container Registry:
 **[ghcr.io/daften/fireflyiii-mcp](https://github.com/daften/fireflyiii-mcp/pkgs/container/fireflyiii-mcp)**
 
+::: tip Headless caller? Use PAT-only mode instead
+The steps below set up OAuth, which needs a browser and a human to approve it on first connection. If this container is fronted by something that can't do that — a gateway, an automation script — skip straight to [npm + HTTP/PAT](/guide/http-pat) instead: omit `FIREFLY_OAUTH_CLIENT_ID` and `MCP_BASE_URL`, and authenticate with a Bearer-token Personal Access Token instead.
+:::
+
 ## Step 1: Register an OAuth client in Firefly III
 
 Go to **Options → Remote access and tokens → Create New Client**:

@@ -18,10 +18,13 @@ const { transport, host, port, portWasExplicit, filterOptions } = parsed;
 const url = process.env.FIREFLY_URL;
 
 if (transport === 'http') {
+  // FIREFLY_OAUTH_CLIENT_ID is optional: when unset, the server runs in PAT-only
+  // mode (no OAuth proxy surface) and expects a Firefly III Personal Access Token
+  // as the per-request Bearer token instead.
   const oauthClientId = process.env.FIREFLY_OAUTH_CLIENT_ID;
-  if (!url || !oauthClientId) {
+  if (!url) {
     process.stderr.write(
-      'Error: FIREFLY_URL and FIREFLY_OAUTH_CLIENT_ID environment variables are required for HTTP transport.\n' +
+      'Error: FIREFLY_URL environment variable is required for HTTP transport.\n' +
         'See .env.example for configuration instructions.\n',
     );
     process.exit(1);

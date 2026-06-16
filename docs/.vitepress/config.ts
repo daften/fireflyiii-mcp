@@ -21,6 +21,7 @@ export default defineConfig({
             { text: 'Overview', link: '/guide/' },
             { text: 'npm + stdio', link: '/guide/stdio' },
             { text: 'npm + HTTP/OAuth', link: '/guide/http-oauth' },
+            { text: 'npm + HTTP/PAT', link: '/guide/http-pat' },
             { text: 'Docker + HTTP', link: '/guide/docker' },
             { text: 'Git checkout', link: '/guide/git-checkout' },
             { text: 'Nightly builds', link: '/guide/nightly' },

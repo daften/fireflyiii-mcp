@@ -512,6 +512,176 @@ describe('createOAuthHandler — Bearer guard', () => {
   });
 });
 
+describe('createOAuthHandler — PAT-only mode (no oauthClientId)', () => {
+  it('returns 404 for GET /.well-known/oauth-authorization-server', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-authorization-server', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.error).toBe('not_found');
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for GET /oauth/authorize', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc', {
+      host: '127.0.0.1:3000',
+    });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for POST /oauth/register', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, '{}');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for POST /oauth/token', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000' }, 'grant_type=authorization_code');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for GET /oauth/callback', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/oauth/callback?code=abc&state=xyz', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('still returns 401 with WWW-Authenticate for /mcp without a Bearer token', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/mcp');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="MCP server for Firefly III"');
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('still calls mcpHandler with the PAT from the Bearer header for /mcp', async () => {
+    let capturedToken: string | undefined;
+    const mcpHandler = vi.fn().mockImplementation(async () => {
+      capturedToken = requestContext.getStore()?.token;
+    });
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/mcp', { authorization: 'Bearer my-personal-access-token' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(mcpHandler).toHaveBeenCalled();
+    expect(capturedToken).toBe('my-personal-access-token');
+  });
+});
+
+describe('startHttpServer — PAT-only mode skips MCP_BASE_URL requirement', () => {
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    // Defensively mocked: a regression here must not actually kill the test worker.
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: number | string | null) => {
+      throw new Error('process.exit called');
+    });
+  });
+
+  afterEach(() => {
+    delete process.env.MCP_BASE_URL;
+    vi.restoreAllMocks();
+  });
+
+  it('does not warn or exit when MCP_BASE_URL is unset and oauthClientId is undefined, even on a non-loopback host', async () => {
+    const mockTryListen = vi.fn().mockResolvedValue(undefined);
+    const createMcpServer = vi.fn().mockReturnValue({
+      connect: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await startHttpServer(
+      createMcpServer as unknown as () => import('@modelcontextprotocol/sdk/server/mcp.js').McpServer,
+      '0.0.0.0',
+      3000,
+      false,
+      undefined,
+      'https://firefly.example.com',
+      mockTryListen,
+    );
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    const stderrCalls = (process.stderr.write as ReturnType<typeof vi.fn>).mock.calls.map((c: unknown[]) =>
+      String(c[0]),
+    );
+    expect(stderrCalls.some((line) => line.includes('MCP_BASE_URL'))).toBe(false);
+  });
+});
+
 describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
