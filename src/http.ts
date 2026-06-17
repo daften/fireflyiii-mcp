@@ -60,6 +60,15 @@ export function createOAuthHandler(
   }
 
   return async (req, res) => {
+    // Liveness probe — no auth, mode-agnostic. Always 200 whether OAuth is
+    // enabled or not, so container/orchestrator health checks don't depend on
+    // the OAuth surface (which 404s in PAT-only mode).
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ status: 'ok' }));
+      return;
+    }
+
     const baseUrl =
       (process.env.MCP_BASE_URL?.trim().replace(/\/$/, '') || null) ?? `http://${req.headers.host ?? '127.0.0.1:3000'}`;
 

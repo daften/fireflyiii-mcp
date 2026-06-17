@@ -69,6 +69,10 @@ docker compose up -d
 OAuth state is held in-process. Run only one container replica — multiple replicas will break the OAuth flow because the callback may land on a different instance than the one that initiated authorization.
 :::
 
+### Health check
+
+The image ships a Docker `HEALTHCHECK` that probes `GET /health`, which returns `200 {"status":"ok"}` in both OAuth and PAT-only mode (it requires no authentication). Use the same endpoint for orchestrator liveness/readiness probes (Kubernetes, compose `depends_on: { condition: service_healthy }`, etc.).
+
 ## Step 3: Connect your AI client
 
 ```json

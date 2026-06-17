@@ -512,6 +512,62 @@ describe('createOAuthHandler — Bearer guard', () => {
   });
 });
 
+describe('createOAuthHandler — health endpoint', () => {
+  it('returns 200 {status:"ok"} for GET /health without auth (OAuth mode)', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/health');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ status: 'ok' });
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 for GET /health in PAT-only mode (no oauthClientId)', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/health');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ status: 'ok' });
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 with no body for HEAD /health', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('HEAD', '/health');
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('');
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+});
+
 describe('createOAuthHandler — PAT-only mode (no oauthClientId)', () => {
   it('returns 404 for GET /.well-known/oauth-authorization-server', async () => {
     const mcpHandler = vi.fn();
