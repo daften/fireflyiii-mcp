@@ -4,6 +4,10 @@ HTTP mode uses OAuth 2.0 (Authorization Code + PKCE) instead of a Personal Acces
 
 **Requires:** Node.js 20+.
 
+::: tip Headless caller? Use PAT-only mode instead
+The OAuth flow below needs a browser and a human to approve it on first connection. If you're connecting from somewhere that can't do that — a server-side gateway, an automation script — see [npm + HTTP/PAT](/guide/http-pat), which skips OAuth entirely in favor of a Bearer-token Personal Access Token.
+:::
+
 ## Step 1: Register an OAuth client in Firefly III
 
 Go to **Options → Remote access and tokens → Create New Client**:

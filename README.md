@@ -29,8 +29,8 @@ Choose your setup method:
 | Method | Transport | Best for |
 |--------|-----------|----------|
 | [npm — stdio](#option-1-npm-package--stdio-simplest) | stdio | Simplest setup, AI on the same machine |
-| [npm — HTTP](#option-2-npm-package--http-oauth) | HTTP + OAuth | Remote AI access or when you prefer OAuth over a PAT |
-| [Docker — HTTP](#option-3-docker--http-self-hosted) | HTTP + OAuth | Self-hosted on a server or home lab |
+| [npm — HTTP](#option-2-npm-package--http-oauth-or-pat) | HTTP + OAuth or PAT | Remote AI access, or a headless gateway with no browser in the loop |
+| [Docker — HTTP](#option-3-docker--http-self-hosted) | HTTP + OAuth or PAT | Self-hosted on a server or home lab |
 | [Git checkout](#option-4-git-checkout-development) | stdio or HTTP | Contributing or local development |
 
 All options except Docker require **Node.js 20+**.
@@ -62,9 +62,9 @@ Your MCP client downloads and starts the server automatically on first use. No s
 
 ---
 
-## Option 2: npm package — HTTP (OAuth)
+## Option 2: npm package — HTTP (OAuth or PAT)
 
-→ See [HTTP/OAuth setup guide](https://daften.github.io/fireflyiii-mcp/guide/http-oauth) in the docs.
+→ See the [HTTP/OAuth](https://daften.github.io/fireflyiii-mcp/guide/http-oauth) setup guide, or [HTTP/PAT](https://daften.github.io/fireflyiii-mcp/guide/http-pat) for headless callers (gateways, automation) that can't drive a browser-based OAuth flow.
 
 ---
 

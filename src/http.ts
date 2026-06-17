@@ -32,9 +32,21 @@ function isRedirectUriAllowed(uri: string): boolean {
     .some((p) => p && uri.startsWith(p));
 }
 
+// Mirrors the route matching used by the branches below — kept in sync so that
+// disabling OAuth (no client ID) cleanly 404s the same surface it would otherwise serve.
+function isOAuthProxyPath(url: string): boolean {
+  return (
+    url === '/.well-known/oauth-authorization-server' ||
+    url.startsWith('/oauth/authorize') ||
+    url === '/oauth/register' ||
+    url === '/oauth/token' ||
+    url.startsWith('/oauth/callback')
+  );
+}
+
 export function createOAuthHandler(
   fireflyUrl: string,
-  oauthClientId: string,
+  oauthClientId: string | undefined,
   mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
 ): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
   const FLOW_TTL_MS = 10 * 60 * 1000;
@@ -48,8 +60,31 @@ export function createOAuthHandler(
   }
 
   return async (req, res) => {
+    // Liveness probe — no auth, mode-agnostic. Always 200 whether OAuth is
+    // enabled or not, so container/orchestrator health checks don't depend on
+    // the OAuth surface (which 404s in PAT-only mode).
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ status: 'ok' }));
+      return;
+    }
+
     const baseUrl =
       (process.env.MCP_BASE_URL?.trim().replace(/\/$/, '') || null) ?? `http://${req.headers.host ?? '127.0.0.1:3000'}`;
+
+    // PAT-only mode (no FIREFLY_OAUTH_CLIENT_ID): the OAuth proxy surface isn't
+    // backed by a real client, so report it as absent rather than serving a
+    // half-working flow. Clients fall back to a manually configured Bearer token.
+    if (!oauthClientId && req.url && isOAuthProxyPath(req.url)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          error: 'not_found',
+          error_description: 'OAuth is not enabled on this server. Authenticate with a Bearer token instead.',
+        }),
+      );
+      return;
+    }
 
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
       const metadata = {
@@ -230,11 +265,13 @@ export async function startHttpServer(
   host: string,
   requestedPort: number,
   portWasExplicit: boolean,
-  oauthClientId: string,
+  oauthClientId: string | undefined,
   fireflyUrl: string,
   tryListenFn: (server: http.Server, host: string, port: number) => Promise<void> = tryListen,
 ): Promise<void> {
-  if (!process.env.MCP_BASE_URL?.trim()) {
+  // MCP_BASE_URL only matters for constructing OAuth redirect URIs — irrelevant
+  // in PAT-only mode (no oauthClientId), since no OAuth surface is served.
+  if (oauthClientId && !process.env.MCP_BASE_URL?.trim()) {
     if (classifyHost(host) === 'non-loopback') {
       process.stderr.write(
         `Error: MCP_BASE_URL must be set when binding to a non-loopback interface (--host ${host}).\n` +

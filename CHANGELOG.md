@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- HTTP transport now supports PAT-only mode: `FIREFLY_OAUTH_CLIENT_ID` is optional, and omitting it runs the server without the OAuth proxy surface (`/.well-known/oauth-authorization-server` and `/oauth/*` now 404), authenticating every request with a Firefly III Personal Access Token sent as a Bearer token instead. `MCP_BASE_URL` is no longer required in this mode, since there's no OAuth redirect URI to construct. Intended for headless callers — gateways, automation — that have no way to drive an interactive browser-based OAuth flow. See the new [HTTP/PAT guide](https://daften.github.io/fireflyiii-mcp/guide/http-pat).
+- Unauthenticated, mode-agnostic `GET /health` liveness endpoint that always returns `200 {"status":"ok"}`. The Docker `HEALTHCHECK` now probes `/health` instead of the OAuth metadata endpoint, so containers report healthy in PAT-only mode (where the OAuth surface 404s).
+
 ### Security
 - Pinned the transitive `hono` dependency (pulled in by `@modelcontextprotocol/sdk`) to `^4.12.25` via an `overrides` entry, closing a high-severity advisory affecting `hono <=4.12.24` (GHSA-wwfh-h76j-fc44 and related). None of the flagged code paths (`serve-static` on Windows, the AWS Lambda / Lambda@Edge adapters, CORS middleware) are reachable from this server, which uses the raw Node `http` module — but the bump clears the `npm audit --audit-level=moderate` gate in CI. `npm audit` now reports 0 vulnerabilities.
 

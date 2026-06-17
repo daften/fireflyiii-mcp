@@ -14,10 +14,10 @@ Store credentials in a `.env` file (gitignored). Copy `.env.example` from the re
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `FIREFLY_URL` | Yes | Base URL of your Firefly III instance. No trailing slash. |
-| `FIREFLY_OAUTH_CLIENT_ID` | Yes | OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client. |
-| `MCP_BASE_URL` | Required when not on loopback | Public base URL of this server. Used to build OAuth redirect URIs. Required when hosting on a server; omit for local `127.0.0.1` setups. |
+| `FIREFLY_OAUTH_CLIENT_ID` | No | OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client. Omit to run in [PAT-only mode](/guide/http-pat) instead of OAuth. |
+| `MCP_BASE_URL` | Required when not on loopback, and only if `FIREFLY_OAUTH_CLIENT_ID` is set | Public base URL of this server. Used to build OAuth redirect URIs. Not used in PAT-only mode. |
 
-In HTTP mode, `FIREFLY_TOKEN` is not used. The Bearer token is resolved per-request from the `Authorization` header after the OAuth flow.
+In HTTP mode, `FIREFLY_TOKEN` is not used. The Bearer token is resolved per-request from the `Authorization` header instead — either set by the MCP client after completing the OAuth flow, or supplied directly as your Firefly III Personal Access Token when `FIREFLY_OAUTH_CLIENT_ID` is omitted. See [npm + HTTP/OAuth](/guide/http-oauth) and [npm + HTTP/PAT](/guide/http-pat).
 
 ## Tool filtering (both transports)
 

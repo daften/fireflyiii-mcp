@@ -6,7 +6,7 @@
 
 Users can query their finances in natural language through Claude, getting answers about accounts, transactions, budgets, categories, bills, piggy banks, and financial insights without writing queries themselves.
 
-**Current state:** 140 tools across 14 groups, full CRUD, stdio and HTTP/OAuth transports, tool filtering via `--preset`/`--groups`/`--read-only`.
+**Current state:** 140 tools across 14 groups, full CRUD, stdio and HTTP (OAuth or PAT) transports, tool filtering via `--preset`/`--groups`/`--read-only`.
 
 ### Architecture at a glance
 
@@ -17,6 +17,7 @@ MCP client (Claude Code / Desktop / ...)
         ▼                                 ▼
   StdioServerTransport          OAuth proxy (src/http.ts)
         │                         · /.well-known metadata, /oauth/{authorize,token,register,callback}
+        │                           (404 instead, if FIREFLY_OAUTH_CLIENT_ID is unset — PAT-only mode)
         │                         · substitutes redirect_uri, Bearer guard
         │                         · per-request token via AsyncLocalStorage
         └────────────┬────────────┘
@@ -66,11 +67,12 @@ FIREFLY_TOKEN     String, required. Personal Access Token from Firefly III Optio
 **HTTP transport:**
 ```
 FIREFLY_URL                String, required. Base URL of Firefly III instance (no trailing slash).
-FIREFLY_OAUTH_CLIENT_ID    String, required. OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client.
-MCP_BASE_URL               String, required when not listening on loopback. Public base URL of this server.
+FIREFLY_OAUTH_CLIENT_ID    String, optional. OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client.
+                           Omit to run in PAT-only mode (no OAuth proxy surface; see below).
+MCP_BASE_URL               String, required when not listening on loopback AND FIREFLY_OAUTH_CLIENT_ID is set. Public base URL of this server.
 ```
 
-In HTTP mode, the Bearer token is resolved per-request from the Authorization header (set by the MCP client after completing the OAuth flow). `FIREFLY_TOKEN` is not used in HTTP mode.
+In HTTP mode, the Bearer token is always resolved per-request from the Authorization header — either set by the MCP client after completing the OAuth flow, or supplied directly as a Firefly III Personal Access Token when `FIREFLY_OAUTH_CLIENT_ID` is unset (PAT-only mode). `FIREFLY_TOKEN` is not used in HTTP mode.
 
 **Optional (both transports):**
 ```
@@ -379,6 +381,8 @@ Routes handled by the proxy (no auth required):
 All other requests require a `Bearer` token in the `Authorization` header. The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
 
 **Limitation:** OAuth state lives in-process — single replica only. Horizontal scaling breaks the auth flow.
+
+**PAT-only mode:** when `FIREFLY_OAUTH_CLIENT_ID` is unset, none of the proxy routes above are registered — each one 404s instead, since there's no real OAuth client behind them. Every request falls straight through to the `Bearer` token check, and whatever token is supplied is forwarded to Firefly III as-is. This is for headless callers (gateways, automation) that hold a Firefly III Personal Access Token and have no way to drive an interactive browser-based OAuth flow.
 
 ---
 
