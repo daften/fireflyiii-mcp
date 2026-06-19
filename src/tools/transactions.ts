@@ -204,12 +204,12 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     },
     ({ type, accountId, start, end, page, limit }) =>
       fetchTransactions(client, {
-        type: type as string | undefined,
-        accountId: accountId as string | undefined,
-        start: start as string | undefined,
-        end: end as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        type: type,
+        accountId: accountId,
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -225,7 +225,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchTransaction(client, id as string),
+    ({ id }) => fetchTransaction(client, id),
   );
 
   defineTool(
@@ -250,7 +250,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createTransaction(client, params as Parameters<typeof createTransaction>[1]),
+    (params) => createTransaction(client, params),
   );
 
   defineTool(
@@ -276,7 +276,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateTransaction(client, id as string, params as Parameters<typeof updateTransaction>[2]),
+    ({ id, ...params }) => updateTransaction(client, id, params),
   );
 
   defineTool(
@@ -291,7 +291,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteTransaction(client, id as string),
+    ({ id }) => deleteTransaction(client, id),
   );
 
   defineTool(
@@ -310,9 +310,9 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     },
     ({ query, page, limit }) =>
       searchTransactions(client, {
-        query: query as string,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        query: query,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -346,7 +346,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createSplitTransaction(client, params as Parameters<typeof createSplitTransaction>[1]),
+    (params) => createSplitTransaction(client, params),
   );
 
   defineTool(
@@ -365,6 +365,6 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => bulkUpdateTransactions(client, params as Parameters<typeof bulkUpdateTransactions>[1]),
+    (params) => bulkUpdateTransactions(client, params),
   );
 }

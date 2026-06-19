@@ -1,5 +1,4 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { z } from 'zod';
 import type { FireflyClient } from '../client.js';
 import type { QueryParams } from '../types.js';
 import { READ_ANNOTATIONS } from './_annotations.js';
@@ -41,23 +40,33 @@ const EXPORT_TOOLS: Array<{ name: string; title: string; entity: ExportEntity; h
 
 export function registerExportTools(server: McpServer, client: FireflyClient): void {
   for (const { name, title, entity, hasDates } of EXPORT_TOOLS) {
-    const inputSchema: Record<string, z.ZodTypeAny> = {};
     if (hasDates) {
-      inputSchema.start = dateSchema.optional().describe('Start date (YYYY-MM-DD)');
-      inputSchema.end = dateSchema.optional().describe('End date (YYYY-MM-DD)');
+      defineTool(
+        server,
+        name,
+        {
+          title,
+          description: `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv). Optionally filter by date range.`,
+          inputSchema: {
+            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
+          },
+          annotations: READ_ANNOTATIONS,
+        },
+        ({ start, end }) => exportEntity(client, entity, { start, end }),
+      );
+    } else {
+      defineTool(
+        server,
+        name,
+        {
+          title,
+          description: `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv).`,
+          inputSchema: {},
+          annotations: READ_ANNOTATIONS,
+        },
+        () => exportEntity(client, entity, {}),
+      );
     }
-
-    defineTool(
-      server,
-      name,
-      {
-        title,
-        description: `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv).${hasDates ? ' Optionally filter by date range.' : ''}`,
-        inputSchema,
-        annotations: READ_ANNOTATIONS,
-      },
-      ({ start, end }) =>
-        exportEntity(client, entity, { start: start as string | undefined, end: end as string | undefined }),
-    );
   }
 }

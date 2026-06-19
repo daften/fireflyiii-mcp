@@ -96,10 +96,10 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
     },
     ({ start, end, page, limit }) =>
       fetchBills(client, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -122,7 +122,7 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createBill(client, params as Parameters<typeof createBill>[1]),
+    (params) => createBill(client, params),
   );
 
   defineTool(
@@ -149,7 +149,7 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateBill(client, id as string, params as Parameters<typeof updateBill>[2]),
+    ({ id, ...params }) => updateBill(client, id, params),
   );
 
   defineTool(
@@ -162,7 +162,7 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       inputSchema: { id: z.string().describe('Bill ID — use get_bills to find valid IDs') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteBill(client, id as string),
+    ({ id }) => deleteBill(client, id),
   );
 
   defineTool(
@@ -181,11 +181,11 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, page, limit }) =>
-      fetchBillTransactions(client, id as string, {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchBillTransactions(client, id, {
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
       }),
   );
 }

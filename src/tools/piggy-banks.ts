@@ -99,8 +99,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchPiggyBanks(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchPiggyBanks(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -119,7 +118,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createPiggyBank(client, params as Parameters<typeof createPiggyBank>[1]),
+    (params) => createPiggyBank(client, params),
   );
 
   defineTool(
@@ -140,7 +139,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updatePiggyBank(client, id as string, params as Parameters<typeof updatePiggyBank>[2]),
+    ({ id, ...params }) => updatePiggyBank(client, id, params),
   );
 
   defineTool(
@@ -153,7 +152,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       inputSchema: { id: z.string().describe('Piggy bank ID — use get_piggy_banks to find valid IDs') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deletePiggyBank(client, id as string),
+    ({ id }) => deletePiggyBank(client, id),
   );
 
   defineTool(
@@ -171,9 +170,9 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       annotations: READ_ANNOTATIONS,
     },
     ({ id, page, limit }) =>
-      fetchPiggyBankEvents(client, id as string, {
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchPiggyBankEvents(client, id, {
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -191,8 +190,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    ({ id, amount, date }) =>
-      createPiggyBankEvent(client, id as string, { amount: amount as string, date: date as string }),
+    ({ id, amount, date }) => createPiggyBankEvent(client, id, { amount: amount, date: date }),
   );
 
   defineTool(
@@ -208,6 +206,6 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id, event_id }) => deletePiggyBankEvent(client, id as string, event_id as string),
+    ({ id, event_id }) => deletePiggyBankEvent(client, id, event_id),
   );
 }
