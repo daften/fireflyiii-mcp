@@ -198,10 +198,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create GitHub Release from tag annotation
+      # softprops/action-gh-release does NOT read the git tag annotation into the
+      # release body, so extract the matching CHANGELOG.md section and pass it as
+      # body_path. CHANGELOG.md is the single source of truth for release notes.
+      - name: Extract changelog section for release notes
+        if: needs.setup.outputs.channel == 'release'
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { f = 1; next }
+            f && /^## \[/ { exit }
+            f { print }
+          ' CHANGELOG.md | awk 'NF { p = 1 } p' | tac | awk 'NF { p = 1 } p' | tac > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error file=CHANGELOG.md::Could not extract release notes for v${VERSION}."
+            exit 1
+          fi
+          echo "Extracted release notes for v${VERSION}:"
+          cat release-notes.md
+
+      - name: Create GitHub Release from changelog
         if: needs.setup.outputs.channel == 'release'
         uses: softprops/action-gh-release@v3
         with:
+          body_path: release-notes.md
           generate_release_notes: false
 
       - name: Move rolling nightly tag to HEAD

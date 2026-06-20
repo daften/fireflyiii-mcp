@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- GitHub Release notes are no longer empty. The `release` job assumed `softprops/action-gh-release` would populate the release body from the annotated tag's message, but it does not — releases were created with blank notes. The workflow now extracts the matching `## [X.Y.Z]` section from `CHANGELOG.md` and passes it via `body_path`.
+
 ## [0.3.0] - 2026-06-20
 
 ### Added
