@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^4.1.8",
     "dotenv-cli": "^11.0.0",
     "simple-git-hooks": "^2.13.1",
