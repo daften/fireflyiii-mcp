@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-06-20
 
 ### Added
-- HTTP transport now supports PAT-only mode: `FIREFLY_OAUTH_CLIENT_ID` is optional, and omitting it runs the server without the OAuth proxy surface (`/.well-known/oauth-authorization-server` and `/oauth/*` now 404), authenticating every request with a Firefly III Personal Access Token sent as a Bearer token instead. `MCP_BASE_URL` is no longer required in this mode, since there's no OAuth redirect URI to construct. Intended for headless callers — gateways, automation — that have no way to drive an interactive browser-based OAuth flow. See the new [HTTP/PAT guide](https://daften.github.io/fireflyiii-mcp/guide/http-pat).
-- Unauthenticated, mode-agnostic `GET /health` liveness endpoint that always returns `200 {"status":"ok"}`. The Docker `HEALTHCHECK` now probes `/health` instead of the OAuth metadata endpoint, so containers report healthy in PAT-only mode (where the OAuth surface 404s).
+- HTTP transport now supports PAT-only mode: `FIREFLY_OAUTH_CLIENT_ID` is optional, and omitting it runs the server without the OAuth proxy surface (`/.well-known/oauth-authorization-server` and `/oauth/*` now 404), authenticating every request with a Firefly III Personal Access Token sent as a Bearer token instead. `MCP_BASE_URL` is no longer required in this mode, since there's no OAuth redirect URI to construct. Intended for headless callers — gateways, automation — that have no way to drive an interactive browser-based OAuth flow. See the new [HTTP/PAT guide](https://daften.github.io/fireflyiii-mcp/guide/http-pat). _Contributed by [@mircea-pavel-anton](https://github.com/mircea-pavel-anton) in [#30](https://github.com/daften/fireflyiii-mcp/pull/30)._
+- Unauthenticated, mode-agnostic `GET /health` liveness endpoint that always returns `200 {"status":"ok"}`. The Docker `HEALTHCHECK` now probes `/health` instead of the OAuth metadata endpoint, so containers report healthy in PAT-only mode (where the OAuth surface 404s). _Contributed by [@mircea-pavel-anton](https://github.com/mircea-pavel-anton) in [#30](https://github.com/daften/fireflyiii-mcp/pull/30)._
 
 ### Security
 - Pinned the transitive `hono` dependency (pulled in by `@modelcontextprotocol/sdk`) to `^4.12.25` via an `overrides` entry, closing a high-severity advisory affecting `hono <=4.12.24` (GHSA-wwfh-h76j-fc44 and related). None of the flagged code paths (`serve-static` on Windows, the AWS Lambda / Lambda@Edge adapters, CORS middleware) are reachable from this server, which uses the raw Node `http` module — but the bump clears the `npm audit --audit-level=moderate` gate in CI. `npm audit` now reports 0 vulnerabilities.
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export tool descriptions mention the `text/csv` output format.
 
 ### Fixed
-- `trigger_rule` and `trigger_rule_group` no longer fail with HTTP 415. They sent a bodyless POST, so the client omitted the `Content-Type: application/json` header and Firefly III rejected the request. They now send an empty `{}` JSON body (trigger parameters are read from the query string), matching the other parameterless POST tools.
+- `trigger_rule` and `trigger_rule_group` no longer fail with HTTP 415. They sent a bodyless POST, so the client omitted the `Content-Type: application/json` header and Firefly III rejected the request. They now send an empty `{}` JSON body (trigger parameters are read from the query string), matching the other parameterless POST tools. _Contributed by [@carmelom](https://github.com/carmelom) in [#20](https://github.com/daften/fireflyiii-mcp/pull/20)._
 
 ## [0.2.0] - 2026-05-30
 
