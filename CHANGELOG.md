@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-20
+
 ### Added
 - HTTP transport now supports PAT-only mode: `FIREFLY_OAUTH_CLIENT_ID` is optional, and omitting it runs the server without the OAuth proxy surface (`/.well-known/oauth-authorization-server` and `/oauth/*` now 404), authenticating every request with a Firefly III Personal Access Token sent as a Bearer token instead. `MCP_BASE_URL` is no longer required in this mode, since there's no OAuth redirect URI to construct. Intended for headless callers — gateways, automation — that have no way to drive an interactive browser-based OAuth flow. See the new [HTTP/PAT guide](https://daften.github.io/fireflyiii-mcp/guide/http-pat).
 - Unauthenticated, mode-agnostic `GET /health` liveness endpoint that always returns `200 {"status":"ok"}`. The Docker `HEALTHCHECK` now probes `/health` instead of the OAuth metadata endpoint, so containers report healthy in PAT-only mode (where the OAuth surface 404s).
@@ -73,7 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.1.1...v0.2.0
