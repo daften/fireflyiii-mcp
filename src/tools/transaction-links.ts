@@ -41,7 +41,12 @@ export async function createTransactionLink(
   client: FireflyClient,
   params: { link_type_id: string; in_id: string; out_id: string; notes?: string },
 ): Promise<UnwrappedSingle> {
-  const response = await client.post<JsonApiSingleResponse>('/transaction-links', params);
+  const { in_id, out_id, ...rest } = params;
+  const response = await client.post<JsonApiSingleResponse>('/transaction-links', {
+    ...rest,
+    inward_id: in_id,
+    outward_id: out_id,
+  });
   return unwrapSingle(response);
 }
 
@@ -50,7 +55,11 @@ export async function updateTransactionLink(
   id: string,
   params: { link_type_id?: string; in_id?: string; out_id?: string; notes?: string },
 ): Promise<UnwrappedSingle> {
-  const response = await client.put<JsonApiSingleResponse>(`/transaction-links/${id}`, params);
+  const { in_id, out_id, ...rest } = params;
+  const body: Record<string, unknown> = { ...rest };
+  if (in_id !== undefined) body.inward_id = in_id;
+  if (out_id !== undefined) body.outward_id = out_id;
+  const response = await client.put<JsonApiSingleResponse>(`/transaction-links/${id}`, body);
   return unwrapSingle(response);
 }
 
