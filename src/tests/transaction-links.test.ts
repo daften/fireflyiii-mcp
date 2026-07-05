@@ -21,7 +21,7 @@ const linkSingle = {
   data: {
     id: '5',
     type: 'transaction_links',
-    attributes: { link_type_id: '1', in_id: '10', out_id: '11', notes: '' },
+    attributes: { link_type_id: '1', inward_id: '10', outward_id: '11', notes: '' },
     links: {},
   },
 };
@@ -53,11 +53,11 @@ describe('fetchTransactionLink', () => {
 describe('createTransactionLink', () => {
   it('posts to /transaction-links', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(linkSingle);
-    await createTransactionLink(mockClient, { link_type_id: '1', in_id: '10', out_id: '11' });
+    await createTransactionLink(mockClient, { link_type_id: '1', inward_id: '10', outward_id: '11' });
     expect(mockClient.post).toHaveBeenCalledWith('/transaction-links', {
       link_type_id: '1',
-      in_id: '10',
-      out_id: '11',
+      inward_id: '10',
+      outward_id: '11',
     });
   });
 });

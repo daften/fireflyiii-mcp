@@ -39,7 +39,7 @@ export async function fetchTransactionLink(client: FireflyClient, id: string): P
 
 export async function createTransactionLink(
   client: FireflyClient,
-  params: { link_type_id: string; in_id: string; out_id: string; notes?: string },
+  params: { link_type_id: string; inward_id: string; outward_id: string; notes?: string },
 ): Promise<UnwrappedSingle> {
   const response = await client.post<JsonApiSingleResponse>('/transaction-links', params);
   return unwrapSingle(response);
@@ -48,7 +48,7 @@ export async function createTransactionLink(
 export async function updateTransactionLink(
   client: FireflyClient,
   id: string,
-  params: { link_type_id?: string; in_id?: string; out_id?: string; notes?: string },
+  params: { link_type_id?: string; inward_id?: string; outward_id?: string; notes?: string },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/transaction-links/${id}`, params);
   return unwrapSingle(response);
@@ -119,8 +119,8 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
         'Create a link between two transactions (e.g. mark one as a refund of another). Use get_link_types to find valid link_type_id values.',
       inputSchema: {
         link_type_id: z.string().describe('Link type ID — use get_link_types to find valid IDs'),
-        in_id: z.string().describe('Inward transaction journal ID'),
-        out_id: z.string().describe('Outward transaction journal ID'),
+        inward_id: z.string().describe('Inward transaction journal ID'),
+        outward_id: z.string().describe('Outward transaction journal ID'),
         notes: z.string().optional().describe('Notes about this link'),
       },
       annotations: WRITE_ANNOTATIONS,
@@ -137,8 +137,8 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       inputSchema: {
         id: z.string().describe('Transaction link ID'),
         link_type_id: z.string().optional().describe('Link type ID'),
-        in_id: z.string().optional().describe('Inward transaction journal ID'),
-        out_id: z.string().optional().describe('Outward transaction journal ID'),
+        inward_id: z.string().optional().describe('Inward transaction journal ID'),
+        outward_id: z.string().optional().describe('Outward transaction journal ID'),
         notes: z.string().optional().describe('Notes about this link'),
       },
       annotations: UPDATE_ANNOTATIONS,
