@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- `create_transaction_link` and `update_transaction_link` always failed Firefly's validation with "The inward id field is required." / "The outward id field is required.", regardless of the IDs passed in. The tools' exposed schema uses `in_id` / `out_id`, but Firefly III's `/api/v1/transaction-links` endpoint expects `inward_id` / `outward_id` — the request body was forwarded verbatim without renaming these fields. Both functions now map `in_id`/`out_id` to `inward_id`/`outward_id` before calling the API.
+- `create_transaction_link` and `update_transaction_link` always failed Firefly's validation with "The inward id field is required." / "The outward id field is required.", regardless of the IDs passed in. The tools' exposed schema used `in_id` / `out_id`, but Firefly III's `/api/v1/transaction-links` endpoint expects `inward_id` / `outward_id` — the request body was forwarded verbatim without renaming these fields. The schema fields are now renamed to `inward_id` / `outward_id`, matching Firefly's API and the pattern used by every other tool.
 - GitHub Release notes are no longer empty. The `release` job assumed `softprops/action-gh-release` would populate the release body from the annotated tag's message, but it does not — releases were created with blank notes. The workflow now extracts the matching `## [X.Y.Z]` section from `CHANGELOG.md` and passes it via `body_path`.
 
 ## [0.3.0] - 2026-06-20

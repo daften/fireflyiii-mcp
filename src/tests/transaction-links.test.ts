@@ -21,7 +21,7 @@ const linkSingle = {
   data: {
     id: '5',
     type: 'transaction_links',
-    attributes: { link_type_id: '1', in_id: '10', out_id: '11', notes: '' },
+    attributes: { link_type_id: '1', inward_id: '10', outward_id: '11', notes: '' },
     links: {},
   },
 };
@@ -51,9 +51,9 @@ describe('fetchTransactionLink', () => {
 });
 
 describe('createTransactionLink', () => {
-  it('posts to /transaction-links with in_id/out_id mapped to inward_id/outward_id', async () => {
+  it('posts to /transaction-links', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(linkSingle);
-    await createTransactionLink(mockClient, { link_type_id: '1', in_id: '10', out_id: '11' });
+    await createTransactionLink(mockClient, { link_type_id: '1', inward_id: '10', outward_id: '11' });
     expect(mockClient.post).toHaveBeenCalledWith('/transaction-links', {
       link_type_id: '1',
       inward_id: '10',
@@ -67,15 +67,6 @@ describe('updateTransactionLink', () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(linkSingle);
     await updateTransactionLink(mockClient, '5', { notes: 'related purchase' });
     expect(mockClient.put).toHaveBeenCalledWith('/transaction-links/5', { notes: 'related purchase' });
-  });
-
-  it('maps in_id/out_id to inward_id/outward_id when provided', async () => {
-    mockClient.put = vi.fn().mockResolvedValueOnce(linkSingle);
-    await updateTransactionLink(mockClient, '5', { in_id: '10', out_id: '11' });
-    expect(mockClient.put).toHaveBeenCalledWith('/transaction-links/5', {
-      inward_id: '10',
-      outward_id: '11',
-    });
   });
 });
 
