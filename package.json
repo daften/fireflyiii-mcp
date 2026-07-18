@@ -60,7 +60,7 @@
     "hono": "^4.12.25"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.3",
+    "@biomejs/biome": "2.5.4",
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^4.1.8",
     "dotenv-cli": "^11.0.0",
