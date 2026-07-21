@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- RFC 9728 protected resource metadata at `/.well-known/oauth-protected-resource`, and a `resource_metadata` pointer on the `401` challenge, so MCP clients can discover the authorization server without a legacy fallback probe.
+- Claude Desktop setup guide covering stdio, custom connectors, and the `mcp-remote` bridge.
+- `MCP_ALLOWED_REDIRECT_PREFIXES` is now documented in the environment variable reference and `.env.example`.
+
+### Fixed
+- Claude custom connectors could not complete OAuth: the redirect URI allow-list rejected `https://claude.ai/api/mcp/auth_callback` unless an undocumented environment variable was set. It is now allowed by default, matched exactly on origin and path. ([#43](https://github.com/daften/fireflyiii-mcp/issues/43))
+- `400 invalid_redirect_uri` responses now name `MCP_ALLOWED_REDIRECT_PREFIXES` so the override is discoverable.
+
 ## [0.3.3] - 2026-07-21
 
 ### Security
