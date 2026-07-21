@@ -96,4 +96,4 @@ A custom connector is driven by Anthropic's backend rather than by the Claude ap
 
 `MCP_BASE_URL` must match the URL you type into Claude exactly, with no trailing slash: the server publishes it as the `resource` value in its OAuth metadata, and Claude requires an exact match.
 
-No extra configuration is needed for Claude's OAuth callback — it is allowed by default. Other clients with non-loopback callbacks need [`MCP_ALLOWED_REDIRECT_PREFIXES`](/reference/env-vars).
+No extra configuration is needed for Claude's OAuth callbacks (`https://claude.ai/api/mcp/auth_callback` and the `claude.com` equivalent) — both are allowed by default. Other clients with non-loopback callbacks need [`MCP_ALLOWED_REDIRECT_PREFIXES`](/reference/env-vars).

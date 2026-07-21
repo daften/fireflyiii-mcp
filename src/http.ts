@@ -25,9 +25,14 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 const LOOPBACK_REDIRECT_HOSTNAMES = ['127.0.0.1', 'localhost', '[::1]'];
 
 // Claude's hosted surfaces (claude.ai web, Desktop, mobile, Cowork) all complete
-// OAuth against this single callback. Matched exactly on origin+pathname — a prefix
-// match would also admit https://claude.ai/api/mcp/auth_callbackEVIL.
-const CLAUDE_HOSTED_REDIRECT_URI = 'https://claude.ai/api/mcp/auth_callback';
+// OAuth against this callback. claude.ai is the URI Anthropic documents today;
+// claude.com is allowed ahead of Anthropic's domain migration. Each is matched
+// exactly on origin+pathname — a prefix match would also admit
+// https://claude.ai/api/mcp/auth_callbackEVIL.
+const CLAUDE_HOSTED_REDIRECT_URIS = [
+  'https://claude.ai/api/mcp/auth_callback',
+  'https://claude.com/api/mcp/auth_callback',
+];
 
 // Matching is done on components of the PARSED URL, never on the raw string. A raw
 // `uri.startsWith(...)` check is unsafe: URL userinfo lets the raw string lie about
@@ -56,7 +61,7 @@ function isRedirectUriAllowed(uri: string): boolean {
   }
   if (parsed.username !== '' || parsed.password !== '') return false;
   if (parsed.protocol === 'http:' && LOOPBACK_REDIRECT_HOSTNAMES.includes(parsed.hostname)) return true;
-  if (`${parsed.origin}${parsed.pathname}` === CLAUDE_HOSTED_REDIRECT_URI) return true;
+  if (CLAUDE_HOSTED_REDIRECT_URIS.includes(`${parsed.origin}${parsed.pathname}`)) return true;
   const extra = process.env.MCP_ALLOWED_REDIRECT_PREFIXES?.trim();
   if (!extra) return false;
   return extra

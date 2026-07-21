@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MCP_ALLOWED_REDIRECT_PREFIXES` is now documented in the environment variable reference and `.env.example`.
 
 ### Fixed
-- Claude custom connectors could not complete OAuth: the redirect URI allow-list rejected `https://claude.ai/api/mcp/auth_callback` unless an undocumented environment variable was set. It is now allowed by default, matched exactly on origin and path. ([#43](https://github.com/daften/fireflyiii-mcp/issues/43))
+- Claude custom connectors could not complete OAuth: the redirect URI allow-list rejected `https://claude.ai/api/mcp/auth_callback` unless an undocumented environment variable was set. Both `https://claude.ai/api/mcp/auth_callback` and the `claude.com` equivalent are now allowed by default, matched exactly on origin and path, ahead of Anthropic's claude.ai → claude.com domain migration. ([#43](https://github.com/daften/fireflyiii-mcp/issues/43))
 - `400 invalid_redirect_uri` responses now name `MCP_ALLOWED_REDIRECT_PREFIXES` so the override is discoverable.
 
 ## [0.3.3] - 2026-07-21
