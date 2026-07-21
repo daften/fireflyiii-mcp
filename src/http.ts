@@ -33,6 +33,15 @@ const LOOPBACK_REDIRECT_HOSTNAMES = ['127.0.0.1', 'localhost', '[::1]'];
 // including the env-var prefix branch (an entry like 'https://my-client.example.com'
 // would otherwise also match 'https://my-client.example.com@evil.example.com/').
 // Do not reintroduce a startsWith(rawUri) check.
+//
+// A *bare-origin* prefix — one with nothing after the host, e.g. 'https://example.com'
+// — needs an extra boundary on top of that: raw startsWith also matches
+// 'https://example.com.attacker.test/steal', since the hostname is merely extended
+// (no userinfo involved). Bare-origin prefixes are therefore matched by comparing the
+// *parsed* URI's origin to the prefix, never by raw startsWith. A prefix with a path, a
+// trailing slash, or one that doesn't parse as a URL (e.g. the port-prefix form
+// 'http://192.168.1.10:') keeps the raw startsWith behavior, which is safe there: a `/`
+// or `:` right after the host already delimits it, so the hostname cannot be extended.
 function isRedirectUriAllowed(uri: string): boolean {
   let parsed: URL;
   try {
@@ -47,7 +56,17 @@ function isRedirectUriAllowed(uri: string): boolean {
   return extra
     .split(',')
     .map((s) => s.trim())
-    .some((p) => p && uri.startsWith(p));
+    .some((p) => {
+      if (!p) return false;
+      let parsedPrefix: URL;
+      try {
+        parsedPrefix = new URL(p);
+      } catch {
+        return uri.startsWith(p);
+      }
+      if (parsedPrefix.origin === p) return parsed.origin === p;
+      return uri.startsWith(p);
+    });
 }
 
 // Mirrors the route matching used by the branches below — kept in sync so that

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **The OAuth redirect URI allow-list could be bypassed via a hostname-extension attack on bare-origin `MCP_ALLOWED_REDIRECT_PREFIXES` entries.** A bare-origin prefix — one with nothing after the host, e.g. `https://example.com` — was matched against the raw redirect URI string with `uri.startsWith(prefix)`. That check also matches `https://example.com.attacker.test/steal`: the hostname is merely extended, not spoofed via userinfo, so the 0.3.2 userinfo fix did not catch it. The redirect URI is where the OAuth authorization code is sent, so an operator configuring a bare-origin prefix unintentionally allow-listed every hostname sharing that prefix, letting an attacker redirect a victim's authorization code to their own domain.
+
+  Bare-origin prefixes (where `new URL(prefix).origin === prefix`) are now matched by comparing the parsed redirect URI's origin to the prefix, never by raw `startsWith`. Prefixes with a path, a trailing slash, or that don't parse as a URL (e.g. the port-prefix form `http://192.168.1.10:`) keep the existing `startsWith` behavior, which is safe there since a `/` or `:` right after the host already delimits it.
+
+  **Affected:** the HTTP transport in OAuth mode with a bare-origin `MCP_ALLOWED_REDIRECT_PREFIXES` entry configured, in all releases up to and including 0.3.2. **Not affected:** deployments that don't set `MCP_ALLOWED_REDIRECT_PREFIXES`, or that set only prefixes with a path/trailing slash. Operators using a bare-origin prefix should upgrade.
+
 ## [0.3.2] - 2026-07-21
 
 ### Security
