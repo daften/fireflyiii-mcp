@@ -52,7 +52,7 @@ Run this server in [PAT-only mode](/guide/http-pat) — `FIREFLY_URL` set, `FIRE
       "command": "npx",
       "args": [
         "-y",
-        "mcp-remote",
+        "mcp-remote@0.1",
         "https://mcp.example.com",
         "--header",
         "Authorization:${AUTH_HEADER}"
