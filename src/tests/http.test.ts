@@ -231,6 +231,48 @@ describe('createOAuthHandler — registration endpoint', () => {
     expect(res.statusCode).toBe(201);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
+
+  // Regression tests: the handler used to validate only redirectUris[0], so a
+  // registration could smuggle a disallowed URI past index 0.
+  it('rejects registration when a non-first redirect URI is disallowed', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({
+      redirect_uris: ['http://127.0.0.1:3000/cb', 'https://evil.example.com/steal'],
+    });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.error).toBe('invalid_redirect_uri');
+  });
+
+  it('accepts registration when every redirect URI is allowed', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({
+      redirect_uris: ['http://127.0.0.1:3000/cb', 'http://localhost:8080/cb'],
+    });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
 });
 
 describe('createOAuthHandler — token proxy', () => {
@@ -1022,6 +1064,143 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body) as Record<string, unknown>;
     expect(parsed.error).toBe('invalid_redirect_uri');
+  });
+
+  // Regression tests for the bare-origin-prefix bypass. A bare-origin prefix
+  // (nothing after the host, e.g. 'https://example.com') used to be matched with raw
+  // uri.startsWith(prefix), which also matches 'https://example.com.attacker.test/steal' —
+  // the hostname is extended, not spoofed via userinfo, so the userinfo fix doesn't catch
+  // it. Bare-origin prefixes are now matched by comparing parsed origins.
+  describe('bare-origin prefix boundary', () => {
+    afterEach(() => {
+      delete process.env.MCP_ALLOWED_REDIRECT_PREFIXES;
+    });
+
+    it('rejects a hostname-extension bypass of a bare-origin prefix', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://example.com';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['https://example.com.attacker.test/steal'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('accepts a redirect URI whose origin matches a bare-origin prefix', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://example.com';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['https://example.com/callback'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('accepts a redirect URI with an explicit default port matching a bare-origin prefix', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://example.com';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['https://example.com:443/callback'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('rejects a hostname-extension bypass of a bare-origin prefix with a trailing slash', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://example.com/';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['https://example.com.attacker.test/steal'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('accepts a redirect URI matching a trailing-slash prefix', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://example.com/';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['https://example.com/cb'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('accepts a redirect URI matching a non-parsing port-prefix', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'http://192.168.1.10:';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['http://192.168.1.10:8080/cb'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('rejects a hostname-extension bypass of a non-parsing port-prefix', async () => {
+      process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'http://192.168.1.10:';
+      const mcpHandler = vi.fn();
+      const handler = createOAuthHandler(
+        'https://firefly.example.com',
+        'client-id-123',
+        mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+      );
+
+      const body = JSON.stringify({ redirect_uris: ['http://192.168.1.10.evil.test/cb'] });
+      const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+      const res = mockRes();
+
+      await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+      expect(res.statusCode).toBe(400);
+    });
   });
 });
 
