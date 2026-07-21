@@ -180,7 +180,7 @@ export function createOAuthHandler(
       } catch {
         // no body or invalid JSON — return empty redirect_uris
       }
-      if (redirectUris[0] && !isRedirectUriAllowed(redirectUris[0])) {
+      if (redirectUris.some((uri) => !isRedirectUriAllowed(uri))) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
         return;

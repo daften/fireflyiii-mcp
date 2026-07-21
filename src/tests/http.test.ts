@@ -231,6 +231,48 @@ describe('createOAuthHandler — registration endpoint', () => {
     expect(res.statusCode).toBe(201);
     expect(mcpHandler).not.toHaveBeenCalled();
   });
+
+  // Regression tests: the handler used to validate only redirectUris[0], so a
+  // registration could smuggle a disallowed URI past index 0.
+  it('rejects registration when a non-first redirect URI is disallowed', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({
+      redirect_uris: ['http://127.0.0.1:3000/cb', 'https://evil.example.com/steal'],
+    });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.error).toBe('invalid_redirect_uri');
+  });
+
+  it('accepts registration when every redirect URI is allowed', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({
+      redirect_uris: ['http://127.0.0.1:3000/cb', 'http://localhost:8080/cb'],
+    });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
 });
 
 describe('createOAuthHandler — token proxy', () => {
