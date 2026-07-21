@@ -20,10 +20,28 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
-const LOOPBACK_REDIRECT_PREFIXES = ['http://127.0.0.1:', 'http://localhost:', 'http://[::1]:'];
+// Hostnames only — matched against parsed.hostname, never against the raw string.
+// Note new URL('http://[::1]:3000/').hostname is '[::1]' WITH brackets in Node.
+const LOOPBACK_REDIRECT_HOSTNAMES = ['127.0.0.1', 'localhost', '[::1]'];
 
+// Matching is done on components of the PARSED URL, never on the raw string. A raw
+// `uri.startsWith(...)` check is unsafe: URL userinfo lets the raw string lie about
+// the real host, e.g. 'http://127.0.0.1:@evil.example.com/steal' starts with
+// 'http://127.0.0.1:' but its parsed origin is 'http://evil.example.com'. Such a URI
+// reached /oauth/callback, which redirected the authorization code to the attacker.
+// Rejecting any URI that carries userinfo closes that bypass for every branch below,
+// including the env-var prefix branch (an entry like 'https://my-client.example.com'
+// would otherwise also match 'https://my-client.example.com@evil.example.com/').
+// Do not reintroduce a startsWith(rawUri) check.
 function isRedirectUriAllowed(uri: string): boolean {
-  if (LOOPBACK_REDIRECT_PREFIXES.some((p) => uri.startsWith(p))) return true;
+  let parsed: URL;
+  try {
+    parsed = new URL(uri);
+  } catch {
+    return false;
+  }
+  if (parsed.username !== '' || parsed.password !== '') return false;
+  if (parsed.protocol === 'http:' && LOOPBACK_REDIRECT_HOSTNAMES.includes(parsed.hostname)) return true;
   const extra = process.env.MCP_ALLOWED_REDIRECT_PREFIXES?.trim();
   if (!extra) return false;
   return extra
