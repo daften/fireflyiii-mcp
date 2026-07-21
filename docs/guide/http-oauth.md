@@ -57,8 +57,10 @@ Or via the Claude Code CLI:
 claude mcp add --transport http fireflyiii http://127.0.0.1:3000
 ```
 
-::: warning
-The `type: "http"` field is required. Without it, Claude Code assumes stdio and fails to connect.
+::: warning Claude Code syntax — not Claude Desktop
+The JSON above is for **Claude Code** (`.claude/mcp.json`). The `type: "http"` field is required there; without it Claude Code assumes stdio and fails to connect.
+
+**Claude Desktop does not accept this form.** Its `claude_desktop_config.json` handles stdio servers only, and silently drops entries containing `type` or `url`. See [Claude Desktop](/guide/claude-desktop).
 :::
 
 On first connection your AI client opens a browser to authorize with Firefly III. Tokens are managed automatically after that.

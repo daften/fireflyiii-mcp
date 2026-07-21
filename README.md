@@ -60,6 +60,8 @@ Add to your Claude MCP config (`.claude/mcp.json` or Claude Desktop `claude_desk
 
 Your MCP client downloads and starts the server automatically on first use. No separate install step needed.
 
+**Claude Desktop users:** this stdio form is the recommended setup. Claude Desktop's config file does *not* accept HTTP servers — see the [Claude Desktop guide](https://daften.github.io/fireflyiii-mcp/guide/claude-desktop) if you need a remote setup.
+
 ---
 
 ## Option 2: npm package — HTTP (OAuth or PAT)
