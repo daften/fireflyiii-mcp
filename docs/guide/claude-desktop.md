@@ -83,6 +83,6 @@ grep "Skipped invalid MCP server config" ~/Library/Logs/Claude/main.log
 tail -n 20 -f ~/Library/Logs/Claude/mcp*.log
 ```
 
-**"Couldn't register with … sign-in service"** — the connector's OAuth client registration was rejected. Confirm you are on a server version that allows Claude's callback by default; otherwise set [`MCP_ALLOWED_REDIRECT_PREFIXES`](/reference/env-vars) to `https://claude.ai`.
+**"Couldn't register with … sign-in service"** — the connector's OAuth client registration was rejected. Confirm you are on a server version that allows Claude's callback by default; otherwise set [`MCP_ALLOWED_REDIRECT_PREFIXES`](/reference/env-vars) to `https://claude.ai/api/mcp/auth_callback`.
 
 **"Couldn't reach the MCP server"** — discovery failed. Run the two `curl` commands in Option 2 from outside your network.

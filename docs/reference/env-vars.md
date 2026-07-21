@@ -16,7 +16,7 @@ Store credentials in a `.env` file (gitignored). Copy `.env.example` from the re
 | `FIREFLY_URL` | Yes | Base URL of your Firefly III instance. No trailing slash. |
 | `FIREFLY_OAUTH_CLIENT_ID` | No | OAuth client ID from Firefly III Options → Remote access and tokens → Create New Client. Omit to run in [PAT-only mode](/guide/http-pat) instead of OAuth. |
 | `MCP_BASE_URL` | Required when not on loopback, and only if `FIREFLY_OAUTH_CLIENT_ID` is set | Public base URL of this server. Used to build OAuth redirect URIs. Not used in PAT-only mode. |
-| `MCP_ALLOWED_REDIRECT_PREFIXES` | No | Comma-separated list of extra OAuth `redirect_uri` prefixes to accept. Loopback addresses and Claude's hosted callback (`https://claude.ai/api/mcp/auth_callback`) are always allowed — you only need this for other clients. Ignored in PAT-only mode. |
+| `MCP_ALLOWED_REDIRECT_PREFIXES` | No | Comma-separated list of extra OAuth `redirect_uri` prefixes to accept. Loopback addresses and Claude's hosted callback (`https://claude.ai/api/mcp/auth_callback`) are always allowed — you only need this for other clients. Ignored in PAT-only mode. Each entry is matched as a literal string prefix, so include the full callback path, not just an origin — a bare origin like `https://example.com` also matches `https://example.com.attacker.test`. |
 
 In HTTP mode, `FIREFLY_TOKEN` is not used. The Bearer token is resolved per-request from the `Authorization` header instead — either set by the MCP client after completing the OAuth flow, or supplied directly as your Firefly III Personal Access Token when `FIREFLY_OAUTH_CLIENT_ID` is omitted. See [npm + HTTP/OAuth](/guide/http-oauth) and [npm + HTTP/PAT](/guide/http-pat).
 
