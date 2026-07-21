@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.3] - 2026-07-21
 
 ### Security
 - **The OAuth redirect URI allow-list could be bypassed via a hostname-extension attack on bare-origin `MCP_ALLOWED_REDIRECT_PREFIXES` entries.** A bare-origin prefix — one with nothing after the host, e.g. `https://example.com` — was matched against the raw redirect URI string with `uri.startsWith(prefix)`. That check also matches `https://example.com.attacker.test/steal`: the hostname is merely extended, not spoofed via userinfo, so the 0.3.2 userinfo fix did not catch it. The redirect URI is where the OAuth authorization code is sent, so an operator configuring a bare-origin prefix unintentionally allow-listed every hostname sharing that prefix, letting an attacker redirect a victim's authorization code to their own domain.
@@ -102,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.2...v0.3.0
