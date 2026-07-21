@@ -134,7 +134,8 @@ export function createOAuthHandler(
     }
 
     const baseUrl =
-      (process.env.MCP_BASE_URL?.trim().replace(/\/$/, '') || null) ?? `http://${req.headers.host ?? '127.0.0.1:3000'}`;
+      (process.env.MCP_BASE_URL?.trim().replace(/\/+$/, '') || null) ??
+      `http://${req.headers.host ?? '127.0.0.1:3000'}`;
 
     // PAT-only mode (no FIREFLY_OAUTH_CLIENT_ID): the OAuth proxy surface isn't
     // backed by a real client, so report it as absent rather than serving a

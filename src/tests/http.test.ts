@@ -1662,6 +1662,42 @@ describe('createOAuthHandler — protected resource metadata (RFC 9728)', () => 
 
     expect(res.statusCode).toBe(404);
   });
+
+  it('strips a single trailing slash from MCP_BASE_URL in the resource value', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com/';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.resource).toBe('https://mcp.example.com');
+  });
+
+  it('strips multiple trailing slashes from MCP_BASE_URL in the resource value', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com//';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.resource).toBe('https://mcp.example.com');
+  });
 });
 
 describe('createOAuthHandler — 401 challenge', () => {

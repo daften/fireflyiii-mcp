@@ -96,4 +96,6 @@ A custom connector is driven by Anthropic's backend rather than by the Claude ap
 
 `MCP_BASE_URL` must match the URL you type into Claude exactly, with no trailing slash: the server publishes it as the `resource` value in its OAuth metadata, and Claude requires an exact match.
 
+`MCP_BASE_URL` should be a hostname root with no path component. If it has one, RFC 9728's path-aware well-known URL (`/.well-known/oauth-protected-resource/<path>`) is not served by this server — only the 401 challenge's `resource_metadata` pointer keeps the discovery flow working.
+
 No extra configuration is needed for Claude's OAuth callbacks (`https://claude.ai/api/mcp/auth_callback` and the `claude.com` equivalent) — both are allowed by default. Other clients with non-loopback callbacks need [`MCP_ALLOWED_REDIRECT_PREFIXES`](/reference/env-vars).
