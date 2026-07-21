@@ -14,6 +14,7 @@
 |--------|-----------|----------|
 | [npm — stdio](./stdio) | stdio | Simplest. AI client and server on the same machine. |
 | [npm — HTTP/OAuth](./http-oauth) | HTTP + OAuth 2.0 | AI client connecting remotely, prefers OAuth over a PAT. |
+| [npm — HTTP/PAT](./http-pat) | HTTP + Bearer PAT | Headless callers — gateways, automation, no browser. |
 | [Docker — HTTP](./docker) | HTTP + OAuth 2.0 | Self-hosted on a home lab or server. |
 | [Git checkout](./git-checkout) | stdio or HTTP | Contributing or local development. |
 
