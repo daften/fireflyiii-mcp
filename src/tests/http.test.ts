@@ -892,6 +892,118 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     expect(res.statusCode).toBe(201);
   });
 
+  // Regression tests for the URL-userinfo bypass. The allow-list used to compare the
+  // RAW uri string, but userinfo makes that string lie about the real host:
+  // new URL('http://127.0.0.1:@evil.example.com/steal').origin is 'http://evil.example.com',
+  // yet the string starts with 'http://127.0.0.1:'. Accepting it let /oauth/callback
+  // redirect the authorization code to the attacker.
+  it('rejects a redirect URI whose loopback prefix is really userinfo', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1:@evil.example.com/steal'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('rejects authorize when the loopback prefix is really userinfo', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq(
+      'GET',
+      `/oauth/authorize?redirect_uri=${encodeURIComponent('http://127.0.0.1:@evil.example.com/steal')}&state=abc`,
+      { host: '127.0.0.1:3000' },
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).not.toBe(302);
+  });
+
+  it('rejects a localhost-userinfo redirect URI', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://localhost:x@evil.example.com/'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('rejects userinfo that spoofs an allowed MCP_ALLOWED_REDIRECT_PREFIXES entry', async () => {
+    process.env.MCP_ALLOWED_REDIRECT_PREFIXES = 'https://my-client.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://my-client.example.com@evil.example.com/'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('accepts a port-less loopback redirect URI (RFC 8252)', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1/callback'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('rejects a hostname that merely starts with a loopback address', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['http://127.0.0.1.evil.example.com/x'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it('rejects authorize with a non-loopback redirect URI (400 invalid_redirect_uri)', async () => {
     const mcpHandler = vi.fn();
     const handler = createOAuthHandler(

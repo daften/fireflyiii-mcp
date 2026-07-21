@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-21
+
+### Security
+- **The OAuth redirect URI allow-list could be bypassed via URL userinfo, leaking authorization codes.** The allow-list matched loopback addresses against the raw redirect URI string, but URL userinfo lets that string misrepresent the real host: `http://127.0.0.1:@evil.example.com/steal` starts with `http://127.0.0.1:` while its parsed origin is `http://evil.example.com`. Such a URI passed validation at `/oauth/authorize`, was stored against the flow's `state`, and `/oauth/callback` then redirected the Firefly III authorization code to the attacker's host. Because the attacker also supplies the PKCE `code_challenge`, they could complete the token exchange and gain full API access to the victim's Firefly III account. The same technique defeated any `MCP_ALLOWED_REDIRECT_PREFIXES` entry, since those are matched as literal prefixes too (`https://my-client.example.com@evil.example.com/`).
+
+  Matching is now performed on parsed URL components instead of the raw string, and any redirect URI carrying userinfo is rejected outright. Loopback matching additionally accepts a port-less `http://127.0.0.1/callback` per [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252).
+
+  **Affected:** the HTTP transport in OAuth mode (`FIREFLY_OAUTH_CLIENT_ID` set) in all releases up to and including 0.3.1. **Not affected:** the stdio transport, and the HTTP transport in PAT-only mode — that mode serves no OAuth surface at all. Exploitation requires persuading a victim to start an authorization flow from a crafted URL. Operators running HTTP/OAuth mode should upgrade.
+
 ## [0.3.1] - 2026-07-06
 
 ### Fixed
@@ -81,7 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.2.1...v0.2.2
