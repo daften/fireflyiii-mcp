@@ -95,6 +95,7 @@ function rejectRedirectUri(res: http.ServerResponse): void {
 function isOAuthProxyPath(url: string): boolean {
   return (
     url === '/.well-known/oauth-authorization-server' ||
+    url === '/.well-known/oauth-protected-resource' ||
     url.startsWith('/oauth/authorize') ||
     url === '/oauth/register' ||
     url === '/oauth/token' ||
@@ -141,6 +142,22 @@ export function createOAuthHandler(
           error_description: 'OAuth is not enabled on this server. Authenticate with a Bearer token instead.',
         }),
       );
+      return;
+    }
+
+    // RFC 9728 protected resource metadata — no auth required.
+    // Claude's connector flow starts here: it reads the 401 challenge, fetches this
+    // document to learn which authorization server guards the resource, then fetches
+    // that server's own metadata. `resource` must match the URL the user typed into
+    // Claude exactly, which is what makes MCP_BASE_URL load-bearing for connectors.
+    if (req.method === 'GET' && req.url === '/.well-known/oauth-protected-resource') {
+      const metadata = {
+        resource: baseUrl,
+        authorization_servers: [baseUrl],
+        bearer_methods_supported: ['header'],
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(metadata));
       return;
     }
 

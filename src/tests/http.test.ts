@@ -1544,3 +1544,47 @@ describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
     expect(mockTryListen).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('createOAuthHandler — protected resource metadata (RFC 9728)', () => {
+  afterEach(() => {
+    delete process.env.MCP_BASE_URL;
+  });
+
+  it('returns resource metadata JSON in OAuth mode', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.resource).toBe('https://mcp.example.com');
+    expect(parsed.authorization_servers).toEqual(['https://mcp.example.com']);
+    expect(parsed.bearer_methods_supported).toEqual(['header']);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('404s the resource metadata endpoint in PAT-only mode', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+  });
+});
