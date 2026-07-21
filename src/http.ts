@@ -24,6 +24,11 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 // Note new URL('http://[::1]:3000/').hostname is '[::1]' WITH brackets in Node.
 const LOOPBACK_REDIRECT_HOSTNAMES = ['127.0.0.1', 'localhost', '[::1]'];
 
+// Claude's hosted surfaces (claude.ai web, Desktop, mobile, Cowork) all complete
+// OAuth against this single callback. Matched exactly on origin+pathname — a prefix
+// match would also admit https://claude.ai/api/mcp/auth_callbackEVIL.
+const CLAUDE_HOSTED_REDIRECT_URI = 'https://claude.ai/api/mcp/auth_callback';
+
 // Matching is done on components of the PARSED URL, never on the raw string. A raw
 // `uri.startsWith(...)` check is unsafe: URL userinfo lets the raw string lie about
 // the real host, e.g. 'http://127.0.0.1:@evil.example.com/steal' starts with
@@ -51,6 +56,7 @@ function isRedirectUriAllowed(uri: string): boolean {
   }
   if (parsed.username !== '' || parsed.password !== '') return false;
   if (parsed.protocol === 'http:' && LOOPBACK_REDIRECT_HOSTNAMES.includes(parsed.hostname)) return true;
+  if (`${parsed.origin}${parsed.pathname}` === CLAUDE_HOSTED_REDIRECT_URI) return true;
   const extra = process.env.MCP_ALLOWED_REDIRECT_PREFIXES?.trim();
   if (!extra) return false;
   return extra
@@ -67,6 +73,21 @@ function isRedirectUriAllowed(uri: string): boolean {
       if (parsedPrefix.origin === p) return parsed.origin === p;
       return uri.startsWith(p);
     });
+}
+
+// Both /oauth/authorize and /oauth/register reject with the same shape. The error
+// code stays RFC-compliant; the description names the escape hatch so an operator
+// can act on it without reading the source.
+function rejectRedirectUri(res: http.ServerResponse): void {
+  res.writeHead(400, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      error: 'invalid_redirect_uri',
+      error_description:
+        "redirect_uri is not allowed. Loopback addresses and Claude's hosted callback are allowed by default; " +
+        'add any other prefix to MCP_ALLOWED_REDIRECT_PREFIXES (comma-separated).',
+    }),
+  );
 }
 
 // Mirrors the route matching used by the branches below — kept in sync so that
@@ -149,8 +170,7 @@ export function createOAuthHandler(
       const incomingUrl = new URL(req.url, baseUrl);
       const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
       if (clientRedirectUri && !isRedirectUriAllowed(clientRedirectUri)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+        rejectRedirectUri(res);
         return;
       }
       const state = incomingUrl.searchParams.get('state');
@@ -181,8 +201,7 @@ export function createOAuthHandler(
         // no body or invalid JSON — return empty redirect_uris
       }
       if (redirectUris.some((uri) => !isRedirectUriAllowed(uri))) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+        rejectRedirectUri(res);
         return;
       }
       const registration = {

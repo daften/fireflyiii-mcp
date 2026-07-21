@@ -934,6 +934,114 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     expect(res.statusCode).toBe(201);
   });
 
+  it("accepts registration with Claude's hosted callback and no env var set", async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("accepts authorize with Claude's hosted callback and no env var set", async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq(
+      'GET',
+      `/oauth/authorize?redirect_uri=${encodeURIComponent('https://claude.ai/api/mcp/auth_callback')}&state=abc`,
+      { host: '127.0.0.1:3000' },
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(302);
+  });
+
+  it('rejects a redirect URI that merely starts with the Claude callback', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/auth_callbackEVIL'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('ignores query and fragment when matching the Claude callback', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/auth_callback?x=1'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('rejects a malformed redirect URI', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['not a valid uri'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('names MCP_ALLOWED_REDIRECT_PREFIXES in the rejection body', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://evil.example.com/steal'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.error).toBe('invalid_redirect_uri');
+    expect(parsed.error_description).toContain('MCP_ALLOWED_REDIRECT_PREFIXES');
+  });
+
   // Regression tests for the URL-userinfo bypass. The allow-list used to compare the
   // RAW uri string, but userinfo makes that string lie about the real host:
   // new URL('http://127.0.0.1:@evil.example.com/steal').origin is 'http://evil.example.com',
