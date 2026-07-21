@@ -496,7 +496,9 @@ describe('createOAuthHandler — Bearer guard', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(401);
-    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="MCP server for Firefly III"');
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe(
+      'Bearer resource_metadata="http://127.0.0.1:3000/.well-known/oauth-protected-resource"',
+    );
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -714,7 +716,7 @@ describe('createOAuthHandler — PAT-only mode (no oauthClientId)', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(401);
-    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="MCP server for Firefly III"');
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer');
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -1586,5 +1588,48 @@ describe('createOAuthHandler — protected resource metadata (RFC 9728)', () => 
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('createOAuthHandler — 401 challenge', () => {
+  afterEach(() => {
+    delete process.env.MCP_BASE_URL;
+  });
+
+  it('points at the resource metadata document in OAuth mode', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe(
+      'Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"',
+    );
+  });
+
+  it('omits resource_metadata in PAT-only mode', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer');
   });
 });

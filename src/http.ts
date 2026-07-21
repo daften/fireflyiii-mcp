@@ -307,8 +307,14 @@ export function createOAuthHandler(
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) {
+      // RFC 9728 §5.1: the resource_metadata parameter is how a client discovers
+      // where to authenticate. PAT-only mode serves no metadata document, so it
+      // sends a bare challenge rather than pointing at a 404.
+      const challenge = oauthClientId
+        ? `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`
+        : 'Bearer';
       res.writeHead(401, {
-        'WWW-Authenticate': 'Bearer resource="MCP server for Firefly III"',
+        'WWW-Authenticate': challenge,
         'Content-Type': 'application/json',
       });
       res.end(JSON.stringify({ error: 'unauthorized', error_description: 'Bearer token required' }));
