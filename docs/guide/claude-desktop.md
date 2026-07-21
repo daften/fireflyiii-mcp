@@ -65,7 +65,7 @@ Run this server in [PAT-only mode](/guide/http-pat) — `FIREFLY_URL` set, `FIRE
 }
 ```
 
-The `${AUTH_HEADER}` indirection is required, not cosmetic: the header value contains a space, which does not survive being passed directly inside `args`.
+The `${AUTH_HEADER}` indirection matters most on Claude Desktop (Windows) and Cursor, where `mcp-remote`'s README documents a bug that mangles spaces inside `args` when it invokes `npx` — the header value contains a space, and the direct form silently breaks there. Keep the indirection on every platform anyway, so the config stays portable.
 
 ::: warning
 This needs Node.js on the client and puts a Personal Access Token in a plaintext config file — the same costs as [stdio](/guide/stdio), plus an extra process. Use it only when the client genuinely cannot reach Firefly III directly, for example when Firefly III sits behind an auth proxy that a PAT cannot satisfy and this server reaches it over an internal hostname.
