@@ -14,7 +14,8 @@
 
 - ESM only — all relative imports carry a `.js` extension (e.g. `from '../http.js'`).
 - Strict TypeScript. `npm run check` must pass: `biome ci src/ && tsc --noEmit && vitest run`.
-- A `simple-git-hooks` pre-commit hook runs `npm run check`. **Every commit therefore requires the full suite green** — commit only at the green step of each TDD cycle, never at red.
+- **Run `npm install` before Task 1.** As of writing, this clone has no `node_modules`, so no test or build command works until you do. It also runs `npm run prepare`, which installs the `simple-git-hooks` pre-commit hook.
+- Once that hook is installed it runs `npm run check` on every commit, so **commit only at the green step of each TDD cycle, never at red.** Do not assume the hook is active — verify with `ls .git/hooks/pre-commit`, and run `npm run check` manually before each commit if it is missing.
 - Commit format: `[type]: [subject]` with a blank line and the trailer `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Types: `feat:`, `fix:`, `refactor:`, `test:`, `chore:`, `docs:`.
 - Claude's hosted callback URI, used verbatim: `https://claude.ai/api/mcp/auth_callback`
 - Anthropic egress range, used verbatim in docs: `160.79.104.0/21`
@@ -37,6 +38,30 @@
 | `docs/guide/http-oauth.md` | Modify. Label the `{type,url}` block Claude Code–only. |
 | `docs/guide/docker.md` | Modify. Same, plus connector requirements. |
 | `README.md` | Modify. Point Claude Desktop readers at the new guide. |
+
+---
+
+## Task 0: Install dependencies
+
+**Files:** none (no commit).
+
+- [ ] **Step 1: Install**
+
+Run: `npm install`
+
+Expected: `node_modules/` is created and `npm run prepare` installs the pre-commit hook.
+
+- [ ] **Step 2: Confirm the baseline is green before changing anything**
+
+Run: `npm run check`
+
+Expected: Biome clean, `tsc --noEmit` clean, full Vitest suite passing. If the baseline is already red, stop and report it — do not start Task 1 on top of a failing suite.
+
+- [ ] **Step 3: Confirm the hook installed**
+
+Run: `ls .git/hooks/pre-commit`
+
+Expected: the file exists. If it does not, run `npm run check` manually before every commit in this plan.
 
 ---
 
