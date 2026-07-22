@@ -5,6 +5,11 @@ name: Auto-merge security PRs
 # this workflow gates nothing on its own. RELEASE_TOKEN (a PAT) is used so
 # the resulting merge push triggers auto-release.yml; auto-merge enabled by
 # the default GITHUB_TOKEN would produce an inert push and break the chain.
+#
+# RELEASE_TOKEN must be provisioned as a *Dependabot* secret in addition to
+# the Actions secret: pull_request runs triggered by dependabot[bot] receive
+# only the Dependabot secret store (repository Actions secrets resolve
+# empty there, by GitHub design).
 
 on: pull_request
 
@@ -16,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Fetch Dependabot metadata
         id: meta
