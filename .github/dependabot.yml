@@ -12,6 +12,12 @@ updates:
     schedule:
       interval: daily
     open-pull-requests-limit: 0
+    # Explicit prefix: auto-release.yml's trigger matches commit subjects
+    # starting `chore(deps` — never rely on Dependabot's convention
+    # auto-detection for that.
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
     groups:
       security-fixes:
         applies-to: security-updates
@@ -23,6 +29,9 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
     groups:
       minor-and-patch:
         applies-to: version-updates
@@ -35,6 +44,8 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       all-actions:
         patterns: ["*"]
