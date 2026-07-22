@@ -19,10 +19,13 @@ jobs:
           fetch-depth: 0
 
       - name: Verify CHANGELOG.md is updated
+        env:
+          # env indirection: the PR title is attacker-controlled text and must
+          # never be spliced into shell source.
+          TITLE: ${{ github.event.pull_request.title }}
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
-          TITLE="${{ github.event.pull_request.title }}"
           if echo "$TITLE" | grep -qi '\[skip changelog\]'; then
             echo "Skipping changelog check ([skip changelog] in PR title)."
             exit 0
