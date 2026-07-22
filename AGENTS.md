@@ -540,6 +540,7 @@ Use the correct developer attribution matching the model's originating company:
 - `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.
 - Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly.
 - `MCP_BASE_URL` must be set when the HTTP server is not on loopback (e.g. Docker); the server exits with code 1 otherwise.
+- **Internal planning docs (design specs, implementation plans) are local-only.** They live in `docs/superpowers/` (gitignored, and `srcExclude`d from the VitePress site) and must never be committed — do not create alternative locations like `docs/design/` for them.
 
 ---
 
