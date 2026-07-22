@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions: {}
 
@@ -19,10 +19,13 @@ jobs:
           fetch-depth: 0
 
       - name: Verify CHANGELOG.md is updated
+        env:
+          # env indirection: the PR title is attacker-controlled text and must
+          # never be spliced into shell source.
+          TITLE: ${{ github.event.pull_request.title }}
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
-          TITLE="${{ github.event.pull_request.title }}"
           if echo "$TITLE" | grep -qi '\[skip changelog\]'; then
             echo "Skipping changelog check ([skip changelog] in PR title)."
             exit 0
@@ -55,9 +58,6 @@ jobs:
       - name: Install dependencies
         run: for i in 1 2 3; do npm ci && break || sleep 5; done
 
-      - name: Audit dependencies (production only)
-        run: npm audit --audit-level=moderate --omit=dev
-
       - name: Lint (Biome)
         run: npx biome ci src/
 
@@ -75,3 +75,33 @@ jobs:
         # always() so the comment also appears (with red numbers) when tests fail.
         if: always() && github.event_name == 'pull_request' && matrix.node-version == 22
         uses: davelosert/vitest-coverage-report-action@v2
+
+  # Relative audit: a PR may not introduce moderate+ advisories that its base
+  # doesn't already have. Deliberately NOT absolute — when several security
+  # advisories are open at once, each fix-PR would fail an absolute audit
+  # because of the advisories the *other* PRs fix, deadlocking auto-merge.
+  # The strict absolute audit runs in nightly.yml instead.
+  audit:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # npm audit only needs package.json + the lockfile (no node_modules),
+      # so the base side runs from two files extracted into a scratch dir.
+      - name: Audit (no new moderate+ advisories vs base)
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          npm audit --json --omit=dev > /tmp/head-audit.json || true
+          git fetch --depth=1 origin "$BASE_SHA"
+          mkdir -p /tmp/base-pkg
+          git show "$BASE_SHA:package.json" > /tmp/base-pkg/package.json
+          git show "$BASE_SHA:package-lock.json" > /tmp/base-pkg/package-lock.json
+          (cd /tmp/base-pkg && npm audit --json --omit=dev > /tmp/base-audit.json) || true
+          bash scripts/audit-compare.sh /tmp/base-audit.json /tmp/head-audit.json

@@ -41,6 +41,10 @@ npm run test:integration
 
 These are skipped in CI; run them manually before submitting changes to API-calling code.
 
+## Branches
+
+Open feature and fix PRs against the **`develop`** branch — `main` is the always-releasable branch and only receives security fixes, hotfixes, and release promotions. See `AGENTS.md` ("Branching Model") for the full workflow.
+
 ## Releasing a new version
 
 `CHANGELOG.md` is the single source of truth. Contributors add entries under `## [Unreleased]` as part of their PRs; releases promote that section to a dated version and paste the same block into the tag annotation. The publish workflow validates the changelog before publishing, and the GitHub Release is auto-created from the tag annotation.
