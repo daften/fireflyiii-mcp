@@ -1,0 +1,82 @@
+name: Auto-release security fixes
+
+# Fully automated patch releases for Dependabot security merges on main.
+# Chain: dependabot security PR -> auto-merge.yml enables auto-merge ->
+# squash merge lands here -> patch bump + changelog + tag -> the tag push
+# (made with RELEASE_TOKEN, so it is NOT inert like GITHUB_TOKEN pushes)
+# triggers publish.yml's normal release path.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Compute version + changelog, print the diff, but do not commit/tag/push'
+        type: boolean
+        default: true
+
+permissions: {}
+
+# Serialize: two closely-spaced merges to main must not race the version
+# bump/tag; the second run waits and releases on top of the first.
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Only Dependabot squash-merges qualify: on main those are security fixes
+    # by construction (version updates target develop). Promotion merges from
+    # develop are authored by the maintainer and our own release commits
+    # start with chore(release): — both excluded.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.head_commit.author.username == 'dependabot[bot]' &&
+       startsWith(github.event.head_commit.message, 'chore(deps') &&
+       !startsWith(github.event.head_commit.message, 'chore(release):'))
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          # PAT, not GITHUB_TOKEN: the pushed tag must trigger publish.yml.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Bump patch version
+        id: bump
+        run: |
+          NEW_VERSION=$(npm version patch --no-git-tag-version)
+          echo "version=${NEW_VERSION#v}" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${NEW_VERSION}"
+
+      - name: Write changelog entry
+        env:
+          # env indirection, not inline ${{ }} interpolation: the commit
+          # message is attacker-influenceable text and must never be
+          # spliced into shell source.
+          HEAD_MSG: ${{ github.event.head_commit.message || 'Manually triggered security release (workflow_dispatch)' }}
+        run: bash scripts/release-changelog.sh "${{ steps.bump.outputs.version }}" "$HEAD_MSG"
+
+      - name: Commit, tag, push (skipped in dry-run)
+        if: github.event_name == 'push' || inputs.dry-run == false
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): ${VERSION}"
+          git tag -a "v${VERSION}" -m "Automated security release ${VERSION}"
+          git push --atomic origin main "v${VERSION}"
+
+      - name: Dry-run summary
+        if: github.event_name == 'workflow_dispatch' && inputs.dry-run == true
+        run: |
+          echo "DRY RUN — would release v${{ steps.bump.outputs.version }} with this diff:"
+          git diff
