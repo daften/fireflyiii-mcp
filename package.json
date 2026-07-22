@@ -56,6 +56,7 @@
     "zod": "^4.4.3"
   },
   "overrides": {
+    "@hono/node-server": "^2.0.5",
     "esbuild": "^0.28.1",
     "hono": "^4.12.31"
   },

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **Forced the transitive `@hono/node-server` dependency to ^2.0.5 via an npm override**, resolving [GHSA-frvp-7c67-39w9](https://github.com/advisories/GHSA-frvp-7c67-39w9) (medium severity), a path traversal in its `serve-static` module on Windows via encoded backslashes. The package comes in through `@modelcontextprotocol/sdk`, which pins `^1.19.9` — below the patched 2.0.5. This server was not exploitable: the SDK only uses `serve`/`getRequestListener`, never the vulnerable `serveStatic`, and the flaw is Windows-only. The override closes the alert until the SDK moves to 2.x upstream.
+
 ## [0.3.3] - 2026-07-21
 
 ### Security
