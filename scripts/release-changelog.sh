@@ -16,6 +16,23 @@ BULLET=$(printf '%s\n' "$2" | head -n 1)
 DATE=$(date -u +%Y-%m-%d)
 REPO="https://github.com/daften/fireflyiii-mcp"
 
+case "$VERSION" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) echo "invalid version: '${VERSION}'" >&2; exit 1 ;;
+esac
+
+# Idempotence: a workflow retry must not duplicate the section or produce a
+# self-referential compare link (PREV would re-derive to VERSION itself).
+if grep -qF "## [${VERSION}]" CHANGELOG.md; then
+  echo "CHANGELOG.md already contains a section for ${VERSION}; nothing to do."
+  exit 0
+fi
+
+# The bullet reaches awk via ENVIRON, never -v: -v assignment values undergo
+# escape processing, so a commit subject containing backslashes would inject
+# control characters into the changelog.
+export BULLET
+
 # Previous release = first versioned section header currently in the file.
 PREV=$(grep -m1 -oE '^## \[[0-9][^]]*\]' CHANGELOG.md | sed 's/^## \[//; s/\]$//' || echo "")
 if [ -z "$PREV" ]; then
@@ -29,13 +46,13 @@ fi
 # the first versioned section header.
 if grep -q '^## \[Unreleased\]$' CHANGELOG.md; then MODE=after; else MODE=before; fi
 
-awk -v ver="$VERSION" -v date="$DATE" -v bullet="$BULLET" -v mode="$MODE" '
+awk -v ver="$VERSION" -v date="$DATE" -v mode="$MODE" '
   function section() {
     print "## [" ver "] - " date
     print ""
     print "### Security"
     print ""
-    print "- " bullet " (automated security release)"
+    print "- " ENVIRON["BULLET"] " (automated security release)"
   }
   mode == "after" && /^## \[Unreleased\]$/ { print; print ""; section(); next }
   mode == "before" && !done && /^## \[/ { section(); print ""; done = 1 }
