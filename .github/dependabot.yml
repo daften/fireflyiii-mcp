@@ -1,18 +1,51 @@
 version: 2
 updates:
+  # --- Security updates (npm) ---------------------------------------------
+  # Security PRs are always raised against the default branch (main).
+  # `open-pull-requests-limit: 0` disables *version* updates for this entry
+  # so it exists purely to configure security updates — grouped, so that
+  # concurrent advisories arrive as ONE PR (separate PRs would each fail the
+  # relative audit's predecessor and can still race each other on the
+  # lockfile).
   - package-ecosystem: npm
     directory: "/"
     schedule:
+      interval: daily
+    open-pull-requests-limit: 0
+    # Explicit prefix: auto-release.yml's trigger matches commit subjects
+    # starting `chore(deps` — never rely on Dependabot's convention
+    # auto-detection for that.
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      security-fixes:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  # --- Routine version updates (npm) → develop ----------------------------
+  - package-ecosystem: npm
+    directory: "/"
+    target-branch: develop
+    schedule:
       interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
     groups:
       minor-and-patch:
+        applies-to: version-updates
         update-types: [minor, patch]
     open-pull-requests-limit: 5
 
+  # --- GitHub Actions version updates → develop ---------------------------
   - package-ecosystem: github-actions
     directory: "/"
+    target-branch: develop
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "chore(deps)"
     groups:
       all-actions:
         patterns: ["*"]

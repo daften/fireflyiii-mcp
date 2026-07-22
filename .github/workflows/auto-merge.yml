@@ -1,0 +1,37 @@
+name: Auto-merge security PRs
+
+# Enables GitHub auto-merge on Dependabot security PRs against main. The
+# merge itself only happens once branch protection's required checks pass —
+# this workflow gates nothing on its own. RELEASE_TOKEN (a PAT) is used so
+# the resulting merge push triggers auto-release.yml; auto-merge enabled by
+# the default GITHUB_TOKEN would produce an inert push and break the chain.
+#
+# RELEASE_TOKEN must be provisioned as a *Dependabot* secret in addition to
+# the Actions secret: pull_request runs triggered by dependabot[bot] receive
+# only the Dependabot secret store (repository Actions secrets resolve
+# empty there, by GitHub design).
+
+on: pull_request
+
+permissions: {}
+
+jobs:
+  automerge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # alert-state is non-empty only for PRs that fix a security advisory.
+      - name: Enable auto-merge (squash)
+        if: steps.meta.outputs.alert-state != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"

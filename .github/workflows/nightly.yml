@@ -14,6 +14,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: develop
 
       - uses: actions/setup-node@v7
         with:
@@ -42,3 +44,23 @@ jobs:
       - name: Stop Firefly III
         if: always()
         run: docker compose -f docker-compose.ci.yml down
+
+  # The strict absolute audit lives here (not in PR CI — see ci.yml's audit
+  # job comment). Red means an advisory is outstanding on develop, including
+  # unfixable ones waiting on upstream; it alerts the maintainer via the
+  # scheduled-workflow failure email without blocking any merge.
+  strict-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Strict production audit (moderate+)
+        run: npm audit --audit-level=moderate --omit=dev

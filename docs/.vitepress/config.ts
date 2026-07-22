@@ -5,7 +5,7 @@ export default defineConfig({
   description:
     'Connect any MCP-compatible AI assistant to your Firefly III personal finance instance.',
   base: '/fireflyiii-mcp/',
-  srcExclude: ['design/**', 'superpowers/**'],
+  srcExclude: ['superpowers/**'],
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/' },

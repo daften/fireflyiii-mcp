@@ -1,0 +1,45 @@
+name: Back-merge main into develop
+
+# Keeps develop a superset of main. Runs on every push to main (security
+# releases, hotfixes, the chore(release) commit itself). Merge-commit, never
+# squash: shared history is what keeps subsequent back-merges conflict-free.
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: backmerge
+  cancel-in-progress: false
+
+jobs:
+  backmerge:
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      REPO: daften/fireflyiii-mcp
+    steps:
+      - name: Create or update back-merge PR, enable auto-merge
+        run: |
+          AHEAD=$(gh api "repos/${REPO}/compare/develop...main" --jq '.ahead_by')
+          if [ "$AHEAD" = "0" ]; then
+            echo "develop already contains main; nothing to do."
+            exit 0
+          fi
+          # An open main->develop PR tracks new pushes automatically; only
+          # create one if none exists.
+          NUMBER=$(gh pr list --repo "$REPO" --base develop --head main --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$NUMBER" ]; then
+            URL=$(gh pr create --repo "$REPO" --base develop --head main \
+              --title "chore: back-merge main into develop [skip changelog]" \
+              --body "Automated back-merge of released changes from \`main\` into \`develop\`.")
+            NUMBER="${URL##*/}"
+            echo "Opened back-merge PR #${NUMBER}"
+          else
+            echo "Reusing open back-merge PR #${NUMBER}"
+          fi
+          gh pr merge --auto --merge --repo "$REPO" "$NUMBER"
