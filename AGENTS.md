@@ -465,7 +465,7 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 - **`main`** — default branch, always releasable. Receives only: Dependabot security PRs (auto-merged), manual hotfix PRs, and promotion merges from `develop`. Never commit directly to `main`.
 - **`develop`** — integration branch. All feature PRs and routine dependency bumps target `develop`. The nightly npm/Docker channel builds from `develop`.
 - Promotion `develop` → `main` is a **merge-commit PR** (never squash). Feature PRs into `develop` are squash-merged as before.
-- After every push to `main`, `backmerge.yml` opens (or reuses) an auto-merged `main` → `develop` PR so `develop` stays a superset of `main`. If it conflicts, the PR stays open for manual resolution.
+- After every push to `main`, `backmerge.yml` opens (or reuses) an auto-merged `main` → `develop` PR so `develop` stays a superset of `main`. If it conflicts, the PR stays open for manual resolution. During active development this conflict is *routine*, not a malfunction: automated releases and feature PRs both edit the top of `CHANGELOG.md`. Resolve by keeping both sides — the released `## [X.Y.Z]` section and the remaining `[Unreleased]` entries.
 
 ### Automated security releases
 
