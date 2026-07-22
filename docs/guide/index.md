@@ -14,10 +14,17 @@
 |--------|-----------|----------|
 | [npm — stdio](./stdio) | stdio | Simplest. AI client and server on the same machine. |
 | [npm — HTTP/OAuth](./http-oauth) | HTTP + OAuth 2.0 | AI client connecting remotely, prefers OAuth over a PAT. |
+| [npm — HTTP/PAT](./http-pat) | HTTP + Bearer PAT | Headless callers — gateways, automation, no browser. |
 | [Docker — HTTP](./docker) | HTTP + OAuth 2.0 | Self-hosted on a home lab or server. |
 | [Git checkout](./git-checkout) | stdio or HTTP | Contributing or local development. |
 
-**Not sure which to pick?** Start with [npm — stdio](./stdio) — it's one config block and requires no server setup.
+**Not sure which to pick?** Answer one question: can the machine running your AI client reach Firefly III directly?
+
+- **Yes** → [npm — stdio](./stdio). One process, no server to host, no bridge.
+- **No, but you can host this server publicly** → [Docker — HTTP](./docker) with OAuth. The only option where no client device stores a long-lived token.
+- **No, and the server stays on your LAN/VPN** → host it over HTTP and bridge with `mcp-remote`.
+
+Using Claude Desktop? See [Claude Desktop](./claude-desktop) — its config file does **not** accept HTTP servers.
 
 ## Nightly builds
 

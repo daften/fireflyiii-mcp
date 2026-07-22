@@ -24,6 +24,7 @@ export default defineConfig({
             { text: 'npm + HTTP/PAT', link: '/guide/http-pat' },
             { text: 'Docker + HTTP', link: '/guide/docker' },
             { text: 'Git checkout', link: '/guide/git-checkout' },
+            { text: 'Claude Desktop', link: '/guide/claude-desktop' },
             { text: 'Nightly builds', link: '/guide/nightly' },
           ],
         },

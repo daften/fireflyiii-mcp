@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- RFC 9728 protected resource metadata at `/.well-known/oauth-protected-resource`, and a `resource_metadata` pointer on the `401` challenge, so MCP clients can discover the authorization server without a legacy fallback probe.
+- Claude Desktop setup guide covering stdio, custom connectors, and the `mcp-remote` bridge.
+- `MCP_ALLOWED_REDIRECT_PREFIXES` is now documented in the environment variable reference and `.env.example`.
+
 ### Changed
 - Split development onto a `develop` integration branch: feature PRs and routine dependency updates target `develop` (which feeds the nightly channel), while `main` stays always-releasable. Dependabot security fixes on `main` now auto-merge and ship as automated patch releases; the PR dependency audit is now relative to the base branch, with the strict audit moved to the nightly workflow.
+
+### Fixed
+- Claude custom connectors could not complete OAuth: the redirect URI allow-list rejected `https://claude.ai/api/mcp/auth_callback` unless an undocumented environment variable was set. Both `https://claude.ai/api/mcp/auth_callback` and the `claude.com` equivalent are now allowed by default, matched exactly on origin and path, ahead of Anthropic's claude.ai → claude.com domain migration. ([#43](https://github.com/daften/fireflyiii-mcp/issues/43))
+- `400 invalid_redirect_uri` responses now name `MCP_ALLOWED_REDIRECT_PREFIXES` so the override is discoverable.
 
 ## [0.3.4] - 2026-07-22
 

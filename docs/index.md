@@ -77,5 +77,8 @@ Your AI assistant downloads and starts the server automatically on first use. �
 |--------|-----------|----------|
 | [npm — stdio](/guide/stdio) | stdio | Simplest setup, AI on the same machine |
 | [npm — HTTP/OAuth](/guide/http-oauth) | HTTP + OAuth 2.0 | Remote AI access, OAuth instead of PAT |
+| [npm — HTTP/PAT](/guide/http-pat) | HTTP + Bearer PAT | Headless callers — gateways, automation, no browser |
 | [Docker — HTTP](/guide/docker) | HTTP + OAuth 2.0 | Self-hosted on a server or home lab |
 | [Git checkout](/guide/git-checkout) | stdio or HTTP | Contributing or local development |
+
+**Using Claude Desktop?** Its config file accepts stdio servers only — `{"type": "http", ...}` entries are silently dropped at startup. See [Claude Desktop](/guide/claude-desktop) for the three ways to connect it.

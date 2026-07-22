@@ -496,7 +496,9 @@ describe('createOAuthHandler — Bearer guard', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(401);
-    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="MCP server for Firefly III"');
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe(
+      'Bearer resource_metadata="http://127.0.0.1:3000/.well-known/oauth-protected-resource"',
+    );
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -714,7 +716,7 @@ describe('createOAuthHandler — PAT-only mode (no oauthClientId)', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(401);
-    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer resource="MCP server for Firefly III"');
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer');
     expect(mcpHandler).not.toHaveBeenCalled();
   });
 
@@ -932,6 +934,187 @@ describe('createOAuthHandler — redirect URI allow-list (P0-2)', () => {
     await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
 
     expect(res.statusCode).toBe(201);
+  });
+
+  it("accepts registration with Claude's hosted callback and no env var set", async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("accepts authorize with Claude's hosted callback and no env var set", async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq(
+      'GET',
+      `/oauth/authorize?redirect_uri=${encodeURIComponent('https://claude.ai/api/mcp/auth_callback')}&state=abc`,
+      { host: '127.0.0.1:3000' },
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(302);
+  });
+
+  it('rejects a redirect URI that merely starts with the Claude callback', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/auth_callbackEVIL'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("accepts registration with Claude's claude.com hosted callback and no env var set", async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.com/api/mcp/auth_callback'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("accepts authorize with Claude's claude.com hosted callback and no env var set", async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq(
+      'GET',
+      `/oauth/authorize?redirect_uri=${encodeURIComponent('https://claude.com/api/mcp/auth_callback')}&state=abc`,
+      { host: '127.0.0.1:3000' },
+    );
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(302);
+  });
+
+  it('accepts registration with both Claude hosted callbacks', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({
+      redirect_uris: ['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'],
+    });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('rejects a redirect URI that merely starts with the claude.com callback', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.com/api/mcp/auth_callbackEVIL'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('ignores query and fragment when matching the Claude callback', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://claude.ai/api/mcp/auth_callback?x=1'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('rejects a malformed redirect URI', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['not a valid uri'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('names MCP_ALLOWED_REDIRECT_PREFIXES in the rejection body', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const body = JSON.stringify({ redirect_uris: ['https://evil.example.com/steal'] });
+    const req = mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body);
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(400);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.error).toBe('invalid_redirect_uri');
+    expect(parsed.error_description).toContain('MCP_ALLOWED_REDIRECT_PREFIXES');
   });
 
   // Regression tests for the URL-userinfo bypass. The allow-list used to compare the
@@ -1434,5 +1617,128 @@ describe('startHttpServer — EADDRINUSE port-bump behaviour', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     // Should have only tried once since the port was explicit
     expect(mockTryListen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createOAuthHandler — protected resource metadata (RFC 9728)', () => {
+  afterEach(() => {
+    delete process.env.MCP_BASE_URL;
+  });
+
+  it('returns resource metadata JSON in OAuth mode', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(200);
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.resource).toBe('https://mcp.example.com');
+    expect(parsed.authorization_servers).toEqual(['https://mcp.example.com']);
+    expect(parsed.bearer_methods_supported).toEqual(['header']);
+    expect(mcpHandler).not.toHaveBeenCalled();
+  });
+
+  it('404s the resource metadata endpoint in PAT-only mode', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('strips a single trailing slash from MCP_BASE_URL in the resource value', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com/';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.resource).toBe('https://mcp.example.com');
+  });
+
+  it('strips multiple trailing slashes from MCP_BASE_URL in the resource value', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com//';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('GET', '/.well-known/oauth-protected-resource', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    const parsed = JSON.parse(res.body) as Record<string, unknown>;
+    expect(parsed.resource).toBe('https://mcp.example.com');
+  });
+});
+
+describe('createOAuthHandler — 401 challenge', () => {
+  afterEach(() => {
+    delete process.env.MCP_BASE_URL;
+  });
+
+  it('points at the resource metadata document in OAuth mode', async () => {
+    process.env.MCP_BASE_URL = 'https://mcp.example.com';
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe(
+      'Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"',
+    );
+  });
+
+  it('omits resource_metadata in PAT-only mode', async () => {
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      undefined,
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const req = mockReq('POST', '/', { host: '127.0.0.1:3000' });
+    const res = mockRes();
+
+    await handler(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer');
   });
 });

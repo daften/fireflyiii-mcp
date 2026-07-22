@@ -24,6 +24,16 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 // Note new URL('http://[::1]:3000/').hostname is '[::1]' WITH brackets in Node.
 const LOOPBACK_REDIRECT_HOSTNAMES = ['127.0.0.1', 'localhost', '[::1]'];
 
+// Claude's hosted surfaces (claude.ai web, Desktop, mobile, Cowork) all complete
+// OAuth against this callback. claude.ai is the URI Anthropic documents today;
+// claude.com is allowed ahead of Anthropic's domain migration. Each is matched
+// exactly on origin+pathname — a prefix match would also admit
+// https://claude.ai/api/mcp/auth_callbackEVIL.
+const CLAUDE_HOSTED_REDIRECT_URIS = [
+  'https://claude.ai/api/mcp/auth_callback',
+  'https://claude.com/api/mcp/auth_callback',
+];
+
 // Matching is done on components of the PARSED URL, never on the raw string. A raw
 // `uri.startsWith(...)` check is unsafe: URL userinfo lets the raw string lie about
 // the real host, e.g. 'http://127.0.0.1:@evil.example.com/steal' starts with
@@ -51,6 +61,7 @@ function isRedirectUriAllowed(uri: string): boolean {
   }
   if (parsed.username !== '' || parsed.password !== '') return false;
   if (parsed.protocol === 'http:' && LOOPBACK_REDIRECT_HOSTNAMES.includes(parsed.hostname)) return true;
+  if (CLAUDE_HOSTED_REDIRECT_URIS.includes(`${parsed.origin}${parsed.pathname}`)) return true;
   const extra = process.env.MCP_ALLOWED_REDIRECT_PREFIXES?.trim();
   if (!extra) return false;
   return extra
@@ -69,11 +80,27 @@ function isRedirectUriAllowed(uri: string): boolean {
     });
 }
 
+// Both /oauth/authorize and /oauth/register reject with the same shape. The error
+// code stays RFC-compliant; the description names the escape hatch so an operator
+// can act on it without reading the source.
+function rejectRedirectUri(res: http.ServerResponse): void {
+  res.writeHead(400, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      error: 'invalid_redirect_uri',
+      error_description:
+        "redirect_uri is not allowed. Loopback addresses and Claude's hosted callback are allowed by default; " +
+        'add any other prefix to MCP_ALLOWED_REDIRECT_PREFIXES (comma-separated).',
+    }),
+  );
+}
+
 // Mirrors the route matching used by the branches below — kept in sync so that
 // disabling OAuth (no client ID) cleanly 404s the same surface it would otherwise serve.
 function isOAuthProxyPath(url: string): boolean {
   return (
     url === '/.well-known/oauth-authorization-server' ||
+    url === '/.well-known/oauth-protected-resource' ||
     url.startsWith('/oauth/authorize') ||
     url === '/oauth/register' ||
     url === '/oauth/token' ||
@@ -107,7 +134,8 @@ export function createOAuthHandler(
     }
 
     const baseUrl =
-      (process.env.MCP_BASE_URL?.trim().replace(/\/$/, '') || null) ?? `http://${req.headers.host ?? '127.0.0.1:3000'}`;
+      (process.env.MCP_BASE_URL?.trim().replace(/\/+$/, '') || null) ??
+      `http://${req.headers.host ?? '127.0.0.1:3000'}`;
 
     // PAT-only mode (no FIREFLY_OAUTH_CLIENT_ID): the OAuth proxy surface isn't
     // backed by a real client, so report it as absent rather than serving a
@@ -120,6 +148,22 @@ export function createOAuthHandler(
           error_description: 'OAuth is not enabled on this server. Authenticate with a Bearer token instead.',
         }),
       );
+      return;
+    }
+
+    // RFC 9728 protected resource metadata — no auth required.
+    // Claude's connector flow starts here: it reads the 401 challenge, fetches this
+    // document to learn which authorization server guards the resource, then fetches
+    // that server's own metadata. `resource` must match the URL the user typed into
+    // Claude exactly, which is what makes MCP_BASE_URL load-bearing for connectors.
+    if (req.method === 'GET' && req.url === '/.well-known/oauth-protected-resource') {
+      const metadata = {
+        resource: baseUrl,
+        authorization_servers: [baseUrl],
+        bearer_methods_supported: ['header'],
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(metadata));
       return;
     }
 
@@ -149,8 +193,7 @@ export function createOAuthHandler(
       const incomingUrl = new URL(req.url, baseUrl);
       const clientRedirectUri = incomingUrl.searchParams.get('redirect_uri');
       if (clientRedirectUri && !isRedirectUriAllowed(clientRedirectUri)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+        rejectRedirectUri(res);
         return;
       }
       const state = incomingUrl.searchParams.get('state');
@@ -181,8 +224,7 @@ export function createOAuthHandler(
         // no body or invalid JSON — return empty redirect_uris
       }
       if (redirectUris.some((uri) => !isRedirectUriAllowed(uri))) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_redirect_uri', error_description: 'redirect_uri is not allowed' }));
+        rejectRedirectUri(res);
         return;
       }
       const registration = {
@@ -271,8 +313,14 @@ export function createOAuthHandler(
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) {
+      // RFC 9728 §5.1: the resource_metadata parameter is how a client discovers
+      // where to authenticate. PAT-only mode serves no metadata document, so it
+      // sends a bare challenge rather than pointing at a 404.
+      const challenge = oauthClientId
+        ? `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`
+        : 'Bearer';
       res.writeHead(401, {
-        'WWW-Authenticate': 'Bearer resource="MCP server for Firefly III"',
+        'WWW-Authenticate': challenge,
         'Content-Type': 'application/json',
       });
       res.end(JSON.stringify({ error: 'unauthorized', error_description: 'Bearer token required' }));
