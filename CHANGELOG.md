@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.4] - 2026-07-22
 
 ### Security
 - **Forced the transitive `@hono/node-server` dependency to ^2.0.5 via an npm override**, resolving [GHSA-frvp-7c67-39w9](https://github.com/advisories/GHSA-frvp-7c67-39w9) (medium severity), a path traversal in its `serve-static` module on Windows via encoded backslashes. The package comes in through `@modelcontextprotocol/sdk`, which pins `^1.19.9` — below the patched 2.0.5. This server was not exploitable: the SDK only uses `serve`/`getRequestListener`, never the vulnerable `serveStatic`, and the flaw is Windows-only. The override closes the alert until the SDK moves to 2.x upstream.
+- **Bumped transitive `fast-uri` from 3.1.2 to 3.1.4**, resolving two high-severity host-confusion vulnerabilities: [GHSA-4c8g-83qw-93j6](https://github.com/advisories/GHSA-4c8g-83qw-93j6) (failed IDN canonicalization) and [GHSA-v2hh-gcrm-f6hx](https://github.com/advisories/GHSA-v2hh-gcrm-f6hx) (literal backslash accepted as authority delimiter).
+- **Bumped transitive `hono` from 4.12.25 to 4.12.31**, resolving three medium-severity vulnerabilities fixed in 4.12.27: [GHSA-xgm2-5f3f-mvvc](https://github.com/advisories/GHSA-xgm2-5f3f-mvvc) (API Gateway v1 adapter can drop a distinct repeated request header value during de-duplication), [GHSA-w62v-xxxg-mg59](https://github.com/advisories/GHSA-w62v-xxxg-mg59) (server-side XSS via JSX escaping bypass in the `cx()` utility), and [GHSA-hvrm-45r6-mjfj](https://github.com/advisories/GHSA-hvrm-45r6-mjfj) (`hono/jsx` context not isolated per request, allowing cross-request data disclosure).
+- **Bumped transitive `body-parser` from 2.2.2 to 2.3.0**, resolving [GHSA-v422-hmwv-36x6](https://github.com/advisories/GHSA-v422-hmwv-36x6) (low severity), a denial of service where an invalid `limit` value silently disables request-size enforcement.
 
 ## [0.3.3] - 2026-07-21
 
@@ -107,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.0...v0.3.1
