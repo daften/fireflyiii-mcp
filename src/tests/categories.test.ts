@@ -158,8 +158,10 @@ describe('categories autocomplete completions', () => {
     registerCategoryTools(server, client);
 
     const prompt = promptConfigs.get('category-transactions');
-    const categoryField = (prompt as any).argsSchema?.category;
-    const complete = (categoryField as any)[Symbol.for('mcp.completable')].complete as (v: string) => Promise<string[]>;
+    const categoryField = (prompt as { argsSchema?: Record<string, unknown> }).argsSchema?.category;
+    const complete = (categoryField as Record<symbol, { complete: (v: string) => Promise<string[]> }>)[
+      Symbol.for('mcp.completable')
+    ].complete;
 
     vi.mocked(client.get).mockResolvedValueOnce(listFixture);
 
