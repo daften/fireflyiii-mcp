@@ -1,8 +1,11 @@
 name: Back-merge main into develop
 
 # Keeps develop a superset of main. Runs on every push to main (security
-# releases, hotfixes, the chore(release) commit itself). Merge-commit, never
-# squash: shared history is what keeps subsequent back-merges conflict-free.
+# releases, hotfixes, the release merge itself). Merges and pushes directly
+# when the merge is clean, and only opens a PR when it conflicts and needs a
+# human — a PR that is opened and merged two seconds later is pure noise.
+# Merge-commit, never squash: shared history is what keeps subsequent
+# back-merges conflict-free.
 
 on:
   push:
@@ -22,29 +25,64 @@ jobs:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       REPO: daften/fireflyiii-mcp
     steps:
-      - name: Create or update back-merge PR, enable auto-merge
+      # RELEASE_TOKEN, not GITHUB_TOKEN: a GITHUB_TOKEN push does not trigger
+      # downstream workflows, and develop's push CI should run on the result.
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+          persist-credentials: true
+
+      - name: Merge main into develop
+        id: merge
         run: |
-          AHEAD=$(gh api "repos/${REPO}/compare/develop...main" --jq '.ahead_by')
-          if [ "$AHEAD" = "0" ]; then
-            echo "develop already contains main; nothing to do."
-            exit 0
-          fi
-          # An open main->develop PR tracks new pushes automatically; only
-          # create one if none exists.
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          # Retried: the concurrency group serialises this workflow against
+          # itself, but not against a feature PR merging into develop between
+          # our fetch and our push. On rejection, re-merge onto the new tip.
+          for attempt in 1 2 3; do
+            git fetch --quiet origin main develop
+            git checkout --quiet -B develop origin/develop
+
+            if [ "$(git rev-list --count origin/develop..origin/main)" = "0" ]; then
+              echo "develop already contains main; nothing to do."
+              exit 0
+            fi
+
+            # --no-ff so the back-merge is always a merge commit, matching the
+            # repo-wide rule, even when develop could fast-forward.
+            if ! git merge --no-ff origin/main -m 'chore: back-merge main into develop'; then
+              git merge --abort || true
+              echo "conflict=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if git push origin develop; then
+              echo "Back-merged main into develop."
+              exit 0
+            fi
+            echo "Push rejected — develop moved. Retrying (attempt ${attempt}/3)."
+          done
+
+          echo "::error::back-merge could not be pushed after 3 attempts"
+          exit 1
+
+      # Only reached when the merge conflicts. Routine during active
+      # development: releases and feature PRs both edit the top of
+      # CHANGELOG.md. Resolve by keeping both sides.
+      - name: Open PR for manual conflict resolution
+        if: steps.merge.outputs.conflict == 'true'
+        run: |
           NUMBER=$(gh pr list --repo "$REPO" --base develop --head main --state open \
             --json number --jq '.[0].number // empty')
           if [ -z "$NUMBER" ]; then
             URL=$(gh pr create --repo "$REPO" --base develop --head main \
               --title "chore: back-merge main into develop [skip changelog]" \
-              --body "Automated back-merge of released changes from \`main\` into \`develop\`.")
+              --body "The automated back-merge of \`main\` into \`develop\` hit a conflict and needs manual resolution. Keep both sides: the released \`## [X.Y.Z]\` section and the remaining \`[Unreleased]\` entries.")
             NUMBER="${URL##*/}"
-            echo "Opened back-merge PR #${NUMBER}"
-          else
-            echo "Reusing open back-merge PR #${NUMBER}"
           fi
-          # Plain merge, not --auto: develop has no required status checks, and
-          # GitHub refuses to enable auto-merge on a PR with nothing left to
-          # wait for ("Pull request is in clean status"). Whether that fires is
-          # a race against the non-required checks still running, so --auto
-          # here fails intermittently. Nothing gates develop, so merge outright.
-          gh pr merge --merge --repo "$REPO" "$NUMBER"
+          echo "::error::back-merge conflicted; PR #${NUMBER} is open for manual resolution"
+          exit 1
