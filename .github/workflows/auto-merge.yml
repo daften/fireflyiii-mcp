@@ -28,6 +28,7 @@ jobs:
         uses: dependabot/fetch-metadata@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          alert-lookup: true
 
       # alert-state is non-empty only for PRs that fix a security advisory.
       # Merge commit, never squash: this repo keeps merge commits everywhere
