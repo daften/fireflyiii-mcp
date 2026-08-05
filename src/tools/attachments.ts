@@ -106,8 +106,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchAttachments(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchAttachments(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -121,7 +120,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchAttachment(client, id as string),
+    ({ id }) => fetchAttachment(client, id),
   );
 
   defineTool(
@@ -144,11 +143,11 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
     },
     ({ filename, attachable_type, attachable_id, title, notes }) =>
       createAttachment(client, {
-        filename: filename as string,
-        attachable_type: attachable_type as string,
-        attachable_id: attachable_id as string,
-        title: title as string | undefined,
-        notes: notes as string | undefined,
+        filename: filename,
+        attachable_type: attachable_type,
+        attachable_id: attachable_id,
+        title: title,
+        notes: notes,
       }),
   );
 
@@ -168,10 +167,10 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       annotations: UPDATE_ANNOTATIONS,
     },
     ({ id, filename, title, notes }) =>
-      updateAttachment(client, id as string, {
-        filename: filename as string | undefined,
-        title: title as string | undefined,
-        notes: notes as string | undefined,
+      updateAttachment(client, id, {
+        filename: filename,
+        title: title,
+        notes: notes,
       }),
   );
 
@@ -187,7 +186,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteAttachment(client, id as string),
+    ({ id }) => deleteAttachment(client, id),
   );
 
   defineTool(
@@ -203,7 +202,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    ({ id, content_base64 }) => uploadAttachment(client, id as string, Buffer.from(content_base64 as string, 'base64')),
+    ({ id, content_base64 }) => uploadAttachment(client, id, Buffer.from(content_base64, 'base64')),
   );
 
   defineContentTool(
@@ -218,6 +217,6 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       },
       annotations: READ_ANNOTATIONS,
     },
-    async ({ id }) => downloadAttachmentContent(await downloadAttachment(client, id as string)),
+    async ({ id }) => downloadAttachmentContent(await downloadAttachment(client, id)),
   );
 }

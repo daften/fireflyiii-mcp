@@ -437,7 +437,7 @@ defineTool(
     inputSchema: { id: z.string().describe('Account ID') },
     annotations: READ_ANNOTATIONS,
   },
-  ({ id }) => fetchAccount(client, id as string),
+  ({ id }) => fetchAccount(client, id), // args are typed from inputSchema — no casts needed
 );
 
 // src/tests/accounts.test.ts — use a JSON:API envelope fixture

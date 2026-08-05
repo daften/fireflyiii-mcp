@@ -84,8 +84,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchObjectGroups(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchObjectGroups(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -97,7 +96,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       inputSchema: { id: z.string().describe('Object group ID') },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchObjectGroup(client, id as string),
+    ({ id }) => fetchObjectGroup(client, id),
   );
 
   defineTool(
@@ -112,7 +111,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createObjectGroup(client, params as Parameters<typeof createObjectGroup>[1]),
+    (params) => createObjectGroup(client, params),
   );
 
   defineTool(
@@ -129,7 +128,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateObjectGroup(client, id as string, params as Parameters<typeof updateObjectGroup>[2]),
+    ({ id, ...params }) => updateObjectGroup(client, id, params),
   );
 
   defineTool(
@@ -142,7 +141,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       inputSchema: { id: z.string().describe('Object group ID') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteObjectGroup(client, id as string),
+    ({ id }) => deleteObjectGroup(client, id),
   );
 
   defineTool(
@@ -159,9 +158,9 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       annotations: READ_ANNOTATIONS,
     },
     ({ id, page, limit }) =>
-      fetchObjectGroupBills(client, id as string, {
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchObjectGroupBills(client, id, {
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -179,9 +178,9 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       annotations: READ_ANNOTATIONS,
     },
     ({ id, page, limit }) =>
-      fetchObjectGroupPiggyBanks(client, id as string, {
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchObjectGroupPiggyBanks(client, id, {
+        page: page,
+        limit: limit,
       }),
   );
 }

@@ -272,8 +272,10 @@ describe('budgets autocomplete completions', () => {
     registerBudgetTools(server, client);
 
     const prompt = promptConfigs.get('budget-transactions');
-    const budgetField = (prompt as any).argsSchema?.budget;
-    const complete = (budgetField as any)[Symbol.for('mcp.completable')].complete as (v: string) => Promise<string[]>;
+    const budgetField = (prompt as { argsSchema?: Record<string, unknown> }).argsSchema?.budget;
+    const complete = (budgetField as Record<symbol, { complete: (v: string) => Promise<string[]> }>)[
+      Symbol.for('mcp.completable')
+    ].complete;
 
     vi.mocked(client.get).mockResolvedValueOnce(listFixture);
 
