@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateOrDateTimeSchema, dateSchema, defineTool } from './_helpers.js';
+import { dateOrDateTimeSchema, dateSchema, decodeHtmlEntities, defineTool } from './_helpers.js';
 
 export async function fetchTransactions(
   client: FireflyClient,
@@ -62,7 +62,7 @@ export async function createTransaction(
   };
   if (params.source_id !== undefined) split.source_id = params.source_id;
   if (params.destination_id !== undefined) split.destination_id = params.destination_id;
-  if (params.category_name !== undefined) split.category_name = params.category_name;
+  if (params.category_name !== undefined) split.category_name = decodeHtmlEntities(params.category_name);
   if (params.budget_id !== undefined) split.budget_id = params.budget_id;
   if (params.currency_code !== undefined) split.currency_code = params.currency_code;
   if (params.notes !== undefined) split.notes = params.notes;
@@ -99,7 +99,7 @@ export async function updateTransaction(
   if (params.description !== undefined) split.description = params.description;
   if (params.source_id !== undefined) split.source_id = params.source_id;
   if (params.destination_id !== undefined) split.destination_id = params.destination_id;
-  if (params.category_name !== undefined) split.category_name = params.category_name;
+  if (params.category_name !== undefined) split.category_name = decodeHtmlEntities(params.category_name);
   if (params.budget_id !== undefined) split.budget_id = params.budget_id;
   if (params.currency_code !== undefined) split.currency_code = params.currency_code;
   if (params.notes !== undefined) split.notes = params.notes;
@@ -131,7 +131,7 @@ export async function bulkUpdateTransactions(
   params: { query: string; category_name?: string; budget_id?: string; tags?: string[]; notes?: string },
 ): Promise<unknown> {
   const update: Record<string, unknown> = {};
-  if (params.category_name !== undefined) update.category_name = params.category_name;
+  if (params.category_name !== undefined) update.category_name = decodeHtmlEntities(params.category_name);
   if (params.budget_id !== undefined) update.budget_id = params.budget_id;
   if (params.tags !== undefined) update.tags = params.tags;
   if (params.notes !== undefined) update.notes = params.notes;
@@ -169,7 +169,7 @@ export async function createSplitTransaction(
     if (params.source_id !== undefined) item.source_id = params.source_id;
     if (params.destination_id !== undefined) item.destination_id = params.destination_id;
     if (params.currency_code !== undefined) item.currency_code = params.currency_code;
-    if (split.category_name !== undefined) item.category_name = split.category_name;
+    if (split.category_name !== undefined) item.category_name = decodeHtmlEntities(split.category_name);
     if (split.budget_id !== undefined) item.budget_id = split.budget_id;
     if (split.tags !== undefined) item.tags = split.tags;
     if (split.notes !== undefined) item.notes = split.notes;
@@ -219,7 +219,8 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     {
       title: 'Get Transaction',
       description:
-        'Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs.',
+        'Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs. ' +
+        "The response's top-level `id` is the transaction GROUP id — pass that (not the `transaction_journal_id` nested inside each item of the `transactions` array) to update_transaction or delete_transaction. The two ids are different, usually adjacent numbers, and using the journal id instead of the group id silently edits or deletes a different transaction.",
       inputSchema: {
         id: z.string().describe('Transaction ID'),
       },
@@ -234,7 +235,8 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     {
       title: 'Create Transaction',
       description:
-        'Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs.',
+        'Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs. ' +
+        "The response's top-level `id` is the transaction GROUP id — that's what update_transaction/delete_transaction expect, NOT the `transaction_journal_id` nested inside `transactions[0]` of the same response (a different, usually adjacent, number).",
       inputSchema: {
         type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type'),
         date: dateOrDateTimeSchema.describe('Transaction date (YYYY-MM-DD or RFC 3339 date-time with timezone)'),
@@ -261,7 +263,11 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Update an existing transaction in Firefly III. Only fields provided will be changed. Use get_transaction to confirm the ID before updating.',
       inputSchema: {
-        id: z.string().describe('Transaction ID — use get_transactions to find valid IDs'),
+        id: z
+          .string()
+          .describe(
+            'Transaction GROUP ID — the top-level `id` from a create/get response, NOT the `transaction_journal_id` nested inside its `transactions` array (a different, usually adjacent, number). Passing the journal id silently updates a different transaction. Use get_transactions to find valid group IDs.',
+          ),
         type: z.enum(['withdrawal', 'deposit', 'transfer']).optional().describe('Transaction type'),
         date: dateOrDateTimeSchema
           .optional()
@@ -289,7 +295,11 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Permanently delete a transaction from Firefly III. **This action cannot be undone.** Use get_transaction to confirm the transaction before deleting.',
       inputSchema: {
-        id: z.string().describe('Transaction ID — use get_transactions to find valid IDs'),
+        id: z
+          .string()
+          .describe(
+            'Transaction GROUP ID — the top-level `id` from a create/get response, NOT the `transaction_journal_id` nested inside its `transactions` array (a different, usually adjacent, number). Passing the journal id silently deletes a different transaction. Use get_transactions to find valid group IDs.',
+          ),
       },
       annotations: DELETE_ANNOTATIONS,
     },

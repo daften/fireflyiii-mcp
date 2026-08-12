@@ -101,6 +101,21 @@ describe('createAccount', () => {
     const result = await createAccount(mockClient, { name: 'New Account', type: 'asset' });
     expect(result).toEqual({ name: 'New Account', type: 'asset', active: true, id: '10' });
   });
+  it('posts liability_type and liability_direction when type is liability', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    await createAccount(mockClient, {
+      name: 'Credit line',
+      type: 'liability',
+      liability_type: 'debt',
+      liability_direction: 'debit',
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/accounts', {
+      name: 'Credit line',
+      type: 'liability',
+      liability_type: 'debt',
+      liability_direction: 'debit',
+    });
+  });
 });
 
 describe('updateAccount', () => {
@@ -108,6 +123,14 @@ describe('updateAccount', () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(accountSingleFixture);
     await updateAccount(mockClient, '10', { name: 'Renamed' });
     expect(mockClient.put).toHaveBeenCalledWith('/accounts/10', { name: 'Renamed' });
+  });
+  it('puts liability_type and liability_direction when provided', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    await updateAccount(mockClient, '10', { liability_type: 'loan', liability_direction: 'debit' });
+    expect(mockClient.put).toHaveBeenCalledWith('/accounts/10', {
+      liability_type: 'loan',
+      liability_direction: 'debit',
+    });
   });
   it('returns unwrapped single', async () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(accountSingleFixture);

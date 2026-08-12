@@ -70,6 +70,27 @@ export function defineContentTool(
 
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD');
 
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+};
+
+/**
+ * Decodes the small set of HTML entities a name can pick up when copied from rendered HTML (e.g.
+ * "Restaurants &amp; cafés" pasted from a web page). Firefly matches category/tag names by exact
+ * string, so an un-decoded entity silently creates a duplicate ("Restaurants &amp; cafés") instead
+ * of matching the intended category — the mismatch is easy to miss since both names render
+ * identically in most UIs. Deliberately narrow: only the handful of entities realistic in a plain
+ * name, not a general HTML decoder.
+ */
+export function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(?:amp|lt|gt|quot|#39|apos);/g, (match) => HTML_ENTITY_MAP[match] ?? match);
+}
+
 const dateTimeSchema = z.iso.datetime({ offset: true });
 export const dateOrDateTimeSchema = z
   .string()

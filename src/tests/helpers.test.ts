@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, it, vi } from 'vitest';
 import { FireflyError } from '../client.js';
-import { dateOrDateTimeSchema, dateSchema, defineTool, parseId } from '../tools/_helpers.js';
+import { dateOrDateTimeSchema, dateSchema, decodeHtmlEntities, defineTool, parseId } from '../tools/_helpers.js';
 
 function makeServer() {
   let capturedHandler: ((args: Record<string, unknown>) => Promise<unknown>) | null = null;
@@ -111,5 +111,32 @@ describe('parseId', () => {
 
   it('falls back to input if no leading numeric ID is found', () => {
     expect(parseId('no-numbers')).toBe('no-numbers');
+  });
+});
+
+describe('decodeHtmlEntities', () => {
+  it('decodes an ampersand entity', () => {
+    expect(decodeHtmlEntities('Restaurants &amp; cafés')).toBe('Restaurants & cafés');
+  });
+
+  it('decodes multiple distinct entities in one string', () => {
+    expect(decodeHtmlEntities('&lt;Tom &amp; Jerry&gt;')).toBe('<Tom & Jerry>');
+  });
+
+  it('decodes quote and apostrophe entities', () => {
+    expect(decodeHtmlEntities('&quot;Mom&#39;s&quot; café')).toBe('"Mom\'s" café');
+    expect(decodeHtmlEntities('Mom&apos;s')).toBe("Mom's");
+  });
+
+  it('leaves plain text with a literal ampersand unchanged', () => {
+    expect(decodeHtmlEntities('Restaurants & cafés')).toBe('Restaurants & cafés');
+  });
+
+  it('leaves strings with no entities unchanged', () => {
+    expect(decodeHtmlEntities('Groceries')).toBe('Groceries');
+  });
+
+  it('ignores unsupported entities', () => {
+    expect(decodeHtmlEntities('Café &euro; menu')).toBe('Café &euro; menu');
   });
 });
