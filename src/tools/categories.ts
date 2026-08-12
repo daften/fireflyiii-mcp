@@ -18,6 +18,7 @@ import {
   createTtlCache,
   dateSchema,
   debugLog,
+  decodeHtmlEntities,
   defineTool,
   parseId,
 } from './_helpers.js';
@@ -46,7 +47,8 @@ export async function createCategory(
   client: FireflyClient,
   params: { name: string; notes?: string },
 ): Promise<UnwrappedSingle> {
-  const response = await client.post<JsonApiSingleResponse>('/categories', params);
+  const body = { ...params, name: decodeHtmlEntities(params.name) };
+  const response = await client.post<JsonApiSingleResponse>('/categories', body);
   return unwrapSingle(response);
 }
 
@@ -55,7 +57,8 @@ export async function updateCategory(
   id: string,
   params: { name?: string; notes?: string },
 ): Promise<UnwrappedSingle> {
-  const response = await client.put<JsonApiSingleResponse>(`/categories/${id}`, params);
+  const body = params.name !== undefined ? { ...params, name: decodeHtmlEntities(params.name) } : params;
+  const response = await client.put<JsonApiSingleResponse>(`/categories/${id}`, body);
   return unwrapSingle(response);
 }
 
