@@ -43,6 +43,8 @@ export async function createAccount(
     name: string;
     type: 'asset' | 'expense' | 'revenue' | 'liability';
     account_role?: 'defaultAsset' | 'sharedAsset' | 'savingAsset' | 'ccAsset' | 'cashWalletAsset';
+    liability_type?: 'loan' | 'debt' | 'mortgage';
+    liability_direction?: 'credit' | 'debit';
     currency_code?: string;
     iban?: string;
     opening_balance?: string;
@@ -67,6 +69,8 @@ export async function updateAccount(
     include_net_worth?: boolean;
     active?: boolean;
     notes?: string;
+    liability_type?: 'loan' | 'debt' | 'mortgage';
+    liability_direction?: 'credit' | 'debit';
   },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/accounts/${id}`, params);
@@ -183,6 +187,16 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
           .enum(['defaultAsset', 'sharedAsset', 'savingAsset', 'ccAsset', 'cashWalletAsset'])
           .optional()
           .describe('Role for asset accounts (required when type is asset)'),
+        liability_type: z
+          .enum(['loan', 'debt', 'mortgage'])
+          .optional()
+          .describe('Liability type (required when type is liability): loan, debt, or mortgage'),
+        liability_direction: z
+          .enum(['credit', 'debit'])
+          .optional()
+          .describe(
+            "Liability direction (required when type is liability): 'debit' if you owe this money, 'credit' if it is owed to you",
+          ),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         iban: z.string().optional().describe('IBAN number'),
         opening_balance: z.string().optional().describe('Opening balance as a number string'),
@@ -212,6 +226,16 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
         include_net_worth: z.boolean().optional().describe('Include in net worth calculations'),
         active: z.boolean().optional().describe('Whether the account is active'),
         notes: z.string().optional().describe('Notes'),
+        liability_type: z
+          .enum(['loan', 'debt', 'mortgage'])
+          .optional()
+          .describe('Liability type (required when type is liability): loan, debt, or mortgage'),
+        liability_direction: z
+          .enum(['credit', 'debit'])
+          .optional()
+          .describe(
+            "Liability direction (required when type is liability): 'debit' if you owe this money, 'credit' if it is owed to you",
+          ),
       },
       annotations: UPDATE_ANNOTATIONS,
     },
