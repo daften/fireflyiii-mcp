@@ -85,6 +85,12 @@ describe('createCategory', () => {
     const result = await createCategory(mockClient, { name: 'Groceries' });
     expect(result).toEqual({ name: 'Groceries', id: '8' });
   });
+
+  it('decodes HTML entities in the name before sending', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(categorySingleFixture);
+    await createCategory(mockClient, { name: 'Restaurants &amp; cafés' });
+    expect(mockClient.post).toHaveBeenCalledWith('/categories', { name: 'Restaurants & cafés' });
+  });
 });
 
 describe('updateCategory', () => {
@@ -92,6 +98,18 @@ describe('updateCategory', () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(categorySingleFixture);
     await updateCategory(mockClient, '8', { name: 'Food' });
     expect(mockClient.put).toHaveBeenCalledWith('/categories/8', { name: 'Food' });
+  });
+
+  it('decodes HTML entities in the name before sending', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(categorySingleFixture);
+    await updateCategory(mockClient, '8', { name: 'Restaurants &amp; cafés' });
+    expect(mockClient.put).toHaveBeenCalledWith('/categories/8', { name: 'Restaurants & cafés' });
+  });
+
+  it('does not touch notes-only updates', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(categorySingleFixture);
+    await updateCategory(mockClient, '8', { notes: 'no name change' });
+    expect(mockClient.put).toHaveBeenCalledWith('/categories/8', { notes: 'no name change' });
   });
 });
 

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `create_account` and `update_account` were missing `liability_type` and `liability_direction`, which the Firefly III API requires when `type` is `liability`. Creating or updating a debt/loan/mortgage account failed with a validation error and no way to supply the required fields. Both are now accepted as optional enums on both tools.
+- `category_name` on `create_transaction`, `update_transaction`, `create_split_transaction`, and `bulk_update_transactions`, and `name` on `create_category`/`update_category`, are now decoded for a small set of common HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`/`&apos;`) before being sent to Firefly. A name copied from rendered HTML (e.g. "Restaurants &amp; cafés") previously matched nothing by exact string and silently created a duplicate category instead of the intended one.
 
 ## [0.4.2] - 2026-08-04
 
