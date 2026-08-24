@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FireflyClient } from '../client.js';
-import { createAccount, deleteAccount, fetchAccount, fetchAccounts } from '../tools/accounts.js';
+import { createAccount, deleteAccount, fetchAccount, fetchAccounts, updateAccount } from '../tools/accounts.js';
 import { fetchBudgets } from '../tools/budgets.js';
 import { fetchCategories } from '../tools/categories.js';
 import { fetchCurrencies } from '../tools/currencies.js';
@@ -111,6 +111,68 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
       const result = await deleteAccount(client, accountId);
       expect(result.deleted).toBe(true);
       expect(result.id).toBe(accountId);
+    });
+  });
+
+  // ── Liability accounts ─────────────────────────────────────────────────────
+  // create_account and update_account expose different interest_period enums because Firefly III
+  // validates the two endpoints against different lists (see the constants in tools/accounts.ts).
+  // That split, and the liability_amount/liability_start_date pairing, are read off Firefly's
+  // validators rather than any published schema — these are the only assertions that notice if an
+  // upstream release moves them.
+
+  describe('liability accounts', () => {
+    let liabilityId: string;
+
+    afterAll(async () => {
+      if (liabilityId) await deleteAccount(client, liabilityId).catch(() => {});
+    });
+
+    it('can create a liability with its full set of terms', async () => {
+      const result = await createAccount(client, {
+        name: 'CI Test Mortgage',
+        type: 'liability',
+        liability_type: 'mortgage',
+        liability_direction: 'debit',
+        liability_amount: '250000.00',
+        liability_start_date: today,
+        interest: '3.15',
+        interest_period: 'half-year',
+        currency_code: 'EUR',
+      });
+      expect(result).toHaveProperty('id');
+      expect(result).not.toHaveProperty('attributes');
+      expect(result.liability_type).toBe('mortgage');
+      expect(result.liability_direction).toBe('debit');
+      expect(Number(result.interest)).toBeCloseTo(3.15);
+      expect(result.interest_period).toBe('half-year');
+      liabilityId = result.id as string;
+    });
+
+    it('rejects a liability start date sent without its amount', async () => {
+      await expect(
+        createAccount(client, {
+          name: 'CI Test Unpaired Liability',
+          type: 'liability',
+          liability_type: 'debt',
+          liability_direction: 'debit',
+          liability_start_date: today,
+        }),
+      ).rejects.toThrow(/liability_amount/);
+    });
+
+    it('can update the interest terms with a period the update endpoint accepts', async () => {
+      const result = await updateAccount(client, liabilityId, { interest: '4.5', interest_period: 'monthly' });
+      expect(Number(result.interest)).toBeCloseTo(4.5);
+      expect(result.interest_period).toBe('monthly');
+    });
+
+    it('rejects an interest period that only create_account accepts', async () => {
+      // 'quarterly' is in create_account's enum but not update_account's. The cast deliberately
+      // bypasses that split to confirm Firefly enforces it server-side, which is the whole reason
+      // the two tools cannot share one enum.
+      const outOfRange = { interest_period: 'quarterly' } as unknown as Parameters<typeof updateAccount>[2];
+      await expect(updateAccount(client, liabilityId, outOfRange)).rejects.toThrow(/interest_period/);
     });
   });
 
