@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateOrDateTimeSchema, dateSchema, decodeHtmlEntities, defineTool } from './_helpers.js';
+import { CATEGORY_NAME_HINT, dateOrDateTimeSchema, dateSchema, defineTool } from './_helpers.js';
 
 export async function fetchTransactions(
   client: FireflyClient,
@@ -62,7 +62,7 @@ export async function createTransaction(
   };
   if (params.source_id !== undefined) split.source_id = params.source_id;
   if (params.destination_id !== undefined) split.destination_id = params.destination_id;
-  if (params.category_name !== undefined) split.category_name = decodeHtmlEntities(params.category_name);
+  if (params.category_name !== undefined) split.category_name = params.category_name;
   if (params.budget_id !== undefined) split.budget_id = params.budget_id;
   if (params.currency_code !== undefined) split.currency_code = params.currency_code;
   if (params.notes !== undefined) split.notes = params.notes;
@@ -99,7 +99,7 @@ export async function updateTransaction(
   if (params.description !== undefined) split.description = params.description;
   if (params.source_id !== undefined) split.source_id = params.source_id;
   if (params.destination_id !== undefined) split.destination_id = params.destination_id;
-  if (params.category_name !== undefined) split.category_name = decodeHtmlEntities(params.category_name);
+  if (params.category_name !== undefined) split.category_name = params.category_name;
   if (params.budget_id !== undefined) split.budget_id = params.budget_id;
   if (params.currency_code !== undefined) split.currency_code = params.currency_code;
   if (params.notes !== undefined) split.notes = params.notes;
@@ -131,7 +131,7 @@ export async function bulkUpdateTransactions(
   params: { query: string; category_name?: string; budget_id?: string; tags?: string[]; notes?: string },
 ): Promise<unknown> {
   const update: Record<string, unknown> = {};
-  if (params.category_name !== undefined) update.category_name = decodeHtmlEntities(params.category_name);
+  if (params.category_name !== undefined) update.category_name = params.category_name;
   if (params.budget_id !== undefined) update.budget_id = params.budget_id;
   if (params.tags !== undefined) update.tags = params.tags;
   if (params.notes !== undefined) update.notes = params.notes;
@@ -169,7 +169,7 @@ export async function createSplitTransaction(
     if (params.source_id !== undefined) item.source_id = params.source_id;
     if (params.destination_id !== undefined) item.destination_id = params.destination_id;
     if (params.currency_code !== undefined) item.currency_code = params.currency_code;
-    if (split.category_name !== undefined) item.category_name = decodeHtmlEntities(split.category_name);
+    if (split.category_name !== undefined) item.category_name = split.category_name;
     if (split.budget_id !== undefined) item.budget_id = split.budget_id;
     if (split.tags !== undefined) item.tags = split.tags;
     if (split.notes !== undefined) item.notes = split.notes;
@@ -242,7 +242,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         description: z.string().describe('Short description of the transaction'),
         source_id: z.string().optional().describe('Source account ID (required for withdrawals and transfers)'),
         destination_id: z.string().optional().describe('Destination account ID (required for deposits and transfers)'),
-        category_name: z.string().optional().describe('Category name to assign'),
+        category_name: z.string().optional().describe(`Category name to assign. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD). Defaults to account currency.'),
         notes: z.string().optional().describe('Additional notes'),
@@ -270,7 +270,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         description: z.string().optional().describe('Short description'),
         source_id: z.string().optional().describe('Source account ID'),
         destination_id: z.string().optional().describe('Destination account ID'),
-        category_name: z.string().optional().describe('Category name'),
+        category_name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Budget ID'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         notes: z.string().optional().describe('Additional notes'),
@@ -339,7 +339,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
             z.object({
               amount: z.string().describe('Amount as a positive number string, e.g. "42.50"'),
               description: z.string().describe('Description for this split'),
-              category_name: z.string().optional().describe('Category name'),
+              category_name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
               budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
               tags: z.array(z.string()).optional().describe('Tags'),
               notes: z.string().optional().describe('Notes'),
@@ -362,7 +362,10 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         'Update multiple transactions at once using a search query (same syntax as search_transactions). All matching transactions will have the specified fields updated.',
       inputSchema: {
         query: z.string().describe('Search query to select transactions (same syntax as search_transactions)'),
-        category_name: z.string().optional().describe('Set category for all matched transactions'),
+        category_name: z
+          .string()
+          .optional()
+          .describe(`Set category for all matched transactions. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Set budget for all matched transactions'),
         tags: z.array(z.string()).optional().describe('Replace tags on all matched transactions'),
         notes: z.string().optional().describe('Set notes on all matched transactions'),

@@ -129,21 +129,6 @@ describe('createTransaction', () => {
     });
     expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
   });
-
-  it('decodes HTML entities in category_name before sending', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
-    await createTransaction(mockClient, {
-      type: 'withdrawal',
-      date: '2024-01-15',
-      amount: '42.50',
-      description: 'Dinner',
-      category_name: 'Restaurants &amp; cafés',
-    });
-    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
-      transactions: Array<{ category_name?: string }>;
-    };
-    expect(body.transactions[0].category_name).toBe('Restaurants & cafés');
-  });
 });
 
 describe('updateTransaction', () => {
@@ -164,15 +149,6 @@ describe('updateTransaction', () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
     const result = await updateTransaction(mockClient, '5', { amount: '50.00' });
     expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
-  });
-
-  it('decodes HTML entities in category_name before sending', async () => {
-    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
-    await updateTransaction(mockClient, '5', { category_name: 'Tom &amp; Jerry' });
-    const body = (mockClient.put as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
-      transactions: Array<{ category_name?: string }>;
-    };
-    expect(body.transactions[0].category_name).toBe('Tom & Jerry');
   });
 });
 
@@ -293,19 +269,6 @@ describe('createSplitTransaction', () => {
     expect(body.transactions[0]).not.toHaveProperty('destination_id');
     expect(body.transactions[0]).not.toHaveProperty('currency_code');
   });
-
-  it('decodes HTML entities in each split category_name before sending', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
-    await createSplitTransaction(mockClient, {
-      type: 'withdrawal',
-      date: '2026-05-01',
-      splits: [{ amount: '30.00', description: 'Dinner', category_name: 'Restaurants &amp; cafés' }],
-    });
-    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
-      transactions: Array<{ category_name?: string }>;
-    };
-    expect(body.transactions[0].category_name).toBe('Restaurants & cafés');
-  });
 });
 
 describe('bulkUpdateTransactions', () => {
@@ -315,18 +278,6 @@ describe('bulkUpdateTransactions', () => {
     expect(mockClient.post).toHaveBeenCalledWith('/data/bulk/transactions', undefined, {
       query: JSON.stringify({ where: 'description:coffee', update: { category_name: 'Food', budget_id: '3' } }),
     });
-  });
-
-  it('decodes HTML entities in category_name before sending', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
-    await bulkUpdateTransactions(mockClient, { query: 'description:coffee', category_name: 'Restaurants &amp; cafés' });
-    const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0] as [
-      string,
-      unknown,
-      Record<string, string>,
-    ];
-    const sentQuery = JSON.parse(call[2].query) as { update: Record<string, unknown> };
-    expect(sentQuery.update.category_name).toBe('Restaurants & cafés');
   });
 
   it('omits undefined update fields from the JSON query', async () => {
@@ -358,5 +309,17 @@ describe('handler smoke — transactions', () => {
     registerTransactionTools(server, client);
     const result = await handlers.get('get_transactions')!({});
     expect(result).toMatchObject({ isError: true });
+  });
+});
+
+describe('category_name guidance', () => {
+  it('warns on every category_name field that Firefly stores the string verbatim', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerTransactionTools(server, {} as FireflyClient);
+    for (const tool of ['create_transaction', 'update_transaction', 'bulk_update_transactions']) {
+      expect(toolConfigs.get(tool).inputSchema.category_name.description).toContain('&amp;');
+    }
+    const splitShape = toolConfigs.get('create_split_transaction').inputSchema.splits.element.shape;
+    expect(splitShape.category_name.description).toContain('&amp;');
   });
 });

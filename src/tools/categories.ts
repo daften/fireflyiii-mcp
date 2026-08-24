@@ -15,10 +15,10 @@ import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTAT
 import {
   AUTOCOMPLETE_FETCH_LIMIT,
   AUTOCOMPLETE_MAX_SUGGESTIONS,
+  CATEGORY_NAME_HINT,
   createTtlCache,
   dateSchema,
   debugLog,
-  decodeHtmlEntities,
   defineTool,
   parseId,
 } from './_helpers.js';
@@ -47,8 +47,7 @@ export async function createCategory(
   client: FireflyClient,
   params: { name: string; notes?: string },
 ): Promise<UnwrappedSingle> {
-  const body = { ...params, name: decodeHtmlEntities(params.name) };
-  const response = await client.post<JsonApiSingleResponse>('/categories', body);
+  const response = await client.post<JsonApiSingleResponse>('/categories', params);
   return unwrapSingle(response);
 }
 
@@ -57,8 +56,7 @@ export async function updateCategory(
   id: string,
   params: { name?: string; notes?: string },
 ): Promise<UnwrappedSingle> {
-  const body = params.name !== undefined ? { ...params, name: decodeHtmlEntities(params.name) } : params;
-  const response = await client.put<JsonApiSingleResponse>(`/categories/${id}`, body);
+  const response = await client.put<JsonApiSingleResponse>(`/categories/${id}`, params);
   return unwrapSingle(response);
 }
 
@@ -146,7 +144,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       title: 'Create Category',
       description: 'Create a new spending category in Firefly III.',
       inputSchema: {
-        name: z.string().describe('Category name'),
+        name: z.string().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         notes: z.string().optional().describe('Notes'),
       },
       annotations: WRITE_ANNOTATIONS,
@@ -163,7 +161,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
         'Update an existing category in Firefly III. Only fields provided will be changed. Use get_categories to find valid category IDs.',
       inputSchema: {
         id: categoryIdSchema,
-        name: z.string().optional().describe('Category name'),
+        name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         notes: z.string().optional().describe('Notes'),
       },
       annotations: UPDATE_ANNOTATIONS,
