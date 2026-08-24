@@ -13,6 +13,17 @@ import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
 import { dateOrDateTimeSchema, dateSchema, defineTool } from './_helpers.js';
 
+// A transaction response carries two ids: the top-level group `id`, which update_transaction and
+// delete_transaction expect, and a `transaction_journal_id` inside each item of `transactions[]`.
+// They are usually adjacent numbers, so the wrong one addresses a real but unrelated transaction
+// rather than erroring — nothing at write time can tell the two apart, which is why these fields
+// warn instead of validating.
+const GROUP_ID_HINT =
+  'update_transaction and delete_transaction take the top-level `id` (the transaction group), not the `transaction_journal_id` inside `transactions[]`.';
+
+const groupIdField = (verb: string): string =>
+  `Transaction group ID — the top-level \`id\` from get_transaction, not the \`transaction_journal_id\` inside \`transactions[]\`. That is usually an adjacent number, so the wrong one silently ${verb} a different transaction.`;
+
 export async function fetchTransactions(
   client: FireflyClient,
   params: {
@@ -218,9 +229,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     'get_transaction',
     {
       title: 'Get Transaction',
-      description:
-        'Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs. ' +
-        "The response's top-level `id` is the transaction GROUP id — pass that (not the `transaction_journal_id` nested inside each item of the `transactions` array) to update_transaction or delete_transaction. The two ids are different, usually adjacent numbers, and using the journal id instead of the group id silently edits or deletes a different transaction.",
+      description: `Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs. ${GROUP_ID_HINT}`,
       inputSchema: {
         id: z.string().describe('Transaction ID'),
       },
@@ -234,9 +243,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     'create_transaction',
     {
       title: 'Create Transaction',
-      description:
-        'Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs. ' +
-        "The response's top-level `id` is the transaction GROUP id — that's what update_transaction/delete_transaction expect, NOT the `transaction_journal_id` nested inside `transactions[0]` of the same response (a different, usually adjacent, number).",
+      description: `Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs. ${GROUP_ID_HINT}`,
       inputSchema: {
         type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type'),
         date: dateOrDateTimeSchema.describe('Transaction date (YYYY-MM-DD or RFC 3339 date-time with timezone)'),
@@ -263,11 +270,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Update an existing transaction in Firefly III. Only fields provided will be changed. Use get_transaction to confirm the ID before updating.',
       inputSchema: {
-        id: z
-          .string()
-          .describe(
-            'Transaction GROUP ID — the top-level `id` from a create/get response, NOT the `transaction_journal_id` nested inside its `transactions` array (a different, usually adjacent, number). Passing the journal id silently updates a different transaction. Use get_transactions to find valid group IDs.',
-          ),
+        id: z.string().describe(groupIdField('updates')),
         type: z.enum(['withdrawal', 'deposit', 'transfer']).optional().describe('Transaction type'),
         date: dateOrDateTimeSchema
           .optional()
@@ -295,11 +298,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Permanently delete a transaction from Firefly III. **This action cannot be undone.** Use get_transaction to confirm the transaction before deleting.',
       inputSchema: {
-        id: z
-          .string()
-          .describe(
-            'Transaction GROUP ID — the top-level `id` from a create/get response, NOT the `transaction_journal_id` nested inside its `transactions` array (a different, usually adjacent, number). Passing the journal id silently deletes a different transaction. Use get_transactions to find valid group IDs.',
-          ),
+        id: z.string().describe(groupIdField('deletes')),
       },
       annotations: DELETE_ANNOTATIONS,
     },
