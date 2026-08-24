@@ -311,3 +311,15 @@ describe('handler smoke — transactions', () => {
     expect(result).toMatchObject({ isError: true });
   });
 });
+
+describe('category_name guidance', () => {
+  it('warns on every category_name field that Firefly stores the string verbatim', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerTransactionTools(server, {} as FireflyClient);
+    for (const tool of ['create_transaction', 'update_transaction', 'bulk_update_transactions']) {
+      expect(toolConfigs.get(tool).inputSchema.category_name.description).toContain('&amp;');
+    }
+    const splitShape = toolConfigs.get('create_split_transaction').inputSchema.splits.element.shape;
+    expect(splitShape.category_name.description).toContain('&amp;');
+  });
+});
