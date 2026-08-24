@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { z } from 'zod';
 import type { FireflyClient } from '../client.js';
 import {
   clearAccountsCache,
@@ -116,6 +117,29 @@ describe('createAccount', () => {
       liability_direction: 'debit',
     });
   });
+  it('posts the liability amount, start date and interest terms', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    await createAccount(mockClient, {
+      name: 'Mortgage',
+      type: 'liability',
+      liability_type: 'mortgage',
+      liability_direction: 'debit',
+      liability_amount: '250000.00',
+      liability_start_date: '2026-01-01',
+      interest: '3.15',
+      interest_period: 'half-year',
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/accounts', {
+      name: 'Mortgage',
+      type: 'liability',
+      liability_type: 'mortgage',
+      liability_direction: 'debit',
+      liability_amount: '250000.00',
+      liability_start_date: '2026-01-01',
+      interest: '3.15',
+      interest_period: 'half-year',
+    });
+  });
 });
 
 describe('updateAccount', () => {
@@ -130,6 +154,21 @@ describe('updateAccount', () => {
     expect(mockClient.put).toHaveBeenCalledWith('/accounts/10', {
       liability_type: 'loan',
       liability_direction: 'debit',
+    });
+  });
+  it('puts the liability amount, start date and interest terms when provided', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(accountSingleFixture);
+    await updateAccount(mockClient, '10', {
+      liability_amount: '18000.00',
+      liability_start_date: '2026-03-01',
+      interest: '4.5',
+      interest_period: 'monthly',
+    });
+    expect(mockClient.put).toHaveBeenCalledWith('/accounts/10', {
+      liability_amount: '18000.00',
+      liability_start_date: '2026-03-01',
+      interest: '4.5',
+      interest_period: 'monthly',
     });
   });
   it('returns unwrapped single', async () => {
@@ -191,6 +230,34 @@ describe('searchAccounts', () => {
       page: 1,
       limit: 50,
     });
+  });
+});
+
+describe('liability input schemas', () => {
+  function schemaFor(tool: string): Record<string, z.ZodTypeAny> {
+    const { server, toolConfigs } = createMockServer();
+    registerAccountTools(server, {} as FireflyClient);
+    return toolConfigs.get(tool).inputSchema;
+  }
+
+  // Firefly III validates interest_period against config('firefly.interest_periods') on store but
+  // against a hardcoded `in:daily,monthly,yearly` on update, so the two tools must not offer the
+  // same options — update_account would otherwise advertise values the API rejects.
+  it('offers every Firefly interest period on create and only the three update accepts', () => {
+    const create = schemaFor('create_account').interest_period as z.ZodEnum<any>;
+    const update = schemaFor('update_account').interest_period as z.ZodEnum<any>;
+    expect(create.unwrap().options).toEqual(['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly']);
+    expect(update.unwrap().options).toEqual(['daily', 'monthly', 'yearly']);
+  });
+
+  // update_account has no `type` field at all, so "required when type is liability" describes a
+  // condition the tool can never meet and only misleads a caller into supplying nothing.
+  it('does not describe update_account liability fields as conditional on a type field', () => {
+    const update = schemaFor('update_account');
+    for (const field of ['liability_type', 'liability_direction', 'liability_amount', 'interest_period']) {
+      expect(update[field].description).not.toMatch(/type is liability/);
+      expect(update[field].description).toMatch(/liability accounts/);
+    }
   });
 });
 

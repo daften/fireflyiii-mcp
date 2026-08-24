@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `create_account` and `update_account` now also accept the rest of Firefly III's liability terms: `liability_amount`, `liability_start_date`, `interest`, and `interest_period`. Without them a liability could be created but not given the balance and interest terms that make it useful, and there was no way to correct them afterwards. `interest_period` deliberately offers six periods on create and only `daily`/`monthly`/`yearly` on update, because Firefly III validates the two endpoints against different lists.
+
+### Fixed
+- `create_account` and `update_account` were missing `liability_type` and `liability_direction`, which the Firefly III API requires when `type` is `liability`. Creating or updating a debt/loan/mortgage account failed with a validation error and no way to supply the required fields. Both are now accepted as optional enums on both tools. _Contributed by [@lesha198a](https://github.com/lesha198a) in [#77](https://github.com/daften/fireflyiii-mcp/pull/77)._
+- `update_account` described its liability fields as "required when type is liability", a condition it can never meet — the tool has no `type` field and never sends one. They now read "Only applies to liability accounts", so a model does not skip them expecting a `type` to trigger them.
+
 ### Changed
 - Releases are now cut on a short-lived `release/X.Y.Z` branch that reaches `main` as a single PR, instead of a promotion merge followed by a separate release commit on `main`. Since `backmerge.yml` runs on every push to `main`, the old shape back-merged twice per release; this shape does it once, puts the release commit through CI, and leaves `auto-release.yml` as the only thing committing directly to `main`. `backmerge.yml` itself now merges and pushes to `develop` directly, opening a PR only when the merge conflicts and needs manual resolution.
 - `CHANGELOG.md` now has a `merge=union` driver (`.gitattributes`), so `develop`'s pending `[Unreleased]` entries and `main`'s freshly-cut dated release sections no longer conflict on every back-merge — git keeps both sides automatically instead of failing.
-### Fixed
-- `create_account` and `update_account` were missing `liability_type` and `liability_direction`, which the Firefly III API requires when `type` is `liability`. Creating or updating a debt/loan/mortgage account failed with a validation error and no way to supply the required fields. Both are now accepted as optional enums on both tools.
 
 ## [0.4.2] - 2026-08-04
 

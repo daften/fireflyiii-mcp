@@ -37,6 +37,12 @@ export async function fetchAccount(client: FireflyClient, id: string): Promise<U
   return unwrapSingle(response);
 }
 
+// Firefly III validates interest_period against config('firefly.interest_periods') when an account is
+// created, but against a hardcoded `in:daily,monthly,yearly` rule when one is updated. Mirroring that
+// split keeps update_account from advertising four periods the API will reject.
+const CREATE_INTEREST_PERIODS = ['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly'] as const;
+const UPDATE_INTEREST_PERIODS = ['daily', 'monthly', 'yearly'] as const;
+
 export async function createAccount(
   client: FireflyClient,
   params: {
@@ -45,6 +51,10 @@ export async function createAccount(
     account_role?: 'defaultAsset' | 'sharedAsset' | 'savingAsset' | 'ccAsset' | 'cashWalletAsset';
     liability_type?: 'loan' | 'debt' | 'mortgage';
     liability_direction?: 'credit' | 'debit';
+    liability_amount?: string;
+    liability_start_date?: string;
+    interest?: string;
+    interest_period?: (typeof CREATE_INTEREST_PERIODS)[number];
     currency_code?: string;
     iban?: string;
     opening_balance?: string;
@@ -71,6 +81,10 @@ export async function updateAccount(
     notes?: string;
     liability_type?: 'loan' | 'debt' | 'mortgage';
     liability_direction?: 'credit' | 'debit';
+    liability_amount?: string;
+    liability_start_date?: string;
+    interest?: string;
+    interest_period?: (typeof UPDATE_INTEREST_PERIODS)[number];
   },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/accounts/${id}`, params);
@@ -197,6 +211,25 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
           .describe(
             "Liability direction (required when type is liability): 'debit' if you owe this money, 'credit' if it is owed to you",
           ),
+        liability_amount: z
+          .string()
+          .optional()
+          .describe(
+            'Amount of the liability as a number string, for liability accounts. Must be sent together with liability_start_date.',
+          ),
+        liability_start_date: dateSchema
+          .optional()
+          .describe(
+            'Date the liability started (YYYY-MM-DD), for liability accounts. Must be sent together with liability_amount.',
+          ),
+        interest: z
+          .string()
+          .optional()
+          .describe('Interest percentage as a number string between 0 and 100 (e.g. "3.15"), for liability accounts'),
+        interest_period: z
+          .enum(CREATE_INTEREST_PERIODS)
+          .optional()
+          .describe('Period the interest percentage applies to, for liability accounts'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         iban: z.string().optional().describe('IBAN number'),
         opening_balance: z.string().optional().describe('Opening balance as a number string'),
@@ -229,12 +262,33 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
         liability_type: z
           .enum(['loan', 'debt', 'mortgage'])
           .optional()
-          .describe('Liability type (required when type is liability): loan, debt, or mortgage'),
+          .describe('Only applies to liability accounts: loan, debt, or mortgage'),
         liability_direction: z
           .enum(['credit', 'debit'])
           .optional()
+          .describe("Only applies to liability accounts: 'debit' if you owe this money, 'credit' if it is owed to you"),
+        liability_amount: z
+          .string()
+          .optional()
           .describe(
-            "Liability direction (required when type is liability): 'debit' if you owe this money, 'credit' if it is owed to you",
+            'Only applies to liability accounts: amount of the liability as a number string. Must be sent together with liability_start_date.',
+          ),
+        liability_start_date: dateSchema
+          .optional()
+          .describe(
+            'Only applies to liability accounts: date the liability started (YYYY-MM-DD). Must be sent together with liability_amount.',
+          ),
+        interest: z
+          .string()
+          .optional()
+          .describe(
+            'Only applies to liability accounts: interest percentage as a number string between 0 and 100 (e.g. "3.15")',
+          ),
+        interest_period: z
+          .enum(UPDATE_INTEREST_PERIODS)
+          .optional()
+          .describe(
+            'Only applies to liability accounts: period the interest percentage applies to. Firefly III accepts fewer periods here than on create_account.',
           ),
       },
       annotations: UPDATE_ANNOTATIONS,
