@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-09-03
+
+### Security
+
+- chore(deps): Bump fast-uri from 3.1.5 to 3.1.7 in the security-fixes group across 1 directory (automated security release)
+
 ## [0.4.2] - 2026-08-04
 
 ### Security
@@ -144,7 +150,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.3.4...v0.4.0
