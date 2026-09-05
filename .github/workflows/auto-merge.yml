@@ -9,7 +9,8 @@ name: Auto-merge security PRs
 # RELEASE_TOKEN must be provisioned as a *Dependabot* secret in addition to
 # the Actions secret: pull_request runs triggered by dependabot[bot] receive
 # only the Dependabot secret store (repository Actions secrets resolve
-# empty there, by GitHub design).
+# empty there, by GitHub design). It also needs "Dependabot alerts: Read
+# only" — see the metadata step below.
 
 on: pull_request
 
@@ -23,12 +24,29 @@ jobs:
       contents: read
       pull-requests: read
     steps:
+      # alert-lookup requires a PAT or App token with "Dependabot alerts:
+      # Read only" — the default GITHUB_TOKEN cannot read the alerts API and
+      # the action reports that by returning *empty* outputs, not by failing.
+      # Passing GITHUB_TOKEN here left alert-state blank on every run, which
+      # is indistinguishable from "not a security PR", so the merge step
+      # below was silently skipped while the job still reported success.
       - name: Fetch Dependabot metadata
         id: meta
         uses: dependabot/fetch-metadata@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           alert-lookup: true
+
+      # Fail loudly if the lookup came back empty on a PR Dependabot itself
+      # grouped as a security update: that combination means the token lost
+      # its alert-read scope (or expired), not that there is no advisory.
+      # Without this guard the regression looks exactly like a passing check.
+      - name: Verify alert lookup succeeded
+        if: steps.meta.outputs.dependency-group == 'security-fixes' && steps.meta.outputs.alert-state == ''
+        run: |
+          echo "::error::Dependabot metadata returned an empty alert-state for a security-fixes PR." \
+               "RELEASE_TOKEN is most likely missing the 'Dependabot alerts: Read only' permission or has expired."
+          exit 1
 
       # alert-state is non-empty only for PRs that fix a security advisory.
       # Merge commit, never squash: this repo keeps merge commits everywhere
