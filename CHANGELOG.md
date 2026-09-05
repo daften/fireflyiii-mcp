@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Releases are now cut on a short-lived `release/X.Y.Z` branch that reaches `main` as a single PR, instead of a promotion merge followed by a separate release commit on `main`. Since `backmerge.yml` runs on every push to `main`, the old shape back-merged twice per release; this shape does it once, puts the release commit through CI, and leaves `auto-release.yml` as the only thing committing directly to `main`. `backmerge.yml` itself now merges and pushes to `develop` directly, opening a PR only when the merge conflicts and needs manual resolution.
 - `CHANGELOG.md` now has a `merge=union` driver (`.gitattributes`), so `develop`'s pending `[Unreleased]` entries and `main`'s freshly-cut dated release sections no longer conflict on every back-merge — git keeps both sides automatically instead of failing.
+## [0.4.4] - 2026-09-05
+
+### Security
+
+- chore(deps): Bump qs from 6.15.2 to 6.16.0 in the security-fixes group across 1 directory (automated security release)
+
 ### Fixed
 - `auto-merge.yml` still never enabled auto-merge on Dependabot security PRs. `alert-lookup` was being passed the default `GITHUB_TOKEN`, which cannot read the Dependabot alerts API; `dependabot/fetch-metadata` reports that by returning an empty `alert-state` instead of failing, so the merge step's guard stayed false while the job reported success. The metadata step now uses the `RELEASE_TOKEN` PAT (which needs `Dependabot alerts: Read only`), and a new guard step fails the job outright when a `security-fixes`-group PR produces no `alert-state`, so an expired or under-scoped token can no longer masquerade as a passing check. ([#86](https://github.com/daften/fireflyiii-mcp/pull/86))
 
@@ -156,7 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.0...v0.4.1
