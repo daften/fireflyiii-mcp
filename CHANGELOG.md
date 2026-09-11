@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Releases are now cut on a short-lived `release/X.Y.Z` branch that reaches `main` as a single PR, instead of a promotion merge followed by a separate release commit on `main`. Since `backmerge.yml` runs on every push to `main`, the old shape back-merged twice per release; this shape does it once, puts the release commit through CI, and leaves `auto-release.yml` as the only thing committing directly to `main`. `backmerge.yml` itself now merges and pushes to `develop` directly, opening a PR only when the merge conflicts and needs manual resolution.
 - `CHANGELOG.md` now has a `merge=union` driver (`.gitattributes`), so `develop`'s pending `[Unreleased]` entries and `main`'s freshly-cut dated release sections no longer conflict on every back-merge — git keeps both sides automatically instead of failing.
+## [0.4.6] - 2026-09-11
+
+### Security
+
+- chore(deps): update Vitest to patched 4.1.11 and fix CI install retries (automated security release)
+
+### Security
+
+- Update Vitest and its coverage plugin to 4.1.11 to pick up the patched mocker while retaining Node 20 support.
+
+### Fixed
+
+- Fail CI and nightly dependency installation when all retries fail, instead of continuing without the required tools.
+
+## [0.4.5] - 2026-09-11
+
+### Security
+
+- chore(deps): Bump hono from 4.13.0 to 4.13.7 in the security-fixes group across 1 directory (automated security release)
+
 ## [0.4.4] - 2026-09-05
 
 ### Security
@@ -162,7 +182,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.5...v0.4.6
+[0.4.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.1...v0.4.2

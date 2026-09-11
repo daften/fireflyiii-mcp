@@ -1,6 +1,6 @@
 {
   "name": "@daften/fireflyiii-mcp",
-  "version": "0.4.4",
+  "version": "0.4.6",
   "description": "MCP server for Firefly III personal finance manager",
   "type": "module",
   "bin": {
@@ -58,18 +58,18 @@
   "overrides": {
     "@hono/node-server": "^2.0.5",
     "esbuild": "^0.28.1",
-    "hono": "^4.13.0"
+    "hono": "^4.13.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.11",
     "@types/node": "^26.0.0",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.11",
     "dotenv-cli": "^11.0.0",
     "simple-git-hooks": "^2.13.1",
     "tsx": "^4.22.3",
     "typescript": "^7.0.2",
     "vitepress": "2.0.0-alpha.19",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=20"
