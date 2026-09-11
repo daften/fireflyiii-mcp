@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Update Vitest and its coverage plugin to 4.1.11 to pick up the patched mocker while retaining Node 20 support.
+
+### Fixed
+
+- Fail CI and nightly dependency installation when all retries fail, instead of continuing without the required tools.
+
 ## [0.4.5] - 2026-09-11
 
 ### Security

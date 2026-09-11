@@ -22,7 +22,16 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: for i in 1 2 3; do npm ci && break || sleep 5; done
+        run: |
+          for attempt in 1 2 3; do
+            if npm ci; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Start Firefly III
         run: docker compose -f docker-compose.ci.yml up -d
