@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-09-11
+
+### Security
+
+- chore(deps): Bump hono from 4.13.0 to 4.13.7 in the security-fixes group across 1 directory (automated security release)
+
 ## [0.4.4] - 2026-09-05
 
 ### Security
@@ -159,7 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.1...v0.4.2
