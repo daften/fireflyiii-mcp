@@ -72,6 +72,9 @@ jobs:
 
       - run: npx tsc --noEmit
 
+      - name: Test automation scripts
+        run: node --test tests/automation/*.node-test.mjs
+
       - name: Test (with coverage on Node 22)
         run: |
           if [ "${{ matrix.node-version }}" = "22" ]; then
