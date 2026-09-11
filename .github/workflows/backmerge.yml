@@ -10,6 +10,7 @@ name: Back-merge main into develop
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -55,7 +56,11 @@ jobs:
             # --no-ff so the back-merge is always a merge commit, matching the
             # repo-wide rule, even when develop could fast-forward.
             if ! git merge --no-ff origin/main -m 'chore: back-merge main into develop'; then
-              git merge --abort || true
+              if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
+                echo "::error::git merge failed without unmerged files; inspect the Git error above."
+                exit 1
+              fi
+              git merge --abort
               echo "conflict=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
@@ -64,7 +69,13 @@ jobs:
               echo "Back-merged main into develop."
               exit 0
             fi
-            echo "Push rejected — develop moved. Retrying (attempt ${attempt}/3)."
+            PREVIOUS_TIP=$(git rev-parse origin/develop)
+            git fetch --quiet origin develop
+            if [ "$PREVIOUS_TIP" = "$(git rev-parse origin/develop)" ]; then
+              echo "::error::Push failed but develop has not moved; check token permissions, branch rules, and network errors above."
+              exit 1
+            fi
+            echo "develop moved. Retrying (attempt ${attempt}/3)."
           done
 
           echo "::error::back-merge could not be pushed after 3 attempts"

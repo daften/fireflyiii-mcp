@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Match Dependabot security alerts using both bare and equals-prefixed versions, check all grouped dependencies and alert pages, and distinguish API failures from unmatched advisories.
+- Distinguish back-merge conflicts from other Git failures and retry rejected pushes only when `develop` actually moved. Allow manually retrying the back-merge workflow.
+
 ### Changed
 - Releases are now cut on a short-lived `release/X.Y.Z` branch that reaches `main` as a single PR, instead of a promotion merge followed by a separate release commit on `main`. Since `backmerge.yml` runs on every push to `main`, the old shape back-merged twice per release; this shape does it once, puts the release commit through CI, and leaves `auto-release.yml` as the only thing committing directly to `main`. `backmerge.yml` itself now merges and pushes to `develop` directly, opening a PR only when the merge conflicts and needs manual resolution.
 - `CHANGELOG.md` now has a `merge=union` driver (`.gitattributes`), so `develop`'s pending `[Unreleased]` entries and `main`'s freshly-cut dated release sections no longer conflict on every back-merge — git keeps both sides automatically instead of failing.
