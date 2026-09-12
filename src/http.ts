@@ -125,8 +125,9 @@ export function createOAuthHandler(
 
   // Lazy eviction above only runs on authorize/callback traffic, so flows abandoned mid-auth
   // would otherwise sit in memory indefinitely on a quiet long-running server. unref() keeps
-  // the timer from holding the process open.
-  setInterval(evictExpiredFlows, FLOW_TTL_MS).unref();
+  // the timer from holding the process open. Skipped in PAT-only mode, where /oauth/authorize
+  // 404s and pendingFlows therefore stays empty for the life of the process.
+  if (oauthClientId) setInterval(evictExpiredFlows, FLOW_TTL_MS).unref();
 
   return async (req, res) => {
     // Liveness probe — no auth, mode-agnostic. Always 200 whether OAuth is
