@@ -39,7 +39,8 @@ export async function fetchAccount(client: FireflyClient, id: string): Promise<U
 
 // Firefly III validates interest_period against config('firefly.interest_periods') when an account is
 // created, but against a hardcoded `in:daily,monthly,yearly` rule when one is updated. Mirroring that
-// split keeps update_account from advertising four periods the API will reject.
+// split keeps update_account from advertising three periods the API will reject (weekly,
+// quarterly and half-year, which create_account accepts and update_account does not).
 const CREATE_INTEREST_PERIODS = ['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly'] as const;
 const UPDATE_INTEREST_PERIODS = ['daily', 'monthly', 'yearly'] as const;
 
