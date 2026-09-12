@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Abandoned OAuth flows are now swept out of memory every 10 minutes instead of only when new authorize/callback traffic arrives. Lazy eviction already kept the map trimmed on a busy server, so this is about an idle one: a server that sees a burst of abandoned authorizations and then goes quiet used to hold those pending `redirect_uri` values indefinitely.
 - Match Dependabot security alerts using both bare and equals-prefixed versions, check all grouped dependencies and alert pages, and distinguish API failures from unmatched advisories.
 - Distinguish back-merge conflicts from other Git failures and retry rejected pushes only when `develop` actually moved. Allow manually retrying the back-merge workflow.
 - `create_account` and `update_account` were missing `liability_type` and `liability_direction`, which the Firefly III API requires when `type` is `liability`. Creating or updating a debt/loan/mortgage account failed with a validation error and no way to supply the required fields. Both are now accepted as optional enums on both tools. _Contributed by [@lesha198a](https://github.com/lesha198a) in [#77](https://github.com/daften/fireflyiii-mcp/pull/77)._
