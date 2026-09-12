@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { changedReleasedSections, check, duplicateHeadings, latestReleaseTag, parseSections, run } from '../../scripts/changelog-guard.mjs';
+import {
+  baselineTag,
+  changedReleasedSections,
+  check,
+  duplicateHeadings,
+  duplicateSections,
+  hasDatedSections,
+  parseSections,
+  run,
+} from '../../scripts/changelog-guard.mjs';
 
 // The baseline every scenario compares against: one shipped release, one open [Unreleased].
 const baseline = `# Changelog
@@ -99,17 +108,73 @@ test('unreleased-only duplicates are found without a baseline', () => {
   assert.equal(changedReleasedSections(baseline, baseline).length, 0);
 });
 
-test('latestReleaseTag picks the newest tag and copes with none', () => {
-  assert.equal(latestReleaseTag(() => 'v0.5.0\nv0.4.0\n'), 'v0.5.0');
-  assert.equal(latestReleaseTag(() => ''), null);
+test('baselineTag picks the newest tag and copes with none', () => {
+  const exec = (tags, onHead = '') => (args) => (args[1] === '--points-at' ? onHead : tags);
+  assert.equal(baselineTag(exec('v0.5.0\nv0.4.0\n')), 'v0.5.0');
+  assert.equal(baselineTag(exec('')), null);
 });
 
-test('run() honours the skip flag and a tagless repo without touching git', () => {
+// Regression: publish.yml's verify job checks out the very tag being released, so the newest tag is
+// HEAD. Comparing against it compares the file to itself — the guard passed unconditionally at the
+// one moment it was billed as the last gate before npm and GHCR.
+test('baselineTag skips tags on HEAD so the publish-time run is not self-referential', () => {
+  const exec = (args) => (args[1] === '--points-at' ? 'v0.6.0\n' : 'v0.6.0\nv0.5.0\nv0.4.0\n');
+  assert.equal(baselineTag(exec), 'v0.5.0');
+});
+
+test('a freshly cut release is still checked for duplicate headings at publish time', () => {
+  const shipped = `# Changelog\n\n## [Unreleased]\n\n## [0.5.0] - 2026-09-12\n\n### Added\n\n- A\n`;
+  const cut = `# Changelog\n\n## [Unreleased]\n\n## [0.6.0] - 2026-10-01\n\n### Fixed\n\n- one\n\n### Fixed\n\n- two\n\n## [0.5.0] - 2026-09-12\n\n### Added\n\n- A\n`;
+  const exec = (args) => {
+    if (args[1] === '--points-at') return 'v0.6.0\n';
+    if (args[0] === 'tag') return 'v0.6.0\nv0.5.0\n';
+    return shipped;
+  };
+  assert.throws(() => run({}, exec, () => cut), /found 1 problem/);
+});
+
+// Regression: the version -> section Map keeps only the last block, so a corrupted first copy beside
+// a clean second one used to compare equal and pass.
+test('rejects a whole section replayed twice, even when the last copy is clean', () => {
+  const twice = baseline.replace(
+    '## [0.4.0] - 2026-08-01\n\n### Added\n\n- Older thing\n',
+    '## [0.4.0] - 2026-08-01\n\n### Added\n\n- Older thing\n- spliced\n\n## [0.4.0] - 2026-08-01\n\n### Added\n\n- Older thing\n',
+  );
+  assert.match(check(baseline, twice).join('\n'), /appears more than once/);
+  assert.equal(duplicateSections(baseline).length, 0);
+});
+
+// Regression: stripping every `[x]: y` line wherever it appeared made one invisible to the
+// immutability comparison, so a merge could splice one into a published section undetected.
+test('only the trailing link-reference block is ignored', () => {
+  const spliced = baseline.replace('- Older thing', '- Older thing\n[hidden]: spliced by a bad merge');
+  assert.match(check(baseline, spliced).join('\n'), /\[0\.4\.0\].*was modified/s);
+
+  // The real trailing block still must not count as section content.
+  const extraLink = baseline.replace(
+    '[0.5.0]: https://example.com/compare/v0.4.0...v0.5.0',
+    '[0.6.0]: https://example.com/compare/v0.5.0...v0.6.0\n[0.5.0]: https://example.com/compare/v0.4.0...v0.5.0',
+  );
+  assert.deepEqual(check(baseline, extraLink), []);
+});
+
+// A changelog listing shipped versions with no tags in sight means the checkout lost its tags;
+// passing there would be a guard that silently does nothing.
+test('fails loudly when tags are missing but releases are claimed', () => {
+  assert.equal(hasDatedSections('# Changelog\n\n## [Unreleased]\n'), false);
+  assert.equal(hasDatedSections(baseline), true);
+
+  const noTags = () => '';
+  assert.throws(() => run({}, noTags, () => baseline), /no v\* tag is visible/);
+  // A genuinely new repo still passes.
+  assert.doesNotThrow(() => run({}, noTags, () => '# Changelog\n\n## [Unreleased]\n'));
+});
+
+test('run() honours the skip flag without touching git', () => {
   const exploding = () => {
     throw new Error('git should not have been called');
   };
-  run({ CHANGELOG_GUARD_SKIP: 'true' }, exploding);
-  run({}, (args) => (args[0] === 'tag' ? '' : exploding()));
+  run({ CHANGELOG_GUARD_SKIP: 'true' }, exploding, () => baseline);
 });
 
 test('run() compares against the newest tag and names the offending section', () => {
@@ -117,6 +182,7 @@ test('run() compares against the newest tag and names the offending section', ()
   const calls = [];
   const exec = (args) => {
     calls.push(args.join(' '));
+    if (args[1] === '--points-at') return '';
     if (args[0] === 'tag') return 'v0.5.0\nv0.4.0\n';
     if (args[0] === 'show') return baseline;
     throw new Error(`unexpected git ${args.join(' ')}`);
@@ -124,7 +190,11 @@ test('run() compares against the newest tag and names the offending section', ()
 
   assert.throws(() => run({}, exec, () => corrupted), /found 1 problem\(s\) against v0\.5\.0/);
   // Baseline comes from the tag that published the section, not from the base branch's current file.
-  assert.deepEqual(calls, ['tag --list v* --sort=-v:refname', 'show v0.5.0:CHANGELOG.md']);
+  assert.deepEqual(calls, [
+    'tag --points-at HEAD',
+    'tag --list v* --sort=-v:refname',
+    'show v0.5.0:CHANGELOG.md',
+  ]);
 
   // And it passes on a clean file, so the throw above is the corruption and not the plumbing.
   assert.doesNotThrow(() => run({}, exec, () => baseline));

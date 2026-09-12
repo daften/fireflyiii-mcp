@@ -23,6 +23,30 @@ import { readFileSync } from 'node:fs';
 const UNRELEASED = 'Unreleased';
 
 /**
+ * Drop the trailing link-reference block (`[0.4.6]: https://...`, `[Unreleased]: ...`).
+ *
+ * Two things keep this narrow. It scans from the end, so a definition elsewhere in the file is not
+ * touched; and it only recognises *version-shaped* labels, so a line that merely looks like a link
+ * definition — which a merge could splice in right above the real block, where a shape-only match
+ * would swallow it — stays in the section body and trips the immutability check. Releases add a
+ * definition here for the new version, which is the only reason this block is excluded at all.
+ */
+const LINK_DEFINITION = /^\[(?:Unreleased|\d+\.\d+\.\d+)\]:\s/;
+
+function stripTrailingLinkBlock(lines) {
+  let end = lines.length;
+  while (end > 0) {
+    const line = lines[end - 1];
+    if (line.trim() === '' || LINK_DEFINITION.test(line)) {
+      end -= 1;
+      continue;
+    }
+    break;
+  }
+  return lines.slice(0, end);
+}
+
+/**
  * Split a changelog into its `## [...]` sections.
  *
  * Everything before the first section is the preamble, and the trailing link-reference block
@@ -30,7 +54,7 @@ const UNRELEASED = 'Unreleased';
  * during a release does not read as an edit to the oldest release.
  */
 export function parseSections(text) {
-  const lines = text.split('\n');
+  const lines = stripTrailingLinkBlock(text.split('\n'));
   const sections = [];
   let current = null;
 
@@ -42,7 +66,6 @@ export function parseSections(text) {
       continue;
     }
     if (!current) continue;
-    if (/^\[[^\]]+\]:\s/.test(line)) continue;
     current.body.push(line);
   }
 
@@ -56,6 +79,26 @@ export function parseSections(text) {
 
 /** A section's full text, for comparing a release against the tag that shipped it. */
 const sectionText = (section) => `${section.header}\n${section.body}`;
+
+/**
+ * Two `## [X.Y.Z]` blocks for one version — a stale branch's snapshot replayed as a whole section
+ * rather than a bullet. Checked separately because the version→section Map below keeps only the
+ * last block, so a corrupted first copy sitting beside a clean second one would compare equal.
+ */
+export function duplicateSections(text) {
+  const seen = new Set();
+  const problems = [];
+  for (const section of parseSections(text)) {
+    if (seen.has(section.version)) {
+      problems.push(
+        `"${section.header.trim()}" appears more than once. A merge has replayed a whole section; ` +
+          'keep one copy.',
+      );
+    }
+    seen.add(section.version);
+  }
+  return problems;
+}
 
 /**
  * Released sections are immutable. Once `## [X.Y.Z] - date` is tagged and published, its content is
@@ -119,13 +162,35 @@ export function check(baselineText, currentText) {
       .map((section) => section.version)
       .filter((version) => version !== UNRELEASED),
   );
-  return [...changedReleasedSections(baselineText, currentText), ...duplicateHeadings(currentText, released)];
+  return [
+    ...changedReleasedSections(baselineText, currentText),
+    ...duplicateSections(currentText),
+    ...duplicateHeadings(currentText, released),
+  ];
 }
 
-/** Newest `v*` tag by version order, or null when the repo has no releases yet. */
-export function latestReleaseTag(run = (args) => execFileSync('git', args, { encoding: 'utf8' })) {
-  const tags = run(['tag', '--list', 'v*', '--sort=-v:refname']).split('\n').filter(Boolean);
+/**
+ * Newest `v*` tag to compare against, excluding any tag on HEAD itself.
+ *
+ * The exclusion is what makes the publish-time run mean anything. `publish.yml`'s verify job checks
+ * out the very tag being released, so the newest tag *is* HEAD: comparing against it would compare
+ * the file to itself, pass unconditionally, and — because the version being shipped would then also
+ * count as already-released — switch off the duplicate-heading rule for exactly the section being
+ * published. Stepping back one tag compares the shipped history against what shipped, and leaves
+ * the new section subject to the still-editable rules.
+ */
+export function baselineTag(run = (args) => execFileSync('git', args, { encoding: 'utf8' })) {
+  const onHead = new Set(run(['tag', '--points-at', 'HEAD']).split('\n').filter(Boolean));
+  const tags = run(['tag', '--list', 'v*', '--sort=-v:refname'])
+    .split('\n')
+    .filter(Boolean)
+    .filter((tag) => !onHead.has(tag));
   return tags[0] ?? null;
+}
+
+/** True when the changelog claims shipped releases — used to tell "new repo" from "tags missing". */
+export function hasDatedSections(text) {
+  return parseSections(text).some((section) => section.version !== UNRELEASED);
 }
 
 export function run(
@@ -138,8 +203,19 @@ export function run(
     return;
   }
 
-  const tag = latestReleaseTag(exec);
+  const current = readChangelog();
+  const tag = baselineTag(exec);
   if (!tag) {
+    // A repo with no releases yet has nothing to compare against. A repo whose changelog already
+    // lists shipped versions but whose tags are not visible is a broken checkout (shallow clone, or
+    // fetch-depth left at its default), and passing there would be a guard that silently does
+    // nothing — the failure mode this whole script exists to prevent.
+    if (hasDatedSections(current)) {
+      throw new Error(
+        'changelog-guard: CHANGELOG.md lists released versions but no v* tag is visible. The ' +
+          'checkout is missing tags — use fetch-depth: 0.',
+      );
+    }
     console.log('changelog-guard: no v* tag yet, nothing to compare against.');
     return;
   }
@@ -147,7 +223,7 @@ export function run(
   // Released sections are compared against the tag that published them, so a section is checked
   // against what actually shipped rather than against whatever the base branch currently holds.
   const baseline = exec(['show', `${tag}:CHANGELOG.md`]);
-  const problems = check(baseline, readChangelog());
+  const problems = check(baseline, current);
 
   if (problems.length) {
     for (const problem of problems) console.error(`::error file=CHANGELOG.md::${problem}`);
