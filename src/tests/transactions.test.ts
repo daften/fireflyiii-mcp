@@ -310,4 +310,22 @@ describe('handler smoke — transactions', () => {
     const result = await handlers.get('get_transactions')!({});
     expect(result).toMatchObject({ isError: true });
   });
+
+  // Regression test for a real mistake: transaction responses carry two different ids — the
+  // top-level group `id` (what update/delete expect) and a `transaction_journal_id` nested inside
+  // each item of `transactions[]` (usually an adjacent number). Passing the journal id to
+  // update_transaction/delete_transaction silently edits or deletes a different transaction. These
+  // assertions make sure the warning stays present if the tool descriptions are ever reworded.
+  it('warns against transaction_journal_id in id-accepting tool descriptions', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerTransactionTools(server, {} as unknown as FireflyClient);
+    for (const name of ['get_transaction', 'create_transaction', 'update_transaction', 'delete_transaction']) {
+      const config = toolConfigs.get(name);
+      const text =
+        name === 'update_transaction' || name === 'delete_transaction'
+          ? config.inputSchema.id.description
+          : config.description;
+      expect(text, `${name} should warn about transaction_journal_id`).toContain('transaction_journal_id');
+    }
+  });
 });
