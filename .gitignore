@@ -36,6 +36,9 @@ coverage/
 # Editor
 .vscode/settings.json
 .idea/
+# Vim swap files — these appear in the repo root while a tracked file is open,
+# so a stray `git add -A` would otherwise commit one.
+*.sw[a-p]
 
 # Internal planning docs — kept locally but not tracked
 docs/superpowers/

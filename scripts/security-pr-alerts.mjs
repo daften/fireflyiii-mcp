@@ -53,8 +53,27 @@ export function matchingAlerts(dependencies, alerts) {
   }));
 }
 
+// Parsed before any network call. fetch-metadata emits an empty updated-dependencies-json when the
+// PR head commit carries no parseable `updated-dependencies` trailer (a manual rebase or amend of a
+// Dependabot branch does that), and a bare JSON.parse there fails with `"undefined" is not valid
+// JSON` — a message that reads like a crash in this script rather than missing metadata. Validating
+// up front also means the right error arrives immediately instead of after paging every alert.
+export function parseDependencies(raw) {
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    throw new Error('Dependabot dependency metadata is missing: the fetch-metadata step produced no updated-dependencies-json. Check that the PR head commit still carries its "updated-dependencies" trailer.');
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Dependabot dependency metadata is not valid JSON: ${error.message}`);
+  }
+  return parsed;
+}
+
 export async function run(env = process.env, request = fetch) {
-  const dependencies = JSON.parse(env.DEPENDENCIES_JSON);
+  const dependencies = parseDependencies(env.DEPENDENCIES_JSON);
+  if (!Array.isArray(dependencies) || dependencies.length === 0) throw new Error('Dependabot dependency metadata is missing.');
   const matches = matchingAlerts(dependencies, await fetchAlerts(env.GITHUB_REPOSITORY, env.GH_TOKEN, request));
   if (!matches.length && env.DEPENDENCY_GROUP === 'security-fixes') {
     throw new Error('Alert lookup succeeded but no advisory matched this security-fixes PR. Check dependency versions, manifest paths, and the alert data returned by GitHub; this is not an authentication diagnosis.');

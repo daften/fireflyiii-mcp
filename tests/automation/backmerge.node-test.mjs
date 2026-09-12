@@ -6,8 +6,56 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const workflow = readFileSync(new URL('../../.github/workflows/backmerge.yml', import.meta.url), 'utf8');
-const block = workflow.split('        id: merge\n        run: |\n')[1].split('\n      # Only reached')[0];
-const script = block.split('\n').map(line => line.slice(10)).join('\n');
+
+// Extract the `run: |` body of the step with the given id, by indentation rather than by matching
+// the literal text that happens to follow it. The previous version split on a trailing comment and
+// on a hard-coded 8-space indent: rewording the comment made the second split match nothing, so
+// `block` silently became the rest of the file and every scenario below executed the remaining
+// workflow steps as part of the script instead of failing.
+export function extractRunScript(yaml, stepId) {
+  const lines = yaml.split('\n');
+
+  const idIndex = lines.findIndex((line) => line.trim() === `id: ${stepId}`);
+  if (idIndex === -1) throw new Error(`backmerge.yml: no step with "id: ${stepId}".`);
+  const indent = lines[idIndex].slice(0, lines[idIndex].indexOf('id:'));
+
+  // Walk forward to this step's own `run: |`, stopping if the next step starts first, so a later
+  // step's run block can never be mistaken for this one's.
+  let runIndex = -1;
+  for (let i = idIndex + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.trim() === '') continue;
+    if (!line.startsWith(indent) || line.trimStart().startsWith('- ')) break;
+    if (line === `${indent}run: |`) {
+      runIndex = i;
+      break;
+    }
+  }
+  if (runIndex === -1) throw new Error(`backmerge.yml: the "id: ${stepId}" step has no "run: |" block.`);
+
+  const bodyIndent = `${indent}  `;
+  const body = [];
+  for (const line of lines.slice(runIndex + 1)) {
+    if (line.trim() === '') {
+      body.push('');
+      continue;
+    }
+    if (!line.startsWith(bodyIndent)) break;
+    body.push(line.slice(bodyIndent.length));
+  }
+
+  const script = body.join('\n').trim();
+  if (!script) throw new Error(`backmerge.yml: the "id: ${stepId}" run block is empty.`);
+  return script;
+}
+
+const script = extractRunScript(workflow, 'merge');
+
+test('backmerge: the extracted script is the merge step and nothing else', () => {
+  assert.match(script, /git merge/);
+  // Indentation ends the block, so a following step can never be swallowed into it.
+  assert.doesNotMatch(script, /^\s*(?:- name:|uses:|if: )/m);
+});
 
 for (const scenario of ['already-merged', 'clean', 'conflict', 'merge-error', 'push-error', 'race', 'persistent-race']) {
   test(`backmerge: ${scenario}`, () => {

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fetchAlerts, matchingAlerts, run } from '../../scripts/security-pr-alerts.mjs';
+import { fetchAlerts, matchingAlerts, parseDependencies, run } from '../../scripts/security-pr-alerts.mjs';
 
 const dependency = { dependencyName: '@vitest/mocker', prevVersion: '4.1.10', directory: '/', packageEcosystem: 'npm_and_yarn' };
 const alert = {
@@ -78,4 +78,22 @@ test('preserves the existing workflow treatment of fixed and dismissed alerts', 
   for (const state of ['OPEN', 'FIXED', 'DISMISSED']) {
     assert.equal(matchingAlerts([dependency], [{ ...alert, state }]).length, 1);
   }
+});
+
+test('reports missing dependency metadata as such, without calling the alert API', async () => {
+  for (const raw of [undefined, '', '   ']) {
+    assert.throws(() => parseDependencies(raw), /metadata is missing/);
+  }
+  assert.throws(() => parseDependencies('not json'), /not valid JSON/);
+
+  // The bad-metadata error must arrive before any request, so a real security PR fails with a
+  // diagnosis rather than a SyntaxError after dozens of GraphQL pages.
+  let called = false;
+  const request = async () => {
+    called = true;
+    throw new Error('alert API should not have been called');
+  };
+  await assert.rejects(run({ DEPENDENCIES_JSON: undefined }, request), /metadata is missing/);
+  await assert.rejects(run({ DEPENDENCIES_JSON: '[]' }, request), /metadata is missing/);
+  assert.equal(called, false);
 });
