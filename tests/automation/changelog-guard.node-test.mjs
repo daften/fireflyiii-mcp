@@ -5,11 +5,18 @@ import {
   changedReleasedSections,
   check,
   duplicateHeadings,
+  duplicateLinkLabels,
   duplicateSections,
   hasDatedSections,
+  loadAllowedEdits,
   parseSections,
   run,
+  sectionOrder,
 } from '../../scripts/changelog-guard.mjs';
+
+// No test exercises the real allowlist file on disk; every run() call below supplies its own
+// (empty, unless a test says otherwise) so unit tests never depend on repo state.
+const noAllowedEdits = () => '{}';
 
 // The baseline every scenario compares against: one shipped release, one open [Unreleased].
 const baseline = `# Changelog
@@ -130,7 +137,7 @@ test('a freshly cut release is still checked for duplicate headings at publish t
     if (args[0] === 'tag') return 'v0.6.0\nv0.5.0\n';
     return shipped;
   };
-  assert.throws(() => run({}, exec, () => cut), /found 1 problem/);
+  assert.throws(() => run({}, exec, () => cut, [], noAllowedEdits), /found 1 problem/);
 });
 
 // Regression: the version -> section Map keeps only the last block, so a corrupted first copy beside
@@ -165,16 +172,18 @@ test('fails loudly when tags are missing but releases are claimed', () => {
   assert.equal(hasDatedSections(baseline), true);
 
   const noTags = () => '';
-  assert.throws(() => run({}, noTags, () => baseline), /no v\* tag is visible/);
+  assert.throws(() => run({}, noTags, () => baseline, [], noAllowedEdits), /no v\* tag is visible/);
   // A genuinely new repo still passes.
-  assert.doesNotThrow(() => run({}, noTags, () => '# Changelog\n\n## [Unreleased]\n'));
+  assert.doesNotThrow(() =>
+    run({}, noTags, () => '# Changelog\n\n## [Unreleased]\n', [], noAllowedEdits),
+  );
 });
 
 test('run() honours the skip flag without touching git', () => {
   const exploding = () => {
     throw new Error('git should not have been called');
   };
-  run({ CHANGELOG_GUARD_SKIP: 'true' }, exploding, () => baseline);
+  run({ CHANGELOG_GUARD_SKIP: 'true' }, exploding, () => baseline, [], noAllowedEdits);
 });
 
 test('run() compares against the newest tag and names the offending section', () => {
@@ -188,8 +197,11 @@ test('run() compares against the newest tag and names the offending section', ()
     throw new Error(`unexpected git ${args.join(' ')}`);
   };
 
-  assert.throws(() => run({}, exec, () => corrupted), /found 1 problem\(s\) against v0\.5\.0/);
-  // Baseline comes from the tag that published the section, not from the base branch's current file.
+  assert.throws(
+    () => run({}, exec, () => corrupted, [], noAllowedEdits),
+    /found 1 problem\(s\) against v0\.5\.0/,
+  );
+  // Baseline comes from the newest tag prior to HEAD, not from the base branch's current file.
   assert.deepEqual(calls, [
     'tag --points-at HEAD',
     'tag --list v* --sort=-v:refname',
@@ -197,5 +209,63 @@ test('run() compares against the newest tag and names the offending section', ()
   ]);
 
   // And it passes on a clean file, so the throw above is the corruption and not the plumbing.
-  assert.doesNotThrow(() => run({}, exec, () => baseline));
+  assert.doesNotThrow(() => run({}, exec, () => baseline, [], noAllowedEdits));
+});
+
+test('run() accepts --baseline-ref for backmerge.yml, comparing against an explicit ref instead of a tag', () => {
+  const corrupted = baseline.replace('- Older thing', '- Older thing\n- spliced by a stale branch');
+  const calls = [];
+  const exec = (args) => {
+    calls.push(args.join(' '));
+    return baseline;
+  };
+
+  assert.throws(
+    () => run({}, exec, () => corrupted, ['--baseline-ref=origin/main'], noAllowedEdits),
+    /found 1 problem\(s\) against origin\/main/,
+  );
+  // No tag lookup at all: the ref is used directly, and baselineTag() is never consulted.
+  assert.deepEqual(calls, ['show origin/main:CHANGELOG.md']);
+});
+
+test('run() exempts a version listed in the allowed-edits file, even across every future run', () => {
+  const edited = baseline.replace('- Feature A\n- Feature B', '- Feature A (typo fixed)\n- Feature B');
+  const exec = (args) => {
+    if (args[1] === '--points-at') return '';
+    if (args[0] === 'tag') return 'v0.5.0\nv0.4.0\n';
+    return baseline;
+  };
+
+  assert.throws(() => run({}, exec, () => edited, [], noAllowedEdits), /found 1 problem/);
+  assert.doesNotThrow(() => run({}, exec, () => edited, [], () => '{"0.5.0": "reviewed in PR #123"}'));
+});
+
+test('loadAllowedEdits tolerates a missing file and rejects nothing it does not name', () => {
+  const missing = () => {
+    const error = new Error('not found');
+    error.code = 'ENOENT';
+    throw error;
+  };
+  assert.deepEqual(loadAllowedEdits(missing), new Set());
+  assert.deepEqual(loadAllowedEdits(() => '{"0.4.6": "typo fix"}'), new Set(['0.4.6']));
+});
+
+test('sectionOrder rejects two dated sections interleaved out of order', () => {
+  assert.deepEqual(sectionOrder(baseline), []);
+
+  const interleaved = baseline.replace(
+    '## [0.5.0] - 2026-09-12',
+    '## [0.4.7] - 2026-09-12\n\n### Security\n\n- bump\n\n## [0.5.0] - 2026-09-12',
+  );
+  assert.match(sectionOrder(interleaved).join('\n'), /out of order/);
+});
+
+test('duplicateLinkLabels rejects a repeated compare-link definition', () => {
+  assert.deepEqual(duplicateLinkLabels(baseline), []);
+
+  const doubled = baseline.replace(
+    '[0.5.0]: https://example.com/compare/v0.4.0...v0.5.0',
+    '[0.5.0]: https://example.com/compare/v0.4.0...v0.5.0\n[0.5.0]: https://example.com/compare/v0.4.7...v0.5.0',
+  );
+  assert.match(duplicateLinkLabels(doubled).join('\n'), /defined more than once/);
 });
