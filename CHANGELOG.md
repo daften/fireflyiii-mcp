@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- Match Dependabot security alerts using both bare and equals-prefixed versions, check all grouped dependencies and alert pages, and distinguish API failures from unmatched advisories.
-- Distinguish back-merge conflicts from other Git failures and retry rejected pushes only when `develop` actually moved. Allow manually retrying the back-merge workflow.
+- `create_account` and `update_account` now also accept the rest of Firefly III's liability terms: `liability_amount`, `liability_start_date`, `interest`, and `interest_period`. Without them a liability could be created but not given the balance and interest terms that make it useful, and there was no way to correct them afterwards. `interest_period` deliberately offers six periods on create and only `daily`/`monthly`/`yearly` on update, because Firefly III validates the two endpoints against different lists.
 
 ### Changed
 
@@ -22,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every tool field that takes a category *name* — `name` on `create_category`/`update_category` and `category_name` on `create_transaction`, `update_transaction`, `create_split_transaction`, and `bulk_update_transactions` — now warns that Firefly III matches and stores the string verbatim. A name copied out of a rendered web page ("Restaurants &amp; cafés") silently becomes a second category next to the real "Restaurants & cafés", and the two render identically everywhere. Decoding entities on the way out was considered and rejected: it is lossy and cannot be turned off, so a category legitimately named "Restaurants &amp; cafés" would become unreachable. _Reported by [@lesha198a](https://github.com/lesha198a) in [#77](https://github.com/daften/fireflyiii-mcp/pull/77)._
 - Releases are now cut on a short-lived `release/X.Y.Z` branch that reaches `main` as a single PR, instead of a promotion merge followed by a separate release commit on `main`. Since `backmerge.yml` runs on every push to `main`, the old shape back-merged twice per release; this shape does it once, puts the release commit through CI, and leaves `auto-release.yml` as the only thing committing directly to `main`. `backmerge.yml` itself now merges and pushes to `develop` directly, opening a PR only when the merge conflicts and needs manual resolution.
 - `CHANGELOG.md` now has a `merge=union` driver (`.gitattributes`), so `develop`'s pending `[Unreleased]` entries and `main`'s freshly-cut dated release sections no longer conflict on every back-merge — git keeps both sides automatically instead of failing.
+
+### Fixed
+
+- Match Dependabot security alerts using both bare and equals-prefixed versions, check all grouped dependencies and alert pages, and distinguish API failures from unmatched advisories.
+- Distinguish back-merge conflicts from other Git failures and retry rejected pushes only when `develop` actually moved. Allow manually retrying the back-merge workflow.
+- `create_account` and `update_account` were missing `liability_type` and `liability_direction`, which the Firefly III API requires when `type` is `liability`. Creating or updating a debt/loan/mortgage account failed with a validation error and no way to supply the required fields. Both are now accepted as optional enums on both tools. _Contributed by [@lesha198a](https://github.com/lesha198a) in [#77](https://github.com/daften/fireflyiii-mcp/pull/77)._
+- `update_account` described its liability fields as "required when type is liability", a condition it can never meet — the tool has no `type` field and never sends one. They now read "Only applies to liability accounts", so a model does not skip them expecting a `type` to trigger them.
+
 ## [0.4.6] - 2026-09-11
 
 ### Security
