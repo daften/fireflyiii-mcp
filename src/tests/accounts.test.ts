@@ -244,8 +244,11 @@ describe('liability input schemas', () => {
   // against a hardcoded `in:daily,monthly,yearly` on update, so the two tools must not offer the
   // same options — update_account would otherwise advertise values the API rejects.
   it('offers every Firefly interest period on create and only the three update accepts', () => {
-    const create = schemaFor('create_account').interest_period as z.ZodEnum<any>;
-    const update = schemaFor('update_account').interest_period as z.ZodEnum<any>;
+    // Structural rather than z.ZodOptional<z.ZodEnum<...>>: only unwrap().options is used here, and
+    // spelling the full Zod generic out again would re-break on every change to its type parameters.
+    type OptionalEnum = { unwrap(): { options: string[] } };
+    const create = schemaFor('create_account').interest_period as unknown as OptionalEnum;
+    const update = schemaFor('update_account').interest_period as unknown as OptionalEnum;
     expect(create.unwrap().options).toEqual(['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly']);
     expect(update.unwrap().options).toEqual(['daily', 'monthly', 'yearly']);
   });
@@ -335,9 +338,11 @@ describe('accounts autocomplete completions', () => {
     registerAccountTools(server, client);
     const prompt = promptConfigs.get('account-transactions');
     expect(prompt).toBeDefined();
-    const accountField = (prompt as any).argsSchema?.account;
+    const accountField = (prompt as { argsSchema?: Record<string, unknown> }).argsSchema?.account;
     expect(accountField).toBeDefined();
-    const meta = (accountField as any)[Symbol.for('mcp.completable')];
+    const meta = (accountField as Record<symbol, { complete: (value: string) => Promise<string[]> }>)[
+      Symbol.for('mcp.completable')
+    ];
     expect(meta).toBeDefined();
     expect(typeof meta.complete).toBe('function');
     return meta.complete;

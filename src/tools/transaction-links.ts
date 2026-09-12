@@ -73,8 +73,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchLinkTypes(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchLinkTypes(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -92,9 +91,9 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       annotations: READ_ANNOTATIONS,
     },
     ({ journal_id, page, limit }) =>
-      fetchTransactionLinks(client, journal_id as string, {
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchTransactionLinks(client, journal_id, {
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -107,7 +106,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       inputSchema: { id: z.string().describe('Transaction link ID') },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchTransactionLink(client, id as string),
+    ({ id }) => fetchTransactionLink(client, id),
   );
 
   defineTool(
@@ -125,7 +124,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createTransactionLink(client, params as Parameters<typeof createTransactionLink>[1]),
+    (params) => createTransactionLink(client, params),
   );
 
   defineTool(
@@ -143,8 +142,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) =>
-      updateTransactionLink(client, id as string, params as Parameters<typeof updateTransactionLink>[2]),
+    ({ id, ...params }) => updateTransactionLink(client, id, params),
   );
 
   defineTool(
@@ -156,6 +154,6 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       inputSchema: { id: z.string().describe('Transaction link ID') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteTransactionLink(client, id as string),
+    ({ id }) => deleteTransactionLink(client, id),
   );
 }
