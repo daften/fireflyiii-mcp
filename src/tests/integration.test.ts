@@ -122,7 +122,16 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
   // upstream release moves them.
 
   describe('liability accounts', () => {
-    let liabilityId: string;
+    let liabilityId: string | undefined;
+
+    // Set by the create test below. The two tests that update this account would otherwise send
+    // `PUT /accounts/undefined` when creation failed, burying the one real error under two 404s —
+    // and TypeScript can't catch it, because definite-assignment analysis is skipped inside these
+    // callbacks. Failing fast here keeps the create test's own message the only one worth reading.
+    const requireLiabilityId = (): string => {
+      if (!liabilityId) throw new Error('liability account was not created — see the create test above');
+      return liabilityId;
+    };
 
     afterAll(async () => {
       if (liabilityId) await deleteAccount(client, liabilityId).catch(() => {});
@@ -162,7 +171,7 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
     });
 
     it('can update the interest terms with a period the update endpoint accepts', async () => {
-      const result = await updateAccount(client, liabilityId, { interest: '4.5', interest_period: 'monthly' });
+      const result = await updateAccount(client, requireLiabilityId(), { interest: '4.5', interest_period: 'monthly' });
       expect(Number(result.interest)).toBeCloseTo(4.5);
       expect(result.interest_period).toBe('monthly');
     });
@@ -172,7 +181,7 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
       // bypasses that split to confirm Firefly enforces it server-side, which is the whole reason
       // the two tools cannot share one enum.
       const outOfRange = { interest_period: 'quarterly' } as unknown as Parameters<typeof updateAccount>[2];
-      await expect(updateAccount(client, liabilityId, outOfRange)).rejects.toThrow(/interest_period/);
+      await expect(updateAccount(client, requireLiabilityId(), outOfRange)).rejects.toThrow(/interest_period/);
     });
   });
 
