@@ -70,6 +70,19 @@ export function defineContentTool(
 
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD');
 
+/**
+ * Appended to every tool field that takes a category *name* rather than an id.
+ *
+ * Firefly III matches category names by exact string and stores whatever it is given verbatim, so a
+ * name copied out of a rendered web page ("Restaurants &amp; cafés") silently becomes a second
+ * category alongside the real "Restaurants & cafés" — the two look identical wherever they are
+ * rendered. Decoding entities on the way out was considered and rejected: it is lossy and
+ * unavoidable, since a category legitimately named "Restaurants &amp; cafés" would then be
+ * unreachable. Warning the caller is the only option that cannot corrupt a valid name.
+ */
+export const CATEGORY_NAME_HINT =
+  'Matched by exact string — pass literal text, since HTML entities like &amp; or &#039; are not decoded and would create a separate category.';
+
 const dateTimeSchema = z.iso.datetime({ offset: true });
 export const dateOrDateTimeSchema = z
   .string()

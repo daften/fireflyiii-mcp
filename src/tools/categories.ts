@@ -15,6 +15,7 @@ import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTAT
 import {
   AUTOCOMPLETE_FETCH_LIMIT,
   AUTOCOMPLETE_MAX_SUGGESTIONS,
+  CATEGORY_NAME_HINT,
   createTtlCache,
   dateSchema,
   debugLog,
@@ -143,7 +144,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
       title: 'Create Category',
       description: 'Create a new spending category in Firefly III.',
       inputSchema: {
-        name: z.string().describe('Category name'),
+        name: z.string().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         notes: z.string().optional().describe('Notes'),
       },
       annotations: WRITE_ANNOTATIONS,
@@ -160,7 +161,7 @@ export function registerCategoryTools(server: McpServer, client: FireflyClient):
         'Update an existing category in Firefly III. Only fields provided will be changed. Use get_categories to find valid category IDs.',
       inputSchema: {
         id: categoryIdSchema,
-        name: z.string().optional().describe('Category name'),
+        name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         notes: z.string().optional().describe('Notes'),
       },
       annotations: UPDATE_ANNOTATIONS,

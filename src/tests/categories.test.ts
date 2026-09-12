@@ -169,3 +169,15 @@ describe('categories autocomplete completions', () => {
     expect(results).toEqual(['7 (Food & Dining)']);
   });
 });
+
+describe('category name guidance', () => {
+  // The hint is the entire fix for HTML-escaped names — decoding them server-side was rejected as
+  // lossy — so it has to survive any future edit to these descriptions.
+  it('warns on every name field that Firefly stores the string verbatim', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerCategoryTools(server, {} as FireflyClient);
+    for (const tool of ['create_category', 'update_category']) {
+      expect(toolConfigs.get(tool).inputSchema.name.description).toContain('&amp;');
+    }
+  });
+});
