@@ -6,7 +6,7 @@
 
 - A running Firefly III instance (self-hosted or cloud)
 - An MCP-compatible AI client (Claude Code, Claude Desktop, or other)
-- Node.js 20+ (for npm setups) **or** Docker (for the container setup)
+- Node.js 22.12+ (for npm setups) **or** Docker (for the container setup)
 
 ## Choose your setup
 

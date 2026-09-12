@@ -1,6 +1,6 @@
 # npm + stdio (simplest)
 
-**Requires:** Node.js 20+, a Firefly III Personal Access Token.
+**Requires:** Node.js 22.12+, a Firefly III Personal Access Token.
 
 Get a PAT from Firefly III: **Options → Remote access and tokens → Create new token**.
 

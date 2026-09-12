@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Distinguish back-merge conflicts from other Git failures and retry rejected pushes only when `develop` actually moved. Allow manually retrying the back-merge workflow.
 
 ### Changed
+
+- **Node.js 22.12 is now the minimum supported version** (was 20). Node 20 reached end-of-life in April 2026, and Vitest 5 — the test runner this repo builds on — requires `^22.12.0 || ^24.0.0 || >=26.0.0`. `engines.node` is now `>=22.12.0`, so npm warns Node 20 users on install. The published server has no Node-20-specific code, but 20 is no longer tested and is no longer supported.
+- Update Vitest and `@vitest/coverage-v8` to 5.0.0. No test or source changes were needed: the suite uses no removed API (`sequential`, `test.for`, `expect.poll`, deprecated `vitest/*` entry points) and builds its mocks per test, so v5's clear-mocks-by-default has no effect. Coverage still writes `coverage/coverage-summary.json`, so the PR coverage comment is unaffected.
+- CI's test matrix is now Node 22, 24 and 26 (was 20, 22, 24). The coverage job stays on 22.
+- Dependabot now groups `vitest` and `@vitest/*` into a single PR for *all* update types, majors included. They are version-locked on each other, so the previous config — which grouped only minor and patch — split major bumps into two PRs that each failed `npm ci` with `ERESOLVE`. Note this takes effect only once the config reaches `main`, which Dependabot reads it from.
 - Releases are now cut on a short-lived `release/X.Y.Z` branch that reaches `main` as a single PR, instead of a promotion merge followed by a separate release commit on `main`. Since `backmerge.yml` runs on every push to `main`, the old shape back-merged twice per release; this shape does it once, puts the release commit through CI, and leaves `auto-release.yml` as the only thing committing directly to `main`. `backmerge.yml` itself now merges and pushes to `develop` directly, opening a PR only when the merge conflicts and needs manual resolution.
 - `CHANGELOG.md` now has a `merge=union` driver (`.gitattributes`), so `develop`'s pending `[Unreleased]` entries and `main`'s freshly-cut dated release sections no longer conflict on every back-merge — git keeps both sides automatically instead of failing.
 ## [0.4.6] - 2026-09-11
