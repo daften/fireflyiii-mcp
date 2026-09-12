@@ -908,6 +908,10 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
     await handler(callbackReq as http.IncomingMessage, callbackRes as unknown as http.ServerResponse);
 
     expect(callbackRes.statusCode).toBe(400);
+    // Distinguishes the expired-entry branch from the no-entry one. Both say "Start authorization",
+    // and Date.now is mocked rather than the clock advanced, so the sweep never runs and the entry
+    // is still present — this is the only test that reaches `isExpired`.
+    expect(callbackRes.body).toContain('OAuth flow expired');
   });
 });
 
