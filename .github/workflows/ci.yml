@@ -37,6 +37,36 @@ jobs:
             exit 1
           fi
 
+  # Separate from the `changelog` job above, which is pull_request-only. This one also runs on
+  # pushes, because the corruption it looks for arrives most often via backmerge.yml — which pushes
+  # straight to develop with no PR, and whose own conflict path is exactly what merge=union
+  # suppresses. See scripts/changelog-guard.mjs for the failure shapes.
+  changelog-guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Tags included: a released section is compared against the tag that published it, not
+          # against whatever the base branch happens to hold now.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Guard CHANGELOG.md against silent union-merge corruption
+        env:
+          # env indirection: the PR title is attacker-controlled text and must never be spliced
+          # into shell source.
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if echo "$TITLE" | grep -qi '\[skip changelog-guard\]'; then
+            export CHANGELOG_GUARD_SKIP=true
+          fi
+          node scripts/changelog-guard.mjs
+
   test:
     runs-on: ubuntu-latest
     permissions:

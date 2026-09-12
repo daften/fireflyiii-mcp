@@ -57,7 +57,16 @@ test('backmerge: the extracted script is the merge step and nothing else', () =>
   assert.doesNotMatch(script, /^\s*(?:- name:|uses:|if: )/m);
 });
 
-for (const scenario of ['already-merged', 'clean', 'conflict', 'merge-error', 'push-error', 'race', 'persistent-race']) {
+for (const scenario of [
+  'already-merged',
+  'clean',
+  'conflict',
+  'merge-error',
+  'push-error',
+  'race',
+  'persistent-race',
+  'guard-failure',
+]) {
   test(`backmerge: ${scenario}`, () => {
     const dir = mkdtempSync(join(tmpdir(), 'backmerge-test-'));
     try {
@@ -88,16 +97,36 @@ for (const scenario of ['already-merged', 'clean', 'conflict', 'merge-error', 'p
             *) echo "Unexpected git call: $*" >&2; return 99 ;;
           esac
         }
+        # changelog-guard.mjs shells out to the real git binary, which this mock (a bash function)
+        # cannot intercept, so the whole "node scripts/changelog-guard.mjs" call is faked here
+        # instead. Every scenario but guard-failure represents a clean CHANGELOG.md.
+        node() {
+          case "$SCENARIO" in
+            guard-failure) return 1 ;;
+            *) return 0 ;;
+          esac
+        }
       `;
       const result = spawnSync('bash', ['-e', '-c', mock + script], {
         encoding: 'utf8', env: { ...process.env, SCENARIO: scenario, GITHUB_OUTPUT: output, COUNTER: join(dir, 'counter') },
       });
       const fails = ['merge-error', 'push-error', 'persistent-race'].includes(scenario);
       assert.equal(result.status, fails ? 1 : 0, result.stdout + result.stderr);
-      if (scenario === 'conflict') assert.equal(readFileSync(output, 'utf8').trim(), 'conflict=true');
+      if (scenario === 'conflict' || scenario === 'guard-failure') {
+        assert.equal(readFileSync(output, 'utf8').trim(), 'conflict=true');
+      }
       if (scenario === 'merge-error') assert.match(result.stdout, /without unmerged files/);
       if (scenario === 'push-error') assert.match(result.stdout, /develop has not moved/);
-      const expected = { 'already-merged': 0, clean: 1, conflict: 0, 'merge-error': 0, 'push-error': 1, race: 2, 'persistent-race': 3 };
+      const expected = {
+        'already-merged': 0,
+        clean: 1,
+        conflict: 0,
+        'merge-error': 0,
+        'push-error': 1,
+        race: 2,
+        'persistent-race': 3,
+        'guard-failure': 0,
+      };
       assert.equal((result.stderr.match(/push attempt/g) || []).length, expected[scenario]);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
