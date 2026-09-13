@@ -45,14 +45,60 @@ export async function fetchAccount(client: FireflyClient, id: string): Promise<U
 const CREATE_INTEREST_PERIODS = ['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly'] as const;
 const UPDATE_INTEREST_PERIODS = ['daily', 'monthly', 'yearly'] as const;
 
+const LIABILITY_TYPES = ['loan', 'debt', 'mortgage'] as const;
+const LIABILITY_DIRECTIONS = ['credit', 'debit'] as const;
+
+// create_account's liability fields are conditional on `type: 'liability'` (a field update_account
+// doesn't have at all), so the two tools' wording differs — but the six fields and their Firefly
+// semantics are identical. Sharing this factory keeps the *shape* in one place; only the "why would
+// you fill this in" clause is allowed to vary between the two callers.
+function liabilityFields<Mode extends 'create' | 'update'>(mode: Mode) {
+  const scope = mode === 'create' ? 'required when type is liability' : 'Only applies to liability accounts';
+  // Cast needed because the ternary's static type is the union of both branches regardless of
+  // which literal `mode` was passed — the generic `Mode` param is what lets each call site
+  // (liabilityFields('create') vs liabilityFields('update')) get back a differently-typed
+  // interest_period enum instead of the union of both.
+  const interestPeriods = (
+    mode === 'create' ? CREATE_INTEREST_PERIODS : UPDATE_INTEREST_PERIODS
+  ) as Mode extends 'create' ? typeof CREATE_INTEREST_PERIODS : typeof UPDATE_INTEREST_PERIODS;
+  return {
+    liability_type: z.enum(LIABILITY_TYPES).optional().describe(`Liability type (${scope}): loan, debt, or mortgage`),
+    liability_direction: z
+      .enum(LIABILITY_DIRECTIONS)
+      .optional()
+      .describe(`Liability direction (${scope}): 'debit' if you owe this money, 'credit' if it is owed to you`),
+    liability_amount: z
+      .string()
+      .optional()
+      .describe(
+        `Amount of the liability as a number string (${scope}). Must be sent together with liability_start_date.`,
+      ),
+    liability_start_date: dateSchema
+      .optional()
+      .describe(`Date the liability started (YYYY-MM-DD) (${scope}). Must be sent together with liability_amount.`),
+    interest: z
+      .string()
+      .optional()
+      .describe(`Interest percentage as a number string between 0 and 100, e.g. "3.15" (${scope})`),
+    interest_period: z
+      .enum(interestPeriods)
+      .optional()
+      .describe(
+        mode === 'create'
+          ? `Period the interest percentage applies to (${scope})`
+          : `Period the interest percentage applies to (${scope}). Firefly III accepts fewer periods here than on create_account.`,
+      ),
+  };
+}
+
 export async function createAccount(
   client: FireflyClient,
   params: {
     name: string;
     type: 'asset' | 'expense' | 'revenue' | 'liability';
     account_role?: 'defaultAsset' | 'sharedAsset' | 'savingAsset' | 'ccAsset' | 'cashWalletAsset';
-    liability_type?: 'loan' | 'debt' | 'mortgage';
-    liability_direction?: 'credit' | 'debit';
+    liability_type?: (typeof LIABILITY_TYPES)[number];
+    liability_direction?: (typeof LIABILITY_DIRECTIONS)[number];
     liability_amount?: string;
     liability_start_date?: string;
     interest?: string;
@@ -81,8 +127,8 @@ export async function updateAccount(
     include_net_worth?: boolean;
     active?: boolean;
     notes?: string;
-    liability_type?: 'loan' | 'debt' | 'mortgage';
-    liability_direction?: 'credit' | 'debit';
+    liability_type?: (typeof LIABILITY_TYPES)[number];
+    liability_direction?: (typeof LIABILITY_DIRECTIONS)[number];
     liability_amount?: string;
     liability_start_date?: string;
     interest?: string;
@@ -200,35 +246,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
           .enum(['defaultAsset', 'sharedAsset', 'savingAsset', 'ccAsset', 'cashWalletAsset'])
           .optional()
           .describe('Role for asset accounts (required when type is asset)'),
-        liability_type: z
-          .enum(['loan', 'debt', 'mortgage'])
-          .optional()
-          .describe('Liability type (required when type is liability): loan, debt, or mortgage'),
-        liability_direction: z
-          .enum(['credit', 'debit'])
-          .optional()
-          .describe(
-            "Liability direction (required when type is liability): 'debit' if you owe this money, 'credit' if it is owed to you",
-          ),
-        liability_amount: z
-          .string()
-          .optional()
-          .describe(
-            'Amount of the liability as a number string, for liability accounts. Must be sent together with liability_start_date.',
-          ),
-        liability_start_date: dateSchema
-          .optional()
-          .describe(
-            'Date the liability started (YYYY-MM-DD), for liability accounts. Must be sent together with liability_amount.',
-          ),
-        interest: z
-          .string()
-          .optional()
-          .describe('Interest percentage as a number string between 0 and 100 (e.g. "3.15"), for liability accounts'),
-        interest_period: z
-          .enum(CREATE_INTEREST_PERIODS)
-          .optional()
-          .describe('Period the interest percentage applies to, for liability accounts'),
+        ...liabilityFields('create'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         iban: z.string().optional().describe('IBAN number'),
         opening_balance: z.string().optional().describe('Opening balance as a number string'),
@@ -258,37 +276,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
         include_net_worth: z.boolean().optional().describe('Include in net worth calculations'),
         active: z.boolean().optional().describe('Whether the account is active'),
         notes: z.string().optional().describe('Notes'),
-        liability_type: z
-          .enum(['loan', 'debt', 'mortgage'])
-          .optional()
-          .describe('Only applies to liability accounts: loan, debt, or mortgage'),
-        liability_direction: z
-          .enum(['credit', 'debit'])
-          .optional()
-          .describe("Only applies to liability accounts: 'debit' if you owe this money, 'credit' if it is owed to you"),
-        liability_amount: z
-          .string()
-          .optional()
-          .describe(
-            'Only applies to liability accounts: amount of the liability as a number string. Must be sent together with liability_start_date.',
-          ),
-        liability_start_date: dateSchema
-          .optional()
-          .describe(
-            'Only applies to liability accounts: date the liability started (YYYY-MM-DD). Must be sent together with liability_amount.',
-          ),
-        interest: z
-          .string()
-          .optional()
-          .describe(
-            'Only applies to liability accounts: interest percentage as a number string between 0 and 100 (e.g. "3.15")',
-          ),
-        interest_period: z
-          .enum(UPDATE_INTEREST_PERIODS)
-          .optional()
-          .describe(
-            'Only applies to liability accounts: period the interest percentage applies to. Firefly III accepts fewer periods here than on create_account.',
-          ),
+        ...liabilityFields('update'),
       },
       annotations: UPDATE_ANNOTATIONS,
     },
