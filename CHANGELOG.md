@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-13
+
 ### Added
 
 - `scripts/changelog-guard.mjs`, which fails the build when `CHANGELOG.md`'s `merge=union` driver has resolved a merge cleanly but wrongly, or when a real three-way merge (two releases landing on `main` at once) interleaves two dated sections. Union keeps both sides of a conflicting hunk by concatenating lines, with no notion of which release section a bullet belongs to, so it can splice a stale branch's entries into an already-published section, absorb pending `[Unreleased]` entries into the release that just shipped (emptying `[Unreleased]` in the process), or leave two `### Fixed` headings in one section — all reported by git as a clean merge. The guard treats released sections as immutable (compared against the newest prior tag, or against `origin/main` in `backmerge.yml` before it pushes), requires dated sections in strictly descending version order, and rejects a repeated `[label]:` link definition. Deliberate edits to a published section are exempted per-version via `scripts/changelog-guard-allowed-edits.json`, checked in alongside the edit's PR, rather than a PR-title skip that only silences that one run. Runs on pull requests, on pushes (back-merges reach `develop` without a PR), inside `backmerge.yml` itself before it pushes, and again before publishing.
@@ -206,7 +208,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.6...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.6...v0.5.0
 [0.4.6]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.3...v0.4.4
