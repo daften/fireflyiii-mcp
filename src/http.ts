@@ -116,10 +116,13 @@ export function createOAuthHandler(
   const FLOW_TTL_MS = 10 * 60 * 1000;
   const pendingFlows = new Map<string, { redirectUri: string; createdAt: number }>();
 
+  function isFlowExpired(entry: { createdAt: number }): boolean {
+    return Date.now() - entry.createdAt > FLOW_TTL_MS;
+  }
+
   function evictExpiredFlows(): void {
-    const now = Date.now();
     for (const [key, entry] of pendingFlows) {
-      if (now - entry.createdAt > FLOW_TTL_MS) pendingFlows.delete(key);
+      if (isFlowExpired(entry)) pendingFlows.delete(key);
     }
   }
 
@@ -295,7 +298,7 @@ export function createOAuthHandler(
         return;
       }
       const entry = pendingFlows.get(state);
-      const isExpired = entry ? Date.now() - entry.createdAt > FLOW_TTL_MS : false;
+      const isExpired = entry ? isFlowExpired(entry) : false;
       if (!entry || isExpired) {
         evictExpiredFlows();
         res.writeHead(400, { 'Content-Type': 'text/plain' });
