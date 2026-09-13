@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { formatError } from '../client.js';
+import type { QueryParams } from '../types.js';
 
 /** Raw shape accepted as a tool input schema (mutable variant of z.ZodRawShape). */
 export type ToolShape = Record<string, z.ZodType>;
@@ -119,6 +120,25 @@ export const dateOrDateTimeSchema = z
 export function parseId(id: string): string {
   const match = id.match(/^(\d+)/);
   return match ? match[1] : id;
+}
+
+/**
+ * Builds the query params shared by `/transactions` and `/accounts/{id}/transactions` —
+ * both endpoints accept the same type/start/end/page/limit filters. A future Firefly
+ * filter added here reaches both call sites instead of needing to be hand-added twice.
+ */
+export function buildTransactionListQuery(params: {
+  type?: string;
+  start?: string;
+  end?: string;
+  page?: number;
+  limit?: number;
+}): QueryParams {
+  const query: QueryParams = { page: params.page, limit: params.limit };
+  if (params.type) query.type = params.type;
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
+  return query;
 }
 
 // Autocomplete tuning shared by every completion handler.

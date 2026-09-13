@@ -11,19 +11,30 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { CATEGORY_NAME_HINT, dateOrDateTimeSchema, dateSchema, defineTool, parseId } from './_helpers.js';
+import {
+  buildTransactionListQuery,
+  CATEGORY_NAME_HINT,
+  dateOrDateTimeSchema,
+  dateSchema,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 import { fetchAccountTransactions } from './accounts.js';
 
 // A transaction response carries two ids: the top-level group `id`, which update_transaction and
 // delete_transaction expect, and a `transaction_journal_id` inside each item of `transactions[]`.
 // They are usually adjacent numbers, so the wrong one addresses a real but unrelated transaction
 // rather than erroring — nothing at write time can tell the two apart, which is why these fields
-// warn instead of validating.
-const GROUP_ID_HINT =
-  'update_transaction and delete_transaction take the top-level `id` (the transaction group), not the `transaction_journal_id` inside `transactions[]`.';
+// warn instead of validating. GROUP_ID_HINT and groupIdField both restate this fact for different
+// audiences (a tool description vs. a field description); they share this one fragment so the
+// wording can't drift apart.
+const GROUP_VS_JOURNAL_ID =
+  'the top-level `id` (the transaction group), not the `transaction_journal_id` inside `transactions[]`';
+
+const GROUP_ID_HINT = `update_transaction and delete_transaction take ${GROUP_VS_JOURNAL_ID}.`;
 
 const groupIdField = (verb: string): string =>
-  `Transaction group ID — the top-level \`id\` from get_transaction, not the \`transaction_journal_id\` inside \`transactions[]\`. That is usually an adjacent number, so the wrong one silently ${verb} a different transaction.`;
+  `Transaction group ID — ${GROUP_VS_JOURNAL_ID}. That is usually an adjacent number, so the wrong one silently ${verb} a different transaction.`;
 
 export async function fetchTransactions(
   client: FireflyClient,
@@ -47,10 +58,7 @@ export async function fetchTransactions(
       limit: params.limit,
     });
   }
-  const query: QueryParams = { page: params.page, limit: params.limit };
-  if (params.type) query.type = params.type;
-  if (params.start) query.start = params.start;
-  if (params.end) query.end = params.end;
+  const query = buildTransactionListQuery(params);
   const response = await client.get<JsonApiListResponse>('/transactions', query);
   return unwrapList(response);
 }

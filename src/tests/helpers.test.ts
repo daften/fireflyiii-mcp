@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, it, vi } from 'vitest';
 import { FireflyError } from '../client.js';
-import { dateOrDateTimeSchema, dateSchema, defineTool, parseId } from '../tools/_helpers.js';
+import { buildTransactionListQuery, dateOrDateTimeSchema, dateSchema, defineTool, parseId } from '../tools/_helpers.js';
 
 function makeServer() {
   let capturedHandler: ((args: Record<string, unknown>) => Promise<unknown>) | null = null;
@@ -111,5 +111,21 @@ describe('parseId', () => {
 
   it('falls back to input if no leading numeric ID is found', () => {
     expect(parseId('no-numbers')).toBe('no-numbers');
+  });
+});
+
+describe('buildTransactionListQuery', () => {
+  it('always includes page and limit', () => {
+    expect(buildTransactionListQuery({ page: 1, limit: 50 })).toEqual({ page: 1, limit: 50 });
+  });
+
+  it('adds type, start, and end only when provided', () => {
+    expect(
+      buildTransactionListQuery({ type: 'withdrawal', start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 }),
+    ).toEqual({ type: 'withdrawal', start: '2026-01-01', end: '2026-01-31', page: 1, limit: 50 });
+  });
+
+  it('omits type, start, and end when absent', () => {
+    expect(buildTransactionListQuery({ page: 2, limit: 10 })).toEqual({ page: 2, limit: 10 });
   });
 });

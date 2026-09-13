@@ -40,33 +40,29 @@ const EXPORT_TOOLS: Array<{ name: string; title: string; entity: ExportEntity; h
 
 export function registerExportTools(server: McpServer, client: FireflyClient): void {
   for (const { name, title, entity, hasDates } of EXPORT_TOOLS) {
-    if (hasDates) {
-      defineTool(
-        server,
-        name,
-        {
-          title,
-          description: `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv). Optionally filter by date range.`,
-          inputSchema: {
-            start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
-            end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
-          },
-          annotations: READ_ANNOTATIONS,
-        },
-        ({ start, end }) => exportEntity(client, entity, { start, end }),
-      );
-    } else {
-      defineTool(
-        server,
-        name,
-        {
-          title,
-          description: `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv).`,
-          inputSchema: {},
-          annotations: READ_ANNOTATIONS,
-        },
-        () => exportEntity(client, entity, {}),
-      );
-    }
+    const description = hasDates
+      ? `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv). Optionally filter by date range.`
+      : `Export all ${entity} as a CSV file. Returns raw CSV text (text/csv).`;
+    defineTool(
+      server,
+      name,
+      {
+        title,
+        description,
+        inputSchema: hasDates
+          ? {
+              start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
+              end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
+            }
+          : {},
+        annotations: READ_ANNOTATIONS,
+      },
+      (args) =>
+        exportEntity(
+          client,
+          entity,
+          hasDates ? { start: args.start as string | undefined, end: args.end as string | undefined } : {},
+        ),
+    );
   }
 }

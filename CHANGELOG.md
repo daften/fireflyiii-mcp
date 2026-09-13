@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Deduped six maintainability items flagged in the v0.4.6..develop pre-release review (#103): `get_transactions`' account-scoped delegation and `get_account_transactions` now share one query-builder helper; `create_account` and `update_account` now share one `liabilityFields()` schema factory instead of repeating the six-field liability block; the OAuth pending-flow expiry check in `src/http.ts` is defined once and used by both the periodic sweep and the read-time check; `GROUP_ID_HINT` and `groupIdField` in `transactions.ts` now derive from one shared warning fragment instead of two independently-worded copies; and `exports.ts`'s dated/undated tool variants are now registered through a single `defineTool` call instead of two near-identical branches. No behavior change to any tool's request/response shape or validation.
+
+### Fixed
+
+- `createOAuthHandler`'s pending-flow eviction timer no longer starts unconditionally for the life of every handler instance. It now starts lazily, only once an OAuth flow is actually pending, and clears itself again once the pending-flow map drains — harmless in production (the handler is created once), but it was leaking one live interval per instantiation in the test suite, which creates the handler dozens of times per run.
+
 ## [0.5.0] - 2026-09-13
 
 ### Added
