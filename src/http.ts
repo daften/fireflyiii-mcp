@@ -120,17 +120,26 @@ export function createOAuthHandler(
     return Date.now() - entry.createdAt > FLOW_TTL_MS;
   }
 
+  let evictionTimer: NodeJS.Timeout | undefined;
+
   function evictExpiredFlows(): void {
     for (const [key, entry] of pendingFlows) {
       if (isFlowExpired(entry)) pendingFlows.delete(key);
     }
+    if (pendingFlows.size === 0 && evictionTimer) {
+      clearInterval(evictionTimer);
+      evictionTimer = undefined;
+    }
   }
 
-  // Lazy eviction above only runs on authorize/callback traffic, so flows abandoned mid-auth
-  // would otherwise sit in memory indefinitely on a quiet long-running server. unref() keeps
-  // the timer from holding the process open. Skipped in PAT-only mode, where /oauth/authorize
-  // 404s and pendingFlows therefore stays empty for the life of the process.
-  if (oauthClientId) setInterval(evictExpiredFlows, FLOW_TTL_MS).unref();
+  // Started lazily, on the first pending flow, rather than unconditionally at handler-creation
+  // time: most requests (metadata, token proxy, health checks, PAT-only mode) never create a
+  // flow at all, so they should never pay for a timer. unref() keeps it from holding the process
+  // open; evictExpiredFlows() clears it again once pendingFlows drains, so a quiet server doesn't
+  // accumulate one live interval per authorize burst.
+  function scheduleEviction(): void {
+    if (!evictionTimer) evictionTimer = setInterval(evictExpiredFlows, FLOW_TTL_MS).unref();
+  }
 
   return async (req, res) => {
     // Liveness probe — no auth, mode-agnostic. Always 200 whether OAuth is
@@ -209,6 +218,7 @@ export function createOAuthHandler(
       if (clientRedirectUri && state) {
         evictExpiredFlows();
         pendingFlows.set(state, { redirectUri: clientRedirectUri, createdAt: Date.now() });
+        scheduleEviction();
       }
       const fireflyAuthUrl = new URL(`${fireflyUrl}/oauth/authorize`);
       incomingUrl.searchParams.forEach((value, key) => {

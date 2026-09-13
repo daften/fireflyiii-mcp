@@ -513,6 +513,14 @@ describe('createOAuthHandler — pending flow expiry', () => {
     expect(cbRes.statusCode).toBe(400);
     expect(cbRes.body).toContain('No pending OAuth flow');
   });
+
+  it('does not start an eviction timer when no OAuth flow has ever been started', () => {
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(global, 'setInterval');
+    createOAuthHandler('https://firefly.example.com', 'client-id', vi.fn());
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    setIntervalSpy.mockRestore();
+  });
 });
 
 describe('createOAuthHandler — Bearer guard', () => {
