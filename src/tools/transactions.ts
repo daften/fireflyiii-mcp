@@ -11,7 +11,14 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { CATEGORY_NAME_HINT, dateOrDateTimeSchema, dateSchema, defineTool, parseId } from './_helpers.js';
+import {
+  buildTransactionListQuery,
+  CATEGORY_NAME_HINT,
+  dateOrDateTimeSchema,
+  dateSchema,
+  defineTool,
+  parseId,
+} from './_helpers.js';
 import { fetchAccountTransactions } from './accounts.js';
 
 // A transaction response carries two ids: the top-level group `id`, which update_transaction and
@@ -47,10 +54,7 @@ export async function fetchTransactions(
       limit: params.limit,
     });
   }
-  const query: QueryParams = { page: params.page, limit: params.limit };
-  if (params.type) query.type = params.type;
-  if (params.start) query.start = params.start;
-  if (params.end) query.end = params.end;
+  const query = buildTransactionListQuery(params);
   const response = await client.get<JsonApiListResponse>('/transactions', query);
   return unwrapList(response);
 }

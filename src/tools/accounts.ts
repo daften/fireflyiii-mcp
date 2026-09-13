@@ -15,6 +15,7 @@ import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTAT
 import {
   AUTOCOMPLETE_FETCH_LIMIT,
   AUTOCOMPLETE_MAX_SUGGESTIONS,
+  buildTransactionListQuery,
   createTtlCache,
   dateSchema,
   debugLog,
@@ -102,10 +103,7 @@ export async function fetchAccountTransactions(
   id: string,
   params: { start?: string; end?: string; type?: string; page?: number; limit?: number },
 ): Promise<UnwrappedList> {
-  const query: QueryParams = { page: params.page, limit: params.limit };
-  if (params.start) query.start = params.start;
-  if (params.end) query.end = params.end;
-  if (params.type) query.type = params.type;
+  const query = buildTransactionListQuery(params);
   const response = await client.get<JsonApiListResponse>(`/accounts/${id}/transactions`, query);
   return unwrapList(response);
 }
