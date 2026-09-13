@@ -37,12 +37,25 @@ export async function fetchAccount(client: FireflyClient, id: string): Promise<U
   return unwrapSingle(response);
 }
 
+// Firefly III validates interest_period against config('firefly.interest_periods') when an account is
+// created, but against a hardcoded `in:daily,monthly,yearly` rule when one is updated. Mirroring that
+// split keeps update_account from advertising three periods the API will reject (weekly,
+// quarterly and half-year, which create_account accepts and update_account does not).
+const CREATE_INTEREST_PERIODS = ['daily', 'weekly', 'monthly', 'quarterly', 'half-year', 'yearly'] as const;
+const UPDATE_INTEREST_PERIODS = ['daily', 'monthly', 'yearly'] as const;
+
 export async function createAccount(
   client: FireflyClient,
   params: {
     name: string;
     type: 'asset' | 'expense' | 'revenue' | 'liability';
     account_role?: 'defaultAsset' | 'sharedAsset' | 'savingAsset' | 'ccAsset' | 'cashWalletAsset';
+    liability_type?: 'loan' | 'debt' | 'mortgage';
+    liability_direction?: 'credit' | 'debit';
+    liability_amount?: string;
+    liability_start_date?: string;
+    interest?: string;
+    interest_period?: (typeof CREATE_INTEREST_PERIODS)[number];
     currency_code?: string;
     iban?: string;
     opening_balance?: string;
@@ -67,6 +80,12 @@ export async function updateAccount(
     include_net_worth?: boolean;
     active?: boolean;
     notes?: string;
+    liability_type?: 'loan' | 'debt' | 'mortgage';
+    liability_direction?: 'credit' | 'debit';
+    liability_amount?: string;
+    liability_start_date?: string;
+    interest?: string;
+    interest_period?: (typeof UPDATE_INTEREST_PERIODS)[number];
   },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/accounts/${id}`, params);
@@ -130,9 +149,9 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     },
     ({ type, page, limit }) =>
       fetchAccounts(client, {
-        type: type as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        type: type,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -167,7 +186,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       inputSchema: { id: accountIdSchema },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchAccount(client, parseId(id as string)),
+    ({ id }) => fetchAccount(client, parseId(id)),
   );
 
   defineTool(
@@ -183,6 +202,35 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
           .enum(['defaultAsset', 'sharedAsset', 'savingAsset', 'ccAsset', 'cashWalletAsset'])
           .optional()
           .describe('Role for asset accounts (required when type is asset)'),
+        liability_type: z
+          .enum(['loan', 'debt', 'mortgage'])
+          .optional()
+          .describe('Liability type (required when type is liability): loan, debt, or mortgage'),
+        liability_direction: z
+          .enum(['credit', 'debit'])
+          .optional()
+          .describe(
+            "Liability direction (required when type is liability): 'debit' if you owe this money, 'credit' if it is owed to you",
+          ),
+        liability_amount: z
+          .string()
+          .optional()
+          .describe(
+            'Amount of the liability as a number string, for liability accounts. Must be sent together with liability_start_date.',
+          ),
+        liability_start_date: dateSchema
+          .optional()
+          .describe(
+            'Date the liability started (YYYY-MM-DD), for liability accounts. Must be sent together with liability_amount.',
+          ),
+        interest: z
+          .string()
+          .optional()
+          .describe('Interest percentage as a number string between 0 and 100 (e.g. "3.15"), for liability accounts'),
+        interest_period: z
+          .enum(CREATE_INTEREST_PERIODS)
+          .optional()
+          .describe('Period the interest percentage applies to, for liability accounts'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         iban: z.string().optional().describe('IBAN number'),
         opening_balance: z.string().optional().describe('Opening balance as a number string'),
@@ -192,7 +240,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createAccount(client, params as Parameters<typeof createAccount>[1]),
+    (params) => createAccount(client, params),
   );
 
   defineTool(
@@ -212,10 +260,41 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
         include_net_worth: z.boolean().optional().describe('Include in net worth calculations'),
         active: z.boolean().optional().describe('Whether the account is active'),
         notes: z.string().optional().describe('Notes'),
+        liability_type: z
+          .enum(['loan', 'debt', 'mortgage'])
+          .optional()
+          .describe('Only applies to liability accounts: loan, debt, or mortgage'),
+        liability_direction: z
+          .enum(['credit', 'debit'])
+          .optional()
+          .describe("Only applies to liability accounts: 'debit' if you owe this money, 'credit' if it is owed to you"),
+        liability_amount: z
+          .string()
+          .optional()
+          .describe(
+            'Only applies to liability accounts: amount of the liability as a number string. Must be sent together with liability_start_date.',
+          ),
+        liability_start_date: dateSchema
+          .optional()
+          .describe(
+            'Only applies to liability accounts: date the liability started (YYYY-MM-DD). Must be sent together with liability_amount.',
+          ),
+        interest: z
+          .string()
+          .optional()
+          .describe(
+            'Only applies to liability accounts: interest percentage as a number string between 0 and 100 (e.g. "3.15")',
+          ),
+        interest_period: z
+          .enum(UPDATE_INTEREST_PERIODS)
+          .optional()
+          .describe(
+            'Only applies to liability accounts: period the interest percentage applies to. Firefly III accepts fewer periods here than on create_account.',
+          ),
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateAccount(client, parseId(id as string), params as Parameters<typeof updateAccount>[2]),
+    ({ id, ...params }) => updateAccount(client, parseId(id), params),
   );
 
   defineTool(
@@ -228,7 +307,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       inputSchema: { id: accountIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteAccount(client, parseId(id as string)),
+    ({ id }) => deleteAccount(client, parseId(id)),
   );
 
   defineTool(
@@ -251,12 +330,12 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, type, page, limit }) =>
-      fetchAccountTransactions(client, parseId(id as string), {
-        start: start as string | undefined,
-        end: end as string | undefined,
-        type: type as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchAccountTransactions(client, parseId(id), {
+        start: start,
+        end: end,
+        type: type,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -280,10 +359,10 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
     },
     ({ query, field, page, limit }) =>
       searchAccounts(client, {
-        query: query as string,
-        field: field as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        query: query,
+        field: field,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -297,7 +376,7 @@ export function registerAccountTools(server: McpServer, client: FireflyClient): 
       },
     },
     async ({ account }) => {
-      const id = parseId(account as string);
+      const id = parseId(account);
       return {
         description: `Get transactions for account ID ${id}`,
         messages: [

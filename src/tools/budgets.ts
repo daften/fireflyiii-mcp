@@ -175,7 +175,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) => fetchBudgets(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchBudgets(client, { page: page, limit: limit }),
   );
 
   const budgetIdSchema = completable(
@@ -213,8 +213,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ budgetId, start, end }) =>
-      fetchBudgetLimits(client, parseId(budgetId as string), start as string | undefined, end as string | undefined),
+    ({ budgetId, start, end }) => fetchBudgetLimits(client, parseId(budgetId), start, end),
   );
 
   defineTool(
@@ -236,7 +235,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createBudget(client, params as Parameters<typeof createBudget>[1]),
+    (params) => createBudget(client, params),
   );
 
   defineTool(
@@ -260,7 +259,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateBudget(client, parseId(id as string), params as Parameters<typeof updateBudget>[2]),
+    ({ id, ...params }) => updateBudget(client, parseId(id), params),
   );
 
   defineTool(
@@ -273,7 +272,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       inputSchema: { id: budgetIdSchema },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteBudget(client, parseId(id as string)),
+    ({ id }) => deleteBudget(client, parseId(id)),
   );
 
   defineTool(
@@ -295,8 +294,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    ({ budget_id, ...params }) =>
-      createBudgetLimit(client, parseId(budget_id as string), params as Parameters<typeof createBudgetLimit>[2]),
+    ({ budget_id, ...params }) => createBudgetLimit(client, parseId(budget_id), params),
   );
 
   defineTool(
@@ -319,7 +317,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateBudgetLimit(client, id as string, params as Parameters<typeof updateBudgetLimit>[2]),
+    ({ id, ...params }) => updateBudgetLimit(client, id, params),
   );
 
   defineTool(
@@ -332,7 +330,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       inputSchema: { id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteBudgetLimit(client, id as string),
+    ({ id }) => deleteBudgetLimit(client, id),
   );
 
   defineTool(
@@ -348,8 +346,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchAvailableBudgets(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchAvailableBudgets(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -363,7 +360,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchAvailableBudget(client, id as string),
+    ({ id }) => fetchAvailableBudget(client, id),
   );
 
   defineTool(
@@ -382,7 +379,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       annotations: READ_ANNOTATIONS,
     },
     ({ id, start, end, page, limit }) =>
-      fetchBudgetTransactions(client, parseId(id as string), { start, end, page, limit } as Parameters<
+      fetchBudgetTransactions(client, parseId(id), { start, end, page, limit } as Parameters<
         typeof fetchBudgetTransactions
       >[2]),
   );
@@ -401,7 +398,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: READ_ANNOTATIONS,
     },
-    (params) => fetchTransactionsWithoutBudget(client, params as Parameters<typeof fetchTransactionsWithoutBudget>[1]),
+    (params) => fetchTransactionsWithoutBudget(client, params),
   );
 
   server.registerPrompt(
@@ -414,7 +411,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
     },
     async ({ budget }) => {
-      const id = parseId(budget as string);
+      const id = parseId(budget);
       return {
         description: `Get transactions for budget ID ${id}`,
         messages: [

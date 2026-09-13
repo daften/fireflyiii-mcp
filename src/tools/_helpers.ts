@@ -2,10 +2,16 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { formatError } from '../client.js';
 
-type ToolConfig = {
+/** Raw shape accepted as a tool input schema (mutable variant of z.ZodRawShape). */
+export type ToolShape = Record<string, z.ZodType>;
+
+/** Handler argument type inferred from a shape. */
+export type ToolArgs<Shape extends ToolShape> = z.infer<z.ZodObject<Shape>>;
+
+type ToolConfig<Shape extends ToolShape> = {
   title?: string;
   description?: string;
-  inputSchema?: Record<string, z.ZodTypeAny>;
+  inputSchema?: Shape;
   annotations?: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
@@ -14,15 +20,22 @@ type ToolConfig = {
   };
 };
 
+// The generic overload gives call sites handler args inferred from their inputSchema; the
+// implementation signature widens the config so the SDK's conditional ToolCallback type
+// resolves to a concrete function type (it stays deferred over an unresolved type parameter).
+export function defineTool<Shape extends ToolShape>(
+  server: McpServer,
+  name: string,
+  config: ToolConfig<Shape>,
+  fetch: (args: ToolArgs<Shape>) => Promise<unknown>,
+): void;
 export function defineTool(
   server: McpServer,
   name: string,
-  config: ToolConfig,
+  config: ToolConfig<ToolShape>,
   fetch: (args: Record<string, unknown>) => Promise<unknown>,
 ): void {
-  // registerTool is generic in the SDK; the cast avoids fighting its complex overload resolution
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (server as any).registerTool(name, config, async (args: Record<string, unknown>) => {
+  server.registerTool(name, config, async (args: Record<string, unknown>) => {
     try {
       const result = await fetch(args);
       return {
@@ -52,14 +65,19 @@ export type ContentResult = {
  * (content blocks) rather than a plain value. Error handling is identical:
  * thrown errors become an `isError` text block via {@link formatError}.
  */
+export function defineContentTool<Shape extends ToolShape>(
+  server: McpServer,
+  name: string,
+  config: ToolConfig<Shape>,
+  fetch: (args: ToolArgs<Shape>) => Promise<ContentResult>,
+): void;
 export function defineContentTool(
   server: McpServer,
   name: string,
-  config: ToolConfig,
+  config: ToolConfig<ToolShape>,
   fetch: (args: Record<string, unknown>) => Promise<ContentResult>,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (server as any).registerTool(name, config, async (args: Record<string, unknown>) => {
+  server.registerTool(name, config, async (args: Record<string, unknown>) => {
     try {
       return await fetch(args);
     } catch (err) {
@@ -69,6 +87,19 @@ export function defineContentTool(
 }
 
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD');
+
+/**
+ * Appended to every tool field that takes a category *name* rather than an id.
+ *
+ * Firefly III matches category names by exact string and stores whatever it is given verbatim, so a
+ * name copied out of a rendered web page ("Restaurants &amp; cafés") silently becomes a second
+ * category alongside the real "Restaurants & cafés" — the two look identical wherever they are
+ * rendered. Decoding entities on the way out was considered and rejected: it is lossy and
+ * unavoidable, since a category legitimately named "Restaurants &amp; cafés" would then be
+ * unreachable. Warning the caller is the only option that cannot corrupt a valid name.
+ */
+export const CATEGORY_NAME_HINT =
+  'Matched by exact string — pass literal text, since HTML entities like &amp; or &#039; are not decoded and would create a separate category.';
 
 const dateTimeSchema = z.iso.datetime({ offset: true });
 export const dateOrDateTimeSchema = z

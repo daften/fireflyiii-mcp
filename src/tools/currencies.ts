@@ -75,8 +75,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchCurrencies(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchCurrencies(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -88,7 +87,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       inputSchema: { code: z.string().describe('Currency code (e.g. EUR, USD)') },
       annotations: READ_ANNOTATIONS,
     },
-    ({ code }) => fetchCurrency(client, code as string),
+    ({ code }) => fetchCurrency(client, code),
   );
 
   defineTool(
@@ -107,7 +106,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createCurrency(client, params as Parameters<typeof createCurrency>[1]),
+    (params) => createCurrency(client, params),
   );
 
   defineTool(
@@ -127,7 +126,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ code, ...params }) => updateCurrency(client, code as string, params as Parameters<typeof updateCurrency>[2]),
+    ({ code, ...params }) => updateCurrency(client, code, params),
   );
 
   defineTool(
@@ -140,7 +139,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       inputSchema: { code: z.string().describe('Currency code to delete (e.g. EUR)') },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ code }) => deleteCurrency(client, code as string),
+    ({ code }) => deleteCurrency(client, code),
   );
 
   defineTool(
@@ -152,7 +151,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       inputSchema: { code: z.string().describe('Currency code (e.g. EUR)') },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ code }) => enableCurrency(client, code as string),
+    ({ code }) => enableCurrency(client, code),
   );
 
   defineTool(
@@ -164,7 +163,7 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       inputSchema: { code: z.string().describe('Currency code (e.g. EUR)') },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ code }) => disableCurrency(client, code as string),
+    ({ code }) => disableCurrency(client, code),
   );
 
   defineTool(
@@ -176,6 +175,6 @@ export function registerCurrencyTools(server: McpServer, client: FireflyClient):
       inputSchema: { code: z.string().describe('Currency code to set as primary (e.g. EUR)') },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ code }) => setPrimaryCurrency(client, code as string),
+    ({ code }) => setPrimaryCurrency(client, code),
   );
 }

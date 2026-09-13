@@ -481,6 +481,40 @@ describe('createOAuthHandler — OAuth callback proxy', () => {
   });
 });
 
+describe('createOAuthHandler — pending flow expiry', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('background sweep evicts abandoned flows without any further traffic', async () => {
+    vi.useFakeTimers();
+    const mcpHandler = vi.fn();
+    const handler = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id-123',
+      mcpHandler as unknown as (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
+    );
+
+    const authReq = mockReq(
+      'GET',
+      '/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcallback&state=abandoned',
+      { host: '127.0.0.1:3000' },
+    );
+    await handler(authReq as http.IncomingMessage, mockRes() as unknown as http.ServerResponse);
+
+    // Two sweep intervals pass with no requests; the second sweep sees the entry as expired.
+    await vi.advanceTimersByTimeAsync(2 * 10 * 60 * 1000 + 1);
+
+    const cbReq = mockReq('GET', '/oauth/callback?code=abc&state=abandoned', { host: '127.0.0.1:3000' });
+    const cbRes = mockRes();
+    await handler(cbReq as http.IncomingMessage, cbRes as unknown as http.ServerResponse);
+
+    // The sweep already removed the entry, so this reads as "no pending flow", not "expired".
+    expect(cbRes.statusCode).toBe(400);
+    expect(cbRes.body).toContain('No pending OAuth flow');
+  });
+});
+
 describe('createOAuthHandler — Bearer guard', () => {
   it('returns 401 with WWW-Authenticate when Authorization header is missing', async () => {
     const mcpHandler = vi.fn();
@@ -874,6 +908,10 @@ describe('createOAuthHandler — concurrent OAuth flows (P0-1)', () => {
     await handler(callbackReq as http.IncomingMessage, callbackRes as unknown as http.ServerResponse);
 
     expect(callbackRes.statusCode).toBe(400);
+    // Distinguishes the expired-entry branch from the no-entry one. Both say "Start authorization",
+    // and Date.now is mocked rather than the clock advanced, so the sweep never runs and the entry
+    // is still present — this is the only test that reaches `isExpired`.
+    expect(callbackRes.body).toContain('OAuth flow expired');
   });
 });
 

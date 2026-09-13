@@ -1,0 +1,6 @@
+# develop's pending [Unreleased] entries and main's freshly-cut dated
+# release sections both edit the top of CHANGELOG.md independently, and
+# conflict on nearly every back-merge (main -> develop). Both sides are
+# additive, so let git keep both instead of failing: union merge takes
+# the union of changed lines from each side rather than raising a conflict.
+CHANGELOG.md merge=union

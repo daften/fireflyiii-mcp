@@ -11,7 +11,19 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateOrDateTimeSchema, dateSchema, defineTool } from './_helpers.js';
+import { CATEGORY_NAME_HINT, dateOrDateTimeSchema, dateSchema, defineTool, parseId } from './_helpers.js';
+import { fetchAccountTransactions } from './accounts.js';
+
+// A transaction response carries two ids: the top-level group `id`, which update_transaction and
+// delete_transaction expect, and a `transaction_journal_id` inside each item of `transactions[]`.
+// They are usually adjacent numbers, so the wrong one addresses a real but unrelated transaction
+// rather than erroring — nothing at write time can tell the two apart, which is why these fields
+// warn instead of validating.
+const GROUP_ID_HINT =
+  'update_transaction and delete_transaction take the top-level `id` (the transaction group), not the `transaction_journal_id` inside `transactions[]`.';
+
+const groupIdField = (verb: string): string =>
+  `Transaction group ID — the top-level \`id\` from get_transaction, not the \`transaction_journal_id\` inside \`transactions[]\`. That is usually an adjacent number, so the wrong one silently ${verb} a different transaction.`;
 
 export async function fetchTransactions(
   client: FireflyClient,
@@ -24,9 +36,19 @@ export async function fetchTransactions(
     limit?: number;
   },
 ): Promise<UnwrappedList> {
+  // Firefly III's /transactions endpoint has no account_id filter and silently ignores it, so
+  // accountId must be routed to /accounts/{id}/transactions instead — see issue #101.
+  if (params.accountId) {
+    return fetchAccountTransactions(client, parseId(params.accountId), {
+      start: params.start,
+      end: params.end,
+      type: params.type,
+      page: params.page,
+      limit: params.limit,
+    });
+  }
   const query: QueryParams = { page: params.page, limit: params.limit };
   if (params.type) query.type = params.type;
-  if (params.accountId) query.account_id = params.accountId;
   if (params.start) query.start = params.start;
   if (params.end) query.end = params.end;
   const response = await client.get<JsonApiListResponse>('/transactions', query);
@@ -194,7 +216,12 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
           .enum(['withdrawal', 'deposit', 'transfer', 'reconciliation'])
           .optional()
           .describe('Transaction type filter'),
-        accountId: z.string().optional().describe('Filter by account ID — use get_accounts to find valid IDs'),
+        accountId: z
+          .string()
+          .optional()
+          .describe(
+            'Filter by account ID — use get_accounts to find valid IDs. Internally delegates to the same endpoint as get_account_transactions.',
+          ),
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
@@ -204,12 +231,12 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     },
     ({ type, accountId, start, end, page, limit }) =>
       fetchTransactions(client, {
-        type: type as string | undefined,
-        accountId: accountId as string | undefined,
-        start: start as string | undefined,
-        end: end as string | undefined,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        type: type,
+        accountId: accountId,
+        start: start,
+        end: end,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -218,14 +245,13 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     'get_transaction',
     {
       title: 'Get Transaction',
-      description:
-        'Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs.',
+      description: `Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs. ${GROUP_ID_HINT}`,
       inputSchema: {
         id: z.string().describe('Transaction ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchTransaction(client, id as string),
+    ({ id }) => fetchTransaction(client, id),
   );
 
   defineTool(
@@ -233,8 +259,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     'create_transaction',
     {
       title: 'Create Transaction',
-      description:
-        'Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs.',
+      description: `Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs. ${GROUP_ID_HINT}`,
       inputSchema: {
         type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type'),
         date: dateOrDateTimeSchema.describe('Transaction date (YYYY-MM-DD or RFC 3339 date-time with timezone)'),
@@ -242,7 +267,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         description: z.string().describe('Short description of the transaction'),
         source_id: z.string().optional().describe('Source account ID (required for withdrawals and transfers)'),
         destination_id: z.string().optional().describe('Destination account ID (required for deposits and transfers)'),
-        category_name: z.string().optional().describe('Category name to assign'),
+        category_name: z.string().optional().describe(`Category name to assign. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD). Defaults to account currency.'),
         notes: z.string().optional().describe('Additional notes'),
@@ -250,7 +275,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createTransaction(client, params as Parameters<typeof createTransaction>[1]),
+    (params) => createTransaction(client, params),
   );
 
   defineTool(
@@ -261,7 +286,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Update an existing transaction in Firefly III. Only fields provided will be changed. Use get_transaction to confirm the ID before updating.',
       inputSchema: {
-        id: z.string().describe('Transaction ID — use get_transactions to find valid IDs'),
+        id: z.string().describe(groupIdField('updates')),
         type: z.enum(['withdrawal', 'deposit', 'transfer']).optional().describe('Transaction type'),
         date: dateOrDateTimeSchema
           .optional()
@@ -270,7 +295,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         description: z.string().optional().describe('Short description'),
         source_id: z.string().optional().describe('Source account ID'),
         destination_id: z.string().optional().describe('Destination account ID'),
-        category_name: z.string().optional().describe('Category name'),
+        category_name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Budget ID'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         notes: z.string().optional().describe('Additional notes'),
@@ -278,7 +303,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateTransaction(client, id as string, params as Parameters<typeof updateTransaction>[2]),
+    ({ id, ...params }) => updateTransaction(client, id, params),
   );
 
   defineTool(
@@ -289,11 +314,11 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Permanently delete a transaction from Firefly III. **This action cannot be undone.** Use get_transaction to confirm the transaction before deleting.',
       inputSchema: {
-        id: z.string().describe('Transaction ID — use get_transactions to find valid IDs'),
+        id: z.string().describe(groupIdField('deletes')),
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteTransaction(client, id as string),
+    ({ id }) => deleteTransaction(client, id),
   );
 
   defineTool(
@@ -312,9 +337,9 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     },
     ({ query, page, limit }) =>
       searchTransactions(client, {
-        query: query as string,
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+        query: query,
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -339,7 +364,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
             z.object({
               amount: z.string().describe('Amount as a positive number string, e.g. "42.50"'),
               description: z.string().describe('Description for this split'),
-              category_name: z.string().optional().describe('Category name'),
+              category_name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
               budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
               tags: z.array(z.string()).optional().describe('Tags'),
               notes: z.string().optional().describe('Notes'),
@@ -350,7 +375,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createSplitTransaction(client, params as Parameters<typeof createSplitTransaction>[1]),
+    (params) => createSplitTransaction(client, params),
   );
 
   defineTool(
@@ -362,13 +387,16 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         'Update multiple transactions at once using a search query (same syntax as search_transactions). All matching transactions will have the specified fields updated.',
       inputSchema: {
         query: z.string().describe('Search query to select transactions (same syntax as search_transactions)'),
-        category_name: z.string().optional().describe('Set category for all matched transactions'),
+        category_name: z
+          .string()
+          .optional()
+          .describe(`Set category for all matched transactions. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Set budget for all matched transactions'),
         tags: z.array(z.string()).optional().describe('Replace tags on all matched transactions'),
         notes: z.string().optional().describe('Set notes on all matched transactions'),
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => bulkUpdateTransactions(client, params as Parameters<typeof bulkUpdateTransactions>[1]),
+    (params) => bulkUpdateTransactions(client, params),
   );
 }

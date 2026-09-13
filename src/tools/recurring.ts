@@ -208,8 +208,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ page, limit }) =>
-      fetchRecurrences(client, { page: page as number | undefined, limit: limit as number | undefined }),
+    ({ page, limit }) => fetchRecurrences(client, { page: page, limit: limit }),
   );
 
   defineTool(
@@ -223,7 +222,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       },
       annotations: READ_ANNOTATIONS,
     },
-    ({ id }) => fetchRecurrence(client, id as string),
+    ({ id }) => fetchRecurrence(client, id),
   );
 
   defineTool(
@@ -277,7 +276,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    (params) => createRecurrence(client, params as Parameters<typeof createRecurrence>[1]),
+    (params) => createRecurrence(client, params),
   );
 
   defineTool(
@@ -326,7 +325,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateRecurrence(client, id as string, params as Parameters<typeof updateRecurrence>[2]),
+    ({ id, ...params }) => updateRecurrence(client, id, params),
   );
 
   defineTool(
@@ -341,7 +340,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteRecurrence(client, id as string),
+    ({ id }) => deleteRecurrence(client, id),
   );
 
   defineTool(
@@ -359,9 +358,9 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       annotations: READ_ANNOTATIONS,
     },
     ({ id, page, limit }) =>
-      fetchRecurrenceTransactions(client, id as string, {
-        page: page as number | undefined,
-        limit: limit as number | undefined,
+      fetchRecurrenceTransactions(client, id, {
+        page: page,
+        limit: limit,
       }),
   );
 
@@ -380,6 +379,6 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       },
       annotations: WRITE_ANNOTATIONS,
     },
-    ({ id, date }) => triggerRecurrence(client, id as string, date as string | undefined),
+    ({ id, date }) => triggerRecurrence(client, id, date),
   );
 }

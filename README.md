@@ -33,13 +33,13 @@ Choose your setup method:
 | [Docker — HTTP](#option-3-docker--http-self-hosted) | HTTP + OAuth or PAT | Self-hosted on a server or home lab |
 | [Git checkout](#option-4-git-checkout-development) | stdio or HTTP | Contributing or local development |
 
-All options except Docker require **Node.js 20+**.
+All options except Docker require **Node.js 22.12+**.
 
 ---
 
 ## Option 1: npm package — stdio (simplest)
 
-**Requires:** Node.js 20+, a Firefly III Personal Access Token (Options → Remote access and tokens → Create new token).
+**Requires:** Node.js 22.12+, a Firefly III Personal Access Token (Options → Remote access and tokens → Create new token).
 
 Add to your Claude MCP config (`.claude/mcp.json` or Claude Desktop `claude_desktop_config.json`):
 

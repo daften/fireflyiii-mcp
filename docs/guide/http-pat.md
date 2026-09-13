@@ -4,7 +4,7 @@ HTTP mode normally uses OAuth 2.0 (see [npm + HTTP/OAuth](/guide/http-oauth)), w
 
 For those cases, omit `FIREFLY_OAUTH_CLIENT_ID` and the server runs in **PAT-only mode** instead: no OAuth proxy is exposed, and every request just needs a Firefly III Personal Access Token as a Bearer token.
 
-**Requires:** Node.js 20+, a Firefly III Personal Access Token (Options → Remote access and tokens → Create new token).
+**Requires:** Node.js 22.12+, a Firefly III Personal Access Token (Options → Remote access and tokens → Create new token).
 
 ## Step 1: Start the server
 

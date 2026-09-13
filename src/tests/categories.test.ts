@@ -158,8 +158,10 @@ describe('categories autocomplete completions', () => {
     registerCategoryTools(server, client);
 
     const prompt = promptConfigs.get('category-transactions');
-    const categoryField = (prompt as any).argsSchema?.category;
-    const complete = (categoryField as any)[Symbol.for('mcp.completable')].complete as (v: string) => Promise<string[]>;
+    const categoryField = (prompt as { argsSchema?: Record<string, unknown> }).argsSchema?.category;
+    const complete = (categoryField as Record<symbol, { complete: (v: string) => Promise<string[]> }>)[
+      Symbol.for('mcp.completable')
+    ].complete;
 
     vi.mocked(client.get).mockResolvedValueOnce(listFixture);
 
@@ -167,5 +169,17 @@ describe('categories autocomplete completions', () => {
     expect(client.get).toHaveBeenCalledTimes(1);
     expect(client.get).toHaveBeenCalledWith('/categories', { limit: 1000 });
     expect(results).toEqual(['7 (Food & Dining)']);
+  });
+});
+
+describe('category name guidance', () => {
+  // The hint is the entire fix for HTML-escaped names — decoding them server-side was rejected as
+  // lossy — so it has to survive any future edit to these descriptions.
+  it('warns on every name field that Firefly stores the string verbatim', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerCategoryTools(server, {} as FireflyClient);
+    for (const tool of ['create_category', 'update_category']) {
+      expect(toolConfigs.get(tool).inputSchema.name.description).toContain('&amp;');
+    }
   });
 });

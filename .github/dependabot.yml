@@ -33,6 +33,15 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps-dev)"
     groups:
+      # Listed first so it wins the match: `vitest` and `@vitest/*` are
+      # version-locked on each other (`@vitest/coverage-v8@X` peers
+      # `vitest: "X"` exactly), so a bump that splits them across two PRs
+      # can never install — each half fails `npm ci` with ERESOLVE until the
+      # other lands. No `update-types` filter, so majors group too; that is
+      # precisely the case `minor-and-patch` cannot cover.
+      vitest:
+        applies-to: version-updates
+        patterns: ["vitest", "@vitest/*"]
       minor-and-patch:
         applies-to: version-updates
         update-types: [minor, patch]

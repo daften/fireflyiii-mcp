@@ -1,6 +1,6 @@
 {
   "name": "@daften/fireflyiii-mcp",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "MCP server for Firefly III personal finance manager",
   "type": "module",
   "bin": {
@@ -52,7 +52,7 @@
     "url": "https://github.com/daften/fireflyiii-mcp/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.4.3"
   },
   "overrides": {
@@ -61,18 +61,18 @@
     "hono": "^4.13.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.6",
+    "@biomejs/biome": "2.5.12",
     "@types/node": "^26.0.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "dotenv-cli": "^11.0.0",
     "simple-git-hooks": "^2.13.1",
     "tsx": "^4.22.3",
     "typescript": "^7.0.2",
-    "vitepress": "2.0.0-alpha.18",
-    "vitest": "^4.1.11"
+    "vitepress": "2.0.0-alpha.20",
+    "vitest": "^5.0.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "license": "MIT"
 }

@@ -2,7 +2,7 @@
 
 HTTP mode uses OAuth 2.0 (Authorization Code + PKCE) instead of a Personal Access Token. Your MCP client handles the OAuth flow automatically on first connection.
 
-**Requires:** Node.js 20+.
+**Requires:** Node.js 22.12+.
 
 ::: tip Headless caller? Use PAT-only mode instead
 The OAuth flow below needs a browser and a human to approve it on first connection. If you're connecting from somewhere that can't do that — a server-side gateway, an automation script — see [npm + HTTP/PAT](/guide/http-pat), which skips OAuth entirely in favor of a Bearer-token Personal Access Token.
