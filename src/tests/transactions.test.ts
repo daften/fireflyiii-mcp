@@ -37,11 +37,10 @@ const singleFixture = {
 };
 
 describe('fetchTransactions', () => {
-  it('calls /transactions with all provided filters', async () => {
+  it('calls /transactions with all provided filters except accountId', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await fetchTransactions(mockClient, {
       type: 'withdrawal',
-      accountId: '5',
       start: '2026-01-01',
       end: '2026-01-31',
       page: 1,
@@ -49,7 +48,6 @@ describe('fetchTransactions', () => {
     });
     expect(mockClient.get).toHaveBeenCalledWith('/transactions', {
       type: 'withdrawal',
-      account_id: '5',
       start: '2026-01-01',
       end: '2026-01-31',
       page: 1,
@@ -68,6 +66,46 @@ describe('fetchTransactions', () => {
     const result = await fetchTransactions(mockClient, { page: 1, limit: 50 });
     expect(result.data[0]).toEqual({ description: 'Groceries', amount: '-45.00', date: '2026-01-15', id: '101' });
     expect(result.pagination).toEqual({ page: 1, totalPages: 3, total: 120 });
+  });
+
+  // Regression test for #101: /transactions has no account_id filter and silently ignores it,
+  // so passing accountId must delegate to /accounts/{id}/transactions instead — the endpoint that
+  // actually filters. Two different accountId values against the same window must not collide.
+  describe('accountId filtering (#101)', () => {
+    it('delegates to /accounts/:id/transactions instead of querying /transactions', async () => {
+      mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+      await fetchTransactions(mockClient, {
+        accountId: '5',
+        type: 'withdrawal',
+        start: '2026-01-01',
+        end: '2026-01-31',
+        page: 1,
+        limit: 50,
+      });
+      expect(mockClient.get).toHaveBeenCalledWith('/accounts/5/transactions', {
+        type: 'withdrawal',
+        start: '2026-01-01',
+        end: '2026-01-31',
+        page: 1,
+        limit: 50,
+      });
+    });
+
+    it('produces different requests for different accountId values on the same window', async () => {
+      mockClient.get = vi.fn().mockResolvedValue(listFixture);
+      await fetchTransactions(mockClient, { accountId: '1', start: '2026-09-01', end: '2026-09-30' });
+      await fetchTransactions(mockClient, { accountId: '633', start: '2026-09-01', end: '2026-09-30' });
+      const calls = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls[0][0]).toBe('/accounts/1/transactions');
+      expect(calls[1][0]).toBe('/accounts/633/transactions');
+      expect(calls[0][0]).not.toBe(calls[1][0]);
+    });
+
+    it('strips a completion-style label suffix from accountId before using it as a path segment', async () => {
+      mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
+      await fetchTransactions(mockClient, { accountId: '5 (Checking)' });
+      expect(mockClient.get).toHaveBeenCalledWith('/accounts/5/transactions', {});
+    });
   });
 });
 

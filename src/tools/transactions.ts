@@ -11,7 +11,8 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { CATEGORY_NAME_HINT, dateOrDateTimeSchema, dateSchema, defineTool } from './_helpers.js';
+import { CATEGORY_NAME_HINT, dateOrDateTimeSchema, dateSchema, defineTool, parseId } from './_helpers.js';
+import { fetchAccountTransactions } from './accounts.js';
 
 // A transaction response carries two ids: the top-level group `id`, which update_transaction and
 // delete_transaction expect, and a `transaction_journal_id` inside each item of `transactions[]`.
@@ -35,9 +36,19 @@ export async function fetchTransactions(
     limit?: number;
   },
 ): Promise<UnwrappedList> {
+  // Firefly III's /transactions endpoint has no account_id filter and silently ignores it, so
+  // accountId must be routed to /accounts/{id}/transactions instead — see issue #101.
+  if (params.accountId) {
+    return fetchAccountTransactions(client, parseId(params.accountId), {
+      start: params.start,
+      end: params.end,
+      type: params.type,
+      page: params.page,
+      limit: params.limit,
+    });
+  }
   const query: QueryParams = { page: params.page, limit: params.limit };
   if (params.type) query.type = params.type;
-  if (params.accountId) query.account_id = params.accountId;
   if (params.start) query.start = params.start;
   if (params.end) query.end = params.end;
   const response = await client.get<JsonApiListResponse>('/transactions', query);
@@ -205,7 +216,12 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
           .enum(['withdrawal', 'deposit', 'transfer', 'reconciliation'])
           .optional()
           .describe('Transaction type filter'),
-        accountId: z.string().optional().describe('Filter by account ID — use get_accounts to find valid IDs'),
+        accountId: z
+          .string()
+          .optional()
+          .describe(
+            'Filter by account ID — use get_accounts to find valid IDs. Internally delegates to the same endpoint as get_account_transactions.',
+          ),
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),

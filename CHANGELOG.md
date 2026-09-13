@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Distinguish back-merge conflicts from other Git failures and retry rejected pushes only when `develop` actually moved. Allow manually retrying the back-merge workflow.
 - `create_account` and `update_account` were missing `liability_type` and `liability_direction`, which the Firefly III API requires when `type` is `liability`. Creating or updating a debt/loan/mortgage account failed with a validation error and no way to supply the required fields. Both are now accepted as optional enums on both tools. _Contributed by [@lesha198a](https://github.com/lesha198a) in [#77](https://github.com/daften/fireflyiii-mcp/pull/77)._
 - `update_account` described its liability fields as "required when type is liability", a condition it can never meet — the tool has no `type` field and never sends one. They now read "Only applies to liability accounts", so a model does not skip them expecting a `type` to trigger them.
+- `get_transactions`' `accountId` filter now actually filters. Firefly III's `/transactions` endpoint has no `account_id` query parameter and silently ignores it, so every call returned the same unfiltered results for the date range regardless of which account was requested. `get_transactions` now delegates to `/accounts/{id}/transactions` (the endpoint `get_account_transactions` already uses) whenever `accountId` is passed.
 
 ## [0.4.6] - 2026-09-11
 
