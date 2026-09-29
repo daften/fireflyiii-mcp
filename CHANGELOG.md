@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `createOAuthHandler`'s pending-flow eviction timer no longer starts unconditionally for the life of every handler instance. It now starts lazily, only once an OAuth flow is actually pending, and clears itself again once the pending-flow map drains — harmless in production (the handler is created once), but it was leaking one live interval per instantiation in the test suite, which creates the handler dozens of times per run.
+## [0.5.2] - 2026-09-29
+
+### Security
+
+- chore(deps): Bump ip-address from 10.4.0 to 10.7.2 in the security-fixes group across 1 directory (automated security release)
+
 ## [0.5.1] - 2026-09-29
 
 ### Security
@@ -221,7 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.6...v0.5.0
 [0.4.6]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.5...v0.4.6
