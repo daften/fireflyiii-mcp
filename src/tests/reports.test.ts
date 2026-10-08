@@ -196,7 +196,7 @@ describe('deleteTag', () => {
 });
 
 describe('fetchInsightNoX', () => {
-  const endpoints = [
+  const endpoints: Array<Parameters<typeof fetchInsightNoX>[1]> = [
     '/insight/expense/no-bill',
     '/insight/expense/no-budget',
     '/insight/expense/no-category',
