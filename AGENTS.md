@@ -378,7 +378,9 @@ Routes handled by the proxy (no auth required):
 - `POST /oauth/token` — substitutes `redirect_uri` back to our stable callback, proxies token exchange to Firefly III (30 s AbortController timeout)
 - `GET /oauth/callback` — receives Firefly III's redirect, forwards `code`+`state` to the MCP client's original dynamic callback URL
 
-All other requests require a `Bearer` token in the `Authorization` header. The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
+All other requests require a `Bearer` token in the `Authorization` header.
+
+Every request body is read through `readBody(req, maxBytes)`: OAuth routes are capped at 64 KiB (`OAUTH_MAX_BODY_BYTES`) and MCP requests at 16 MiB (`MCP_MAX_BODY_BYTES`, read by `createMcpRequestHandler` and handed to the SDK pre-parsed, because the SDK buffers without a limit). Over-limit requests get `413` with `Connection: close`. Pending OAuth flows are capped at `MAX_PENDING_FLOWS` (1,000, oldest dropped first). The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
 
 **Limitation:** OAuth state lives in-process — single replica only. Horizontal scaling breaks the auth flow.
 

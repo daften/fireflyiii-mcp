@@ -1,6 +1,19 @@
-import type * as http from 'node:http';
+import * as http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { classifyHost, createOAuthHandler, requestContext, startHttpServer } from '../http.js';
+import {
+  classifyHost,
+  createMcpRequestHandler,
+  createOAuthHandler,
+  MAX_PENDING_FLOWS,
+  MCP_MAX_BODY_BYTES,
+  OAUTH_MAX_BODY_BYTES,
+  PayloadTooLargeError,
+  readBody,
+  requestContext,
+  startHttpServer,
+} from '../http.js';
 
 type MockRequest = {
   method: string;
@@ -1786,5 +1799,201 @@ describe('createOAuthHandler — 401 challenge', () => {
 
     expect(res.statusCode).toBe(401);
     expect(res.writtenHeaders['WWW-Authenticate']).toBe('Bearer');
+  });
+});
+
+describe('readBody: size limit', () => {
+  function streamReq(chunks: Buffer[], headers: Record<string, string> = {}) {
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
+    const req = {
+      headers,
+      on(event: string, listener: (...args: unknown[]) => void) {
+        if (!listeners[event]) listeners[event] = [];
+        listeners[event].push(listener);
+        return req;
+      },
+    };
+    queueMicrotask(() => {
+      for (const c of chunks) for (const l of listeners.data ?? []) l(c);
+      for (const l of listeners.end ?? []) l();
+    });
+    return req as unknown as http.IncomingMessage;
+  }
+
+  it('returns the body when it fits', async () => {
+    await expect(readBody(streamReq([Buffer.from('{"a":1}')]), 100)).resolves.toBe('{"a":1}');
+  });
+
+  it('rejects a declared Content-Length over the limit without waiting for the body', async () => {
+    const req = { headers: { 'content-length': '101' }, on: vi.fn() } as unknown as http.IncomingMessage;
+    await expect(readBody(req, 100)).rejects.toBeInstanceOf(PayloadTooLargeError);
+    expect(req.on).not.toHaveBeenCalled();
+  });
+
+  it('rejects a streamed body that crosses the limit even without Content-Length', async () => {
+    const req = streamReq([Buffer.alloc(60, 'a'), Buffer.alloc(60, 'a')]);
+    await expect(readBody(req, 100)).rejects.toBeInstanceOf(PayloadTooLargeError);
+  });
+
+  it('decodes a multi-byte UTF-8 character split across two chunks', async () => {
+    const euro = Buffer.from('€', 'utf8'); // 3 bytes
+    const req = streamReq([euro.subarray(0, 1), euro.subarray(1)]);
+    await expect(readBody(req, 100)).resolves.toBe('€');
+  });
+});
+
+describe('createOAuthHandler: request body limit', () => {
+  const handler = () =>
+    createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id',
+      vi.fn() as unknown as Parameters<typeof createOAuthHandler>[2],
+    );
+
+  it.each(['/oauth/register', '/oauth/token'])('answers 413 for an oversized body on %s', async (url) => {
+    const res = mockRes();
+    const big = 'a'.repeat(OAUTH_MAX_BODY_BYTES + 1);
+    await handler()(
+      mockReq('POST', url, { host: '127.0.0.1:3000' }, big) as http.IncomingMessage,
+      res as unknown as http.ServerResponse,
+    );
+    expect(res.statusCode).toBe(413);
+    expect(res.writtenHeaders.Connection).toBe('close');
+    expect(JSON.parse(res.body).error).toBe('invalid_request');
+  });
+
+  it('answers 413 from the Content-Length header alone on /oauth/token, without calling Firefly', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const res = mockRes();
+    const req = mockReq('POST', '/oauth/token', { host: '127.0.0.1:3000', 'content-length': String(10 * 1024 * 1024) });
+    await handler()(req as http.IncomingMessage, res as unknown as http.ServerResponse);
+    vi.unstubAllGlobals();
+    expect(res.statusCode).toBe(413);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('createOAuthHandler: pending flow cap', () => {
+  it(`keeps at most MAX_PENDING_FLOWS flows, dropping the oldest`, async () => {
+    const h = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id',
+      vi.fn() as unknown as Parameters<typeof createOAuthHandler>[2],
+    );
+    const authorize = (state: string) =>
+      h(
+        mockReq('GET', `/oauth/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcb&state=${state}`, {
+          host: '127.0.0.1:3000',
+        }) as http.IncomingMessage,
+        mockRes() as unknown as http.ServerResponse,
+      );
+    for (let i = 0; i <= MAX_PENDING_FLOWS; i++) await authorize(`s${i}`);
+
+    const callback = async (state: string) => {
+      const res = mockRes();
+      await h(
+        mockReq('GET', `/oauth/callback?code=c&state=${state}`, { host: '127.0.0.1:3000' }) as http.IncomingMessage,
+        res as unknown as http.ServerResponse,
+      );
+      return res;
+    };
+    // s0 was the oldest when the cap was hit, so it is gone; the newest still completes.
+    expect((await callback('s0')).statusCode).toBe(400);
+    expect((await callback(`s${MAX_PENDING_FLOWS}`)).statusCode).toBe(302);
+    expect((await callback('s1')).statusCode).toBe(302);
+  });
+});
+
+describe('createOAuthHandler: redirect prefixes are compared in canonical form', () => {
+  afterEach(() => {
+    delete process.env.MCP_ALLOWED_REDIRECT_PREFIXES;
+  });
+
+  async function register(prefix: string, uri: string): Promise<number> {
+    process.env.MCP_ALLOWED_REDIRECT_PREFIXES = prefix;
+    const h = createOAuthHandler(
+      'https://firefly.example.com',
+      'client-id',
+      vi.fn() as unknown as Parameters<typeof createOAuthHandler>[2],
+    );
+    const res = mockRes();
+    const body = JSON.stringify({ redirect_uris: [uri] });
+    await h(
+      mockReq('POST', '/oauth/register', { host: '127.0.0.1:3000' }, body) as http.IncomingMessage,
+      res as unknown as http.ServerResponse,
+    );
+    return res.statusCode;
+  }
+
+  it.each([
+    // [prefix as the operator typed it, URI, expected status]
+    ['https://Example.com', 'https://Example.com.attacker.test/steal', 400],
+    ['https://Example.com', 'https://example.com/cb', 201],
+    ['https://example.com:443', 'https://example.com:443.attacker.test/cb', 400],
+    ['https://example.com:443', 'https://example.com:4433/cb', 400],
+    ['https://example.com:443', 'https://example.com/cb', 201],
+    ['https://bücher.example', 'https://bücher.example.attacker.test/cb', 400],
+    ['https://bücher.example', 'https://bücher.example/cb', 201],
+    ['https://app.example.com/cb', 'https://app.example.com/cb/../admin', 400],
+    ['https://app.example.com/cb', 'https://app.example.com/cb/done', 201],
+    ['http://192.168.1.10:', 'http://192.168.1.10:9999/cb', 201],
+    ['http://192.168.1.10:', 'https://192.168.1.10:9999/cb', 400],
+    ['not a url', 'https://example.com/cb', 400],
+  ])('prefix %s vs %s -> %i', async (prefix, uri, expected) => {
+    expect(await register(prefix, uri)).toBe(expected);
+  });
+});
+
+describe('createMcpRequestHandler: request body handling', () => {
+  let server: http.Server;
+  let url: string;
+
+  beforeEach(async () => {
+    const handler = createMcpRequestHandler(() => new McpServer({ name: 'test', version: '0.0.0' }));
+    server = http.createServer((req, res) => {
+      handler(req, res).catch(() => {
+        res.writeHead(500);
+        res.end();
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`;
+  });
+
+  afterEach(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const post = (body: string | Uint8Array) =>
+    fetch(url, {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+    });
+
+  it('passes a valid JSON-RPC request through to the MCP server', async () => {
+    const res = await post(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('"serverInfo"');
+  });
+
+  it('answers a JSON-RPC parse error for invalid JSON', async () => {
+    const res = await post('{not json');
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe(-32700);
+  });
+
+  it('answers 413 for a body over MCP_MAX_BODY_BYTES instead of buffering it', async () => {
+    const res = await post(new Uint8Array(MCP_MAX_BODY_BYTES + 1));
+    expect(res.status).toBe(413);
+    expect((await res.json()).error.message).toContain(String(MCP_MAX_BODY_BYTES));
   });
 });
