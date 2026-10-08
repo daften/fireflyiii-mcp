@@ -101,15 +101,16 @@ export async function fetchAbout(client: FireflyClient): Promise<unknown> {
   return client.get('/about');
 }
 
+// Firefly III v1 has no net-worth endpoint; /summary/basic reports net worth as one
+// `net-worth-in-<CURRENCY>` entry per currency, alongside balance, spent, earned and bills.
 export async function fetchNetWorth(
   client: FireflyClient,
   start: string,
   end: string,
   currencyCode?: string,
-): Promise<unknown> {
-  const query: QueryParams = { start, end };
-  if (currencyCode) query.currency_code = currencyCode;
-  return client.get('/summary/net-worth', query);
+): Promise<CleanSummaryItem[]> {
+  const summary = await fetchSummary(client, start, end, currencyCode);
+  return summary.filter((item) => item.key.startsWith('net-worth-in-'));
 }
 
 export async function fetchChart(
@@ -427,7 +428,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
     {
       title: 'Get Net Worth Summary',
       description:
-        'Get net worth over a date range, broken down by currency. Both start and end dates (YYYY-MM-DD) are required.',
+        'Get net worth as of the end of a date range, one entry per currency (the net-worth part of get_summary). Both start and end dates (YYYY-MM-DD) are required.',
       inputSchema: {
         start: dateSchema.describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.describe('End date (YYYY-MM-DD)'),
@@ -502,6 +503,9 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
     endpoint: string;
     filterKey?: string;
     filterDesc?: string;
+    // Firefly III's insight endpoints read account filters from `accounts[]` only (and sort them by
+    // account type themselves), so the asset and revenue filters must be sent under that name.
+    queryKey?: string;
   }> = [
     {
       name: 'get_insight_expenses_by_bill',
@@ -534,6 +538,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       endpoint: '/insight/expense/asset',
       filterKey: 'assets',
       filterDesc: 'Filter to specific asset account IDs',
+      queryKey: 'accounts[]',
     },
     {
       name: 'get_insight_expenses_by_expense_account',
@@ -556,6 +561,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       endpoint: '/insight/income/revenue',
       filterKey: 'revenue',
       filterDesc: 'Filter to specific revenue account IDs',
+      queryKey: 'accounts[]',
     },
     {
       name: 'get_insight_income_by_tag',
@@ -572,6 +578,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       endpoint: '/insight/income/asset',
       filterKey: 'assets',
       filterDesc: 'Filter to specific asset account IDs',
+      queryKey: 'accounts[]',
     },
     {
       name: 'get_insight_income_total',
@@ -602,6 +609,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       endpoint: '/insight/transfer/asset',
       filterKey: 'assets',
       filterDesc: 'Filter to specific asset account IDs',
+      queryKey: 'accounts[]',
     },
     {
       name: 'get_insight_transfers_total',
@@ -611,7 +619,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
     },
   ];
 
-  for (const { name, title, description, endpoint, filterKey, filterDesc } of INSIGHT_GROUPED_TOOLS) {
+  for (const { name, title, description, endpoint, filterKey, filterDesc, queryKey } of INSIGHT_GROUPED_TOOLS) {
     const inputSchema: Record<string, z.ZodTypeAny> = {
       start: dateSchema.describe('Start date (YYYY-MM-DD)'),
       end: dateSchema.describe('End date (YYYY-MM-DD)'),
@@ -633,7 +641,8 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
         const { start, end, ...rest } = params as { start: string; end: string; [k: string]: unknown };
         const filters: Record<string, string[]> = {};
         for (const [k, v] of Object.entries(rest)) {
-          if (Array.isArray(v)) filters[`${k}[]`] = v as string[];
+          if (Array.isArray(v) && v.length > 0)
+            filters[k === filterKey && queryKey ? queryKey : `${k}[]`] = v as string[];
         }
         return fetchInsightGrouped(client, endpoint, start, end, Object.keys(filters).length ? filters : undefined);
       },

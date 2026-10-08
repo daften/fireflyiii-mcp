@@ -1,6 +1,6 @@
 # Available tools
 
-140 tools across 14 groups. Use [Tool filtering](/reference/filtering) to load only what you need.
+137 tools across 14 groups. Requires Firefly III v6.4.0 or later. Use [Tool filtering](/reference/filtering) to load only what you need.
 
 ## Accounts
 
@@ -22,9 +22,9 @@
 | `get_transaction` | Get a single transaction by ID with all splits |
 | `search_transactions` | Keyword search across transactions |
 | `create_transaction` | Create a new transaction |
-| `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets) |
-| `update_transaction` | Update an existing transaction |
-| `bulk_update_transactions` | Update multiple transactions at once using a search query |
+| `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets); requires a group title |
+| `update_transaction` | Update one split of a transaction; the other splits are left untouched (pass `transaction_journal_id` for split transactions) |
+| `bulk_update_transactions` | Set category, budget, tags or notes on every transaction a search query matches (only the matching splits; refuses above `max_transactions`) |
 | `delete_transaction` | Delete a transaction. This action cannot be undone. |
 
 ## Budgets
@@ -37,8 +37,8 @@
 | `update_budget` | Update an existing budget |
 | `delete_budget` | Delete a budget. This action cannot be undone. |
 | `create_budget_limit` | Create a budget limit for a specific period |
-| `update_budget_limit` | Update an existing budget limit |
-| `delete_budget_limit` | Delete a budget limit. This action cannot be undone. |
+| `update_budget_limit` | Update an existing budget limit (takes the limit's `budget_id`) |
+| `delete_budget_limit` | Delete a budget limit (takes the limit's `budget_id`). This action cannot be undone. |
 | `get_available_budgets` | List all available budget periods with amounts available |
 | `get_available_budget` | Get a single available budget period by ID |
 | `get_budget_transactions` | Get all transactions assigned to a specific budget |
@@ -69,12 +69,10 @@
 | Tool | Description |
 |------|-------------|
 | `get_piggy_banks` | List all piggy banks with current/target amounts |
-| `create_piggy_bank` | Create a new piggy bank |
-| `update_piggy_bank` | Update an existing piggy bank |
+| `create_piggy_bank` | Create a new piggy bank saving from one or more asset accounts |
+| `update_piggy_bank` | Update a piggy bank; set `accounts[].current_amount` to put money in or take it out (other linked accounts are kept) |
 | `delete_piggy_bank` | Delete a piggy bank. This action cannot be undone. |
-| `get_piggy_bank_events` | Get all deposit/withdrawal events for a piggy bank |
-| `create_piggy_bank_event` | Add a deposit or withdrawal event to a piggy bank |
-| `delete_piggy_bank_event` | Delete a piggy bank event. This action cannot be undone. |
+| `get_piggy_bank_events` | Get the recorded deposit/withdrawal history of a piggy bank |
 
 ## Recurring Transactions
 
@@ -141,7 +139,7 @@
 | `get_insight_transfer_no_category` | Transfer totals for transactions with no category attached |
 | `get_insight_transfer_no_tag` | Transfer totals for transactions with no tag attached |
 | `get_about` | Get Firefly III server info (version, PHP version, OS) |
-| `get_net_worth_summary` | Get net worth summary for a date range |
+| `get_net_worth_summary` | Get net worth per currency as of the end of a date range |
 | `get_account_overview_chart` | Get account overview chart data for a date range |
 | `get_balance_chart` | Get account balance chart data for a date range |
 | `get_budget_chart` | Get budget overview chart data for a date range |
@@ -191,11 +189,12 @@
 
 ## Object Groups
 
+Firefly III has no API to create an object group: one is created the first time a bill or piggy bank is saved with a new `object_group_title`.
+
 | Tool | Description |
 |------|-------------|
 | `get_object_groups` | List all object groups (used to organise accounts and piggy banks) |
 | `get_object_group` | Get a single object group by ID |
-| `create_object_group` | Create a new object group |
 | `update_object_group` | Update an existing object group |
 | `delete_object_group` | Delete an object group. This action cannot be undone. |
 | `get_object_group_bills` | Get all bills in a specific object group |

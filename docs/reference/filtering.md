@@ -1,6 +1,6 @@
 # Tool filtering
 
-With 140 tools across 14 groups, loading everything consumes significant context window space. Three flags let you control exactly which tools are registered.
+With 137 tools across 14 groups, loading everything consumes significant context window space. Three flags let you control exactly which tools are registered.
 
 ## --preset \<name\>
 
@@ -10,10 +10,10 @@ Load a named subset of tool groups:
 |--------|----------------|-------|
 | `minimal` | accounts, transactions | 15 |
 | `default` | accounts, transactions, budgets, categories, bills | 37 |
-| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 44 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 42 |
 | `insights` | accounts, transactions, categories, reports | 57 |
 | `automation` | accounts, transactions, rules, recurring | 37 |
-| `full` | all 14 groups | 140 |
+| `full` | all 14 groups | 137 |
 
 ```bash
 node dist/index.js --preset default
@@ -39,7 +39,7 @@ node dist/index.js --preset default --read-only
 node dist/index.js --groups rules --read-only
 ```
 
-Without any filter flags the server registers all 140 tools (equivalent to `--preset full`).
+Without any filter flags the server registers all 137 tools (equivalent to `--preset full`).
 
 ## Environment variable equivalents
 

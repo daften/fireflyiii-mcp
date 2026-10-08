@@ -36,6 +36,7 @@ export async function createBill(
     end_date?: string;
     active?: boolean;
     notes?: string;
+    object_group_title?: string;
   },
 ): Promise<UnwrappedSingle> {
   const response = await client.post<JsonApiSingleResponse>('/bills', params);
@@ -55,6 +56,7 @@ export async function updateBill(
     end_date?: string;
     active?: boolean;
     notes?: string;
+    object_group_title?: string;
   },
 ): Promise<UnwrappedSingle> {
   const response = await client.put<JsonApiSingleResponse>(`/bills/${id}`, params);
@@ -119,6 +121,10 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
         end_date: dateSchema.optional().describe('End date for the bill (YYYY-MM-DD)'),
         active: z.boolean().optional().describe('Whether the bill is active'),
         notes: z.string().optional().describe('Notes'),
+        object_group_title: z
+          .string()
+          .optional()
+          .describe('Object group to file this bill under; Firefly III creates the group if it does not exist'),
       },
       annotations: WRITE_ANNOTATIONS,
     },
@@ -146,6 +152,10 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
         end_date: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         active: z.boolean().optional().describe('Whether the bill is active'),
         notes: z.string().optional().describe('Notes'),
+        object_group_title: z
+          .string()
+          .optional()
+          .describe('Object group to file this bill under; Firefly III creates the group if it does not exist'),
       },
       annotations: UPDATE_ANNOTATIONS,
     },

@@ -53,6 +53,9 @@ export async function deleteRuleGroup(client: FireflyClient, id: string): Promis
 
 // ---- Rule fetch + CRUD ----
 
+// The moments a rule can fire, as Firefly III's rule store/update validators accept them.
+const RULE_TRIGGERS = ['store-journal', 'update-journal', 'manual-activation'] as const;
+
 type RuleTriggerInput = {
   type: string;
   value: string;
@@ -355,9 +358,9 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
         title: z.string().describe('Rule name'),
         rule_group_id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
         trigger: z
-          .enum(['store-journal', 'update-journal'])
+          .enum(RULE_TRIGGERS)
           .describe(
-            'When this rule fires: store-journal (on transaction creation) or update-journal (on transaction update)',
+            'When this rule fires: store-journal (on transaction creation), update-journal (on transaction update), or manual-activation (only when run with trigger_rule / trigger_rule_group)',
           ),
         triggers: z.array(triggerObjectSchema).min(1).describe('List of trigger conditions'),
         actions: z.array(actionObjectSchema).min(1).describe('List of actions to perform when triggers match'),
@@ -397,7 +400,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
         id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
         title: z.string().optional().describe('Rule name'),
         rule_group_id: z.string().optional().describe('Rule group ID'),
-        trigger: z.enum(['store-journal', 'update-journal']).optional().describe('When this rule fires'),
+        trigger: z.enum(RULE_TRIGGERS).optional().describe('When this rule fires'),
         triggers: z.array(triggerObjectSchema).min(1).optional().describe('List of trigger conditions'),
         actions: z.array(actionObjectSchema).min(1).optional().describe('List of actions'),
         description: z.string().optional().describe('Description'),

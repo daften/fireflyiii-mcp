@@ -17,7 +17,7 @@ hero:
 
 features:
   - icon: 🛠️
-    title: 140 tools
+    title: 137 tools
     details: 14 groups covering accounts, transactions, budgets, categories, bills, piggy banks, reports, rules, recurring transactions, attachments, currencies, exports, object groups, and transaction links.
   - icon: 🔌
     title: stdio & HTTP

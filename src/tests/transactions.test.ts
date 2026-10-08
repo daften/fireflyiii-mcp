@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FireflyClient } from '../client.js';
+import { type FireflyClient, FireflyError } from '../client.js';
 import {
   bulkUpdateTransactions,
   createSplitTransaction,
@@ -169,21 +169,139 @@ describe('createTransaction', () => {
   });
 });
 
+/** A JSON:API transaction-group envelope with the given splits. */
+function groupFixture(
+  id: string,
+  splits: Array<[journalId: string, description: string, amount: string]>,
+  title: string | null,
+) {
+  return {
+    data: {
+      id,
+      type: 'transactions',
+      attributes: {
+        group_title: title,
+        transactions: splits.map(([transaction_journal_id, description, amount]) => ({
+          transaction_journal_id,
+          description,
+          amount,
+        })),
+      },
+      links: {},
+    },
+  };
+}
+
 describe('updateTransaction', () => {
-  it('puts to /transactions/:id with wrapped body', async () => {
+  it('updates a single-split transaction through its journal id, without a group title', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Groceries', '42.50']], null));
     mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
-    await updateTransaction(mockClient, '5', {
-      date: '2024-01-15T11:30:00+02:00',
-      description: 'Updated',
-    });
+    await updateTransaction(mockClient, '5', { date: '2024-01-15T11:30:00+02:00', description: 'Updated' });
+    expect(mockClient.get).toHaveBeenCalledWith('/transactions/5');
     expect(mockClient.put).toHaveBeenCalledWith('/transactions/5', {
       apply_rules: true,
       fire_webhooks: true,
-      transactions: [{ date: '2024-01-15T11:30:00+02:00', description: 'Updated' }],
+      transactions: [{ transaction_journal_id: '10', date: '2024-01-15T11:30:00+02:00', description: 'Updated' }],
     });
   });
 
+  it('refuses to guess which split to change on a split transaction', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(
+      groupFixture(
+        '7',
+        [
+          ['20', 'split A', '10.00'],
+          ['21', 'split B', '20.00'],
+        ],
+        'Shop',
+      ),
+    );
+    mockClient.put = vi.fn();
+    await expect(updateTransaction(mockClient, '7', { category_name: 'Food' })).rejects.toThrow(
+      /has 2 splits; pass transaction_journal_id.*20 \("split A", 10\.00\), 21 \("split B", 20\.00\)/,
+    );
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+
+  it('sends every split with its journal id but changes only the chosen one', async () => {
+    // Firefly deletes any existing split the PUT does not mention, and treats an entry without
+    // transaction_journal_id as a new split, so both splits must be listed by id.
+    mockClient.get = vi.fn().mockResolvedValueOnce(
+      groupFixture(
+        '7',
+        [
+          ['20', 'split A', '10.00'],
+          ['21', 'split B', '20.00'],
+        ],
+        'Shop',
+      ),
+    );
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '7', { transaction_journal_id: '21', amount: '25.00', category_name: 'Food' });
+    expect(mockClient.put).toHaveBeenCalledWith('/transactions/7', {
+      apply_rules: true,
+      fire_webhooks: true,
+      group_title: 'Shop',
+      transactions: [
+        { transaction_journal_id: '20' },
+        { transaction_journal_id: '21', amount: '25.00', category_name: 'Food' },
+      ],
+    });
+  });
+
+  it('applies a type change to every split, since Firefly requires one type per group', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(
+      groupFixture(
+        '7',
+        [
+          ['20', 'split A', '10.00'],
+          ['21', 'split B', '20.00'],
+        ],
+        'Shop',
+      ),
+    );
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '7', { transaction_journal_id: '20', type: 'deposit' });
+    const body = vi.mocked(mockClient.put).mock.calls[0][1] as { transactions: Array<Record<string, unknown>> };
+    expect(body.transactions).toEqual([
+      { transaction_journal_id: '20', type: 'deposit' },
+      { transaction_journal_id: '21', type: 'deposit' },
+    ]);
+  });
+
+  it('falls back to the first split description when a split group has no title', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(
+      groupFixture(
+        '7',
+        [
+          ['20', 'split A', '10.00'],
+          ['21', 'split B', '20.00'],
+        ],
+        null,
+      ),
+    );
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '7', { transaction_journal_id: '20', notes: 'n' });
+    expect(vi.mocked(mockClient.put).mock.calls[0][1]).toMatchObject({ group_title: 'split A' });
+  });
+
+  it('rejects a journal id that is not part of the group', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Groceries', '42.50']], null));
+    mockClient.put = vi.fn();
+    await expect(updateTransaction(mockClient, '5', { transaction_journal_id: '99', amount: '1' })).rejects.toThrow(
+      'Split 99 is not part of transaction group 5',
+    );
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects an update with no fields before calling Firefly', async () => {
+    mockClient.get = vi.fn();
+    await expect(updateTransaction(mockClient, '5', {})).rejects.toThrow('Nothing to update');
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+
   it('returns unwrapped single', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Groceries', '42.50']], null));
     mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
     const result = await updateTransaction(mockClient, '5', { amount: '50.00' });
     expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
@@ -230,6 +348,7 @@ describe('createSplitTransaction', () => {
       type: 'withdrawal',
       date: '2026-05-01T18:45:00-04:00',
       source_id: '1',
+      group_title: 'Supermarket run',
       splits: [
         { amount: '30.00', description: 'Groceries', category_name: 'Food' },
         { amount: '12.50', description: 'Cleaning supplies', category_name: 'Household' },
@@ -238,6 +357,7 @@ describe('createSplitTransaction', () => {
     expect(mockClient.post).toHaveBeenCalledWith('/transactions', {
       apply_rules: true,
       fire_webhooks: true,
+      group_title: 'Supermarket run',
       transactions: [
         {
           type: 'withdrawal',
@@ -259,7 +379,7 @@ describe('createSplitTransaction', () => {
     });
   });
 
-  it('includes group_title when provided', async () => {
+  it('always sends group_title, which Firefly requires for more than one split', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
     await createSplitTransaction(mockClient, {
       type: 'withdrawal',
@@ -283,6 +403,7 @@ describe('createSplitTransaction', () => {
     const result = await createSplitTransaction(mockClient, {
       type: 'withdrawal',
       date: '2026-05-01',
+      group_title: 'Supermarket run',
       splits: [
         { amount: '30.00', description: 'Groceries' },
         { amount: '12.50', description: 'Cleaning supplies' },
@@ -297,6 +418,7 @@ describe('createSplitTransaction', () => {
     await createSplitTransaction(mockClient, {
       type: 'withdrawal',
       date: '2026-05-01',
+      group_title: 'Supermarket run',
       splits: [
         { amount: '30.00', description: 'Groceries' },
         { amount: '12.50', description: 'Cleaning supplies' },
@@ -310,25 +432,110 @@ describe('createSplitTransaction', () => {
 });
 
 describe('bulkUpdateTransactions', () => {
-  it('sends query as a JSON-encoded URL query param per the OpenAPI spec', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
-    await bulkUpdateTransactions(mockClient, { query: 'description:coffee', category_name: 'Food', budget_id: '3' });
-    expect(mockClient.post).toHaveBeenCalledWith('/data/bulk/transactions', undefined, {
-      query: JSON.stringify({ where: 'description:coffee', update: { category_name: 'Food', budget_id: '3' } }),
+  /** A search-results page; each hit lists only the splits that matched, like Firefly's search. */
+  function searchPage(hits: Array<[groupId: string, journalIds: string[]]>, page: number, totalPages: number) {
+    return {
+      data: hits.map(([id, journals]) => ({
+        id,
+        type: 'transactions',
+        attributes: { transactions: journals.map((transaction_journal_id) => ({ transaction_journal_id })) },
+      })),
+      meta: { pagination: { current_page: page, total_pages: totalPages, total: hits.length } },
+    };
+  }
+
+  it('rejects a call with nothing to change before searching', async () => {
+    mockClient.get = vi.fn();
+    await expect(bulkUpdateTransactions(mockClient, { query: 'coffee' })).rejects.toThrow('Nothing to update');
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
+
+  it('pages through the search, re-reads each group, and changes only the matched splits', async () => {
+    mockClient.get = vi
+      .fn()
+      .mockResolvedValueOnce(searchPage([['7', ['21']]], 1, 2))
+      .mockResolvedValueOnce(searchPage([['8', ['30']]], 2, 2))
+      .mockResolvedValueOnce(
+        groupFixture(
+          '7',
+          [
+            ['20', 'split A', '10.00'],
+            ['21', 'coffee', '3.00'],
+          ],
+          'Shop',
+        ),
+      )
+      .mockResolvedValueOnce(groupFixture('8', [['30', 'coffee', '2.50']], null));
+    mockClient.put = vi.fn().mockResolvedValue(writeSingleFixture);
+
+    const result = await bulkUpdateTransactions(mockClient, { query: 'coffee', category_name: 'Coffee' });
+
+    expect(mockClient.get).toHaveBeenNthCalledWith(1, '/search/transactions', { query: 'coffee', page: 1, limit: 100 });
+    expect(mockClient.get).toHaveBeenNthCalledWith(2, '/search/transactions', { query: 'coffee', page: 2, limit: 100 });
+    expect(mockClient.put).toHaveBeenCalledWith('/transactions/7', {
+      apply_rules: true,
+      fire_webhooks: true,
+      group_title: 'Shop',
+      transactions: [{ transaction_journal_id: '20' }, { transaction_journal_id: '21', category_name: 'Coffee' }],
+    });
+    expect(mockClient.put).toHaveBeenCalledWith('/transactions/8', {
+      apply_rules: true,
+      fire_webhooks: true,
+      transactions: [{ transaction_journal_id: '30', category_name: 'Coffee' }],
+    });
+    expect(result).toEqual({
+      matched: 2,
+      updated: [
+        { id: '7', splits: ['21'] },
+        { id: '8', splits: ['30'] },
+      ],
+      failed: [],
     });
   });
 
-  it('omits undefined update fields from the JSON query', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(undefined);
-    await bulkUpdateTransactions(mockClient, { query: 'description:groceries' });
-    const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0] as [
-      string,
-      unknown,
-      Record<string, string>,
-    ];
-    const sentQuery = JSON.parse(call[2].query) as { where: string; update: Record<string, unknown> };
-    expect(sentQuery.where).toBe('description:groceries');
-    expect(Object.keys(sentQuery.update)).toHaveLength(0);
+  it('changes nothing when the query matches more than max_transactions', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(
+      searchPage(
+        [
+          ['1', ['11']],
+          ['2', ['12']],
+          ['3', ['13']],
+        ],
+        1,
+        1,
+      ),
+    );
+    mockClient.put = vi.fn();
+    await expect(
+      bulkUpdateTransactions(mockClient, { query: 'coffee', notes: 'x', max_transactions: 2 }),
+    ).rejects.toThrow('matches more than 2 transactions, so nothing was changed');
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+
+  it('reports per-transaction failures without stopping the rest', async () => {
+    mockClient.get = vi
+      .fn()
+      .mockResolvedValueOnce(
+        searchPage(
+          [
+            ['1', ['11']],
+            ['2', ['12']],
+          ],
+          1,
+          1,
+        ),
+      )
+      .mockResolvedValueOnce(groupFixture('1', [['11', 'a', '1']], null))
+      .mockResolvedValueOnce(groupFixture('2', [['12', 'b', '2']], null));
+    mockClient.put = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new FireflyError(422, 'https://f/api/v1/transactions/1', '{"errors":{"budget_id":["bad"]}}'),
+      )
+      .mockResolvedValueOnce(writeSingleFixture);
+    const result = await bulkUpdateTransactions(mockClient, { query: 'x', budget_id: '3' });
+    expect(result.updated).toEqual([{ id: '2', splits: ['12'] }]);
+    expect(result.failed).toEqual([{ id: '1', error: expect.stringMatching(/^Validation failed: budget_id\W+bad$/) }]);
   });
 });
 

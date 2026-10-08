@@ -134,18 +134,20 @@ describe('createBudgetLimit', () => {
 });
 
 describe('updateBudgetLimit', () => {
-  it('puts to /budget-limits/:id', async () => {
+  it('puts to the limit nested under its budget', async () => {
+    // Firefly III only routes budget-limit writes as /budgets/{id}/limits/{limitId}; /budget-limits
+    // has nothing but a GET index.
     mockClient.put = vi.fn().mockResolvedValueOnce(limitSingleFixture);
-    await updateBudgetLimit(mockClient, '7', { amount: '600.00' });
-    expect(mockClient.put).toHaveBeenCalledWith('/budget-limits/7', { amount: '600.00' });
+    await updateBudgetLimit(mockClient, '3', '7', { amount: '600.00' });
+    expect(mockClient.put).toHaveBeenCalledWith('/budgets/3/limits/7', { amount: '600.00' });
   });
 });
 
 describe('deleteBudgetLimit', () => {
-  it('calls delete and returns confirmation', async () => {
+  it('deletes the limit nested under its budget and returns confirmation', async () => {
     mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
-    const result = await deleteBudgetLimit(mockClient, '7');
-    expect(mockClient.delete).toHaveBeenCalledWith('/budget-limits/7');
+    const result = await deleteBudgetLimit(mockClient, '3', '7');
+    expect(mockClient.delete).toHaveBeenCalledWith('/budgets/3/limits/7');
     expect(result).toEqual({ deleted: true, id: '7' });
   });
 });
