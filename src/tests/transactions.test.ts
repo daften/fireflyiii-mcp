@@ -167,6 +167,52 @@ describe('createTransaction', () => {
     });
     expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
   });
+
+  it('sends foreign_amount and foreign_currency_code for a cross-currency transfer', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createTransaction(mockClient, {
+      type: 'transfer',
+      date: '2026-10-01',
+      amount: '5300.00',
+      description: 'BRL to USD',
+      source_id: '1',
+      destination_id: '2',
+      currency_code: 'BRL',
+      foreign_amount: '1000.00',
+      foreign_currency_code: 'USD',
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/transactions', {
+      apply_rules: true,
+      fire_webhooks: true,
+      transactions: [
+        {
+          type: 'transfer',
+          date: '2026-10-01',
+          amount: '5300.00',
+          description: 'BRL to USD',
+          source_id: '1',
+          destination_id: '2',
+          currency_code: 'BRL',
+          foreign_amount: '1000.00',
+          foreign_currency_code: 'USD',
+        },
+      ],
+    });
+  });
+
+  it('omits foreign currency fields when not provided', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createTransaction(mockClient, {
+      type: 'withdrawal',
+      date: '2026-10-01',
+      amount: '42.50',
+      description: 'Groceries',
+      source_id: '1',
+    });
+    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(body.transactions[0]).not.toHaveProperty('foreign_amount');
+    expect(body.transactions[0]).not.toHaveProperty('foreign_currency_code');
+  });
 });
 
 describe('updateTransaction', () => {
@@ -187,6 +233,19 @@ describe('updateTransaction', () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
     const result = await updateTransaction(mockClient, '5', { amount: '50.00' });
     expect(result).toEqual({ description: 'Groceries', amount: '42.50', type: 'withdrawal', id: '5' });
+  });
+  it('sends foreign_amount and foreign_currency_code when provided', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '5', {
+      amount: '5400.00',
+      foreign_amount: '1000.00',
+      foreign_currency_code: 'USD',
+    });
+    expect(mockClient.put).toHaveBeenCalledWith('/transactions/5', {
+      apply_rules: true,
+      fire_webhooks: true,
+      transactions: [{ amount: '5400.00', foreign_amount: '1000.00', foreign_currency_code: 'USD' }],
+    });
   });
 });
 
@@ -306,6 +365,46 @@ describe('createSplitTransaction', () => {
     expect(body.transactions[0]).not.toHaveProperty('source_id');
     expect(body.transactions[0]).not.toHaveProperty('destination_id');
     expect(body.transactions[0]).not.toHaveProperty('currency_code');
+    expect(body.transactions[0]).not.toHaveProperty('foreign_currency_code');
+    expect(body.transactions[0]).not.toHaveProperty('foreign_amount');
+  });
+
+  it('copies foreign_currency_code into each split and keeps foreign_amount per split', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createSplitTransaction(mockClient, {
+      type: 'transfer',
+      date: '2026-10-01',
+      source_id: '1',
+      destination_id: '2',
+      foreign_currency_code: 'USD',
+      splits: [
+        { amount: '5300.00', foreign_amount: '1000.00', description: 'Savings' },
+        { amount: '2650.00', foreign_amount: '500.00', description: 'Travel' },
+      ],
+    });
+    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(body.transactions).toEqual([
+      {
+        type: 'transfer',
+        date: '2026-10-01',
+        source_id: '1',
+        destination_id: '2',
+        foreign_currency_code: 'USD',
+        amount: '5300.00',
+        foreign_amount: '1000.00',
+        description: 'Savings',
+      },
+      {
+        type: 'transfer',
+        date: '2026-10-01',
+        source_id: '1',
+        destination_id: '2',
+        foreign_currency_code: 'USD',
+        amount: '2650.00',
+        foreign_amount: '500.00',
+        description: 'Travel',
+      },
+    ]);
   });
 });
 
@@ -377,5 +476,25 @@ describe('category_name guidance', () => {
     }
     const splitShape = toolConfigs.get('create_split_transaction').inputSchema.splits.element.shape;
     expect(splitShape.category_name.description).toContain('&amp;');
+  });
+});
+
+describe('foreign currency guidance', () => {
+  // Firefly III rejects a transfer between accounts in different currencies unless both foreign
+  // fields are present and the foreign currency matches the destination account, and it never
+  // converts between currencies. These assertions keep that guidance in the tool schemas.
+  it('documents the destination-currency rule and the lack of conversion on every write tool', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerTransactionTools(server, {} as FireflyClient);
+    const splitTool = toolConfigs.get('create_split_transaction');
+    const fields = [
+      toolConfigs.get('create_transaction').inputSchema,
+      toolConfigs.get('update_transaction').inputSchema,
+      { ...splitTool.inputSchema, foreign_amount: splitTool.inputSchema.splits.element.shape.foreign_amount },
+    ];
+    for (const schema of fields) {
+      expect(schema.foreign_amount.description).toContain('does not convert');
+      expect(schema.foreign_currency_code.description).toContain("destination account's `currency_code`");
+    }
   });
 });

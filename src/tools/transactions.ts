@@ -36,6 +36,16 @@ const GROUP_ID_HINT = `update_transaction and delete_transaction take ${GROUP_VS
 const groupIdField = (verb: string): string =>
   `Transaction group ID — ${GROUP_VS_JOURNAL_ID}. That is usually an adjacent number, so the wrong one silently ${verb} a different transaction.`;
 
+// Firefly III rejects a transfer (or a withdrawal/deposit between asset and liability accounts)
+// whose two accounts hold different currencies unless foreign_amount and a foreign currency
+// matching the destination account are both present. It never converts between currencies, so the
+// foreign amount has to be the amount actually received, not an estimate.
+const FOREIGN_AMOUNT_HINT =
+  'Amount in foreign_currency_code as a positive number string, e.g. "1000.00". Required, together with foreign_currency_code, when the source and destination accounts hold different currencies (e.g. a transfer from a BRL account to a USD account); `amount` stays in the source account\'s currency. Firefly III does not convert between currencies, so pass the amount actually received by the destination account.';
+
+const FOREIGN_CURRENCY_CODE_HINT =
+  "Foreign currency code (e.g. USD). Required together with foreign_amount. When the source and destination accounts hold different currencies it must be the destination account's `currency_code` — read it from get_account or get_accounts.";
+
 export async function fetchTransactions(
   client: FireflyClient,
   params: {
@@ -80,6 +90,8 @@ export async function createTransaction(
     category_name?: string;
     budget_id?: string;
     currency_code?: string;
+    foreign_amount?: string;
+    foreign_currency_code?: string;
     notes?: string;
     tags?: string[];
   },
@@ -95,6 +107,8 @@ export async function createTransaction(
   if (params.category_name !== undefined) split.category_name = params.category_name;
   if (params.budget_id !== undefined) split.budget_id = params.budget_id;
   if (params.currency_code !== undefined) split.currency_code = params.currency_code;
+  if (params.foreign_amount !== undefined) split.foreign_amount = params.foreign_amount;
+  if (params.foreign_currency_code !== undefined) split.foreign_currency_code = params.foreign_currency_code;
   if (params.notes !== undefined) split.notes = params.notes;
   if (params.tags !== undefined) split.tags = params.tags;
   const response = await client.post<JsonApiSingleResponse>('/transactions', {
@@ -118,6 +132,8 @@ export async function updateTransaction(
     category_name?: string;
     budget_id?: string;
     currency_code?: string;
+    foreign_amount?: string;
+    foreign_currency_code?: string;
     notes?: string;
     tags?: string[];
   },
@@ -132,6 +148,8 @@ export async function updateTransaction(
   if (params.category_name !== undefined) split.category_name = params.category_name;
   if (params.budget_id !== undefined) split.budget_id = params.budget_id;
   if (params.currency_code !== undefined) split.currency_code = params.currency_code;
+  if (params.foreign_amount !== undefined) split.foreign_amount = params.foreign_amount;
+  if (params.foreign_currency_code !== undefined) split.foreign_currency_code = params.foreign_currency_code;
   if (params.notes !== undefined) split.notes = params.notes;
   if (params.tags !== undefined) split.tags = params.tags;
   const response = await client.put<JsonApiSingleResponse>(`/transactions/${id}`, {
@@ -178,9 +196,11 @@ export async function createSplitTransaction(
     source_id?: string;
     destination_id?: string;
     currency_code?: string;
+    foreign_currency_code?: string;
     group_title?: string;
     splits: Array<{
       amount: string;
+      foreign_amount?: string;
       description: string;
       category_name?: string;
       budget_id?: string;
@@ -199,6 +219,8 @@ export async function createSplitTransaction(
     if (params.source_id !== undefined) item.source_id = params.source_id;
     if (params.destination_id !== undefined) item.destination_id = params.destination_id;
     if (params.currency_code !== undefined) item.currency_code = params.currency_code;
+    if (params.foreign_currency_code !== undefined) item.foreign_currency_code = params.foreign_currency_code;
+    if (split.foreign_amount !== undefined) item.foreign_amount = split.foreign_amount;
     if (split.category_name !== undefined) item.category_name = split.category_name;
     if (split.budget_id !== undefined) item.budget_id = split.budget_id;
     if (split.tags !== undefined) item.tags = split.tags;
@@ -267,7 +289,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
     'create_transaction',
     {
       title: 'Create Transaction',
-      description: `Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs. ${GROUP_ID_HINT}`,
+      description: `Create a new transaction in Firefly III. Use get_accounts to find source and destination account IDs and their currencies; a transfer between accounts in different currencies also needs foreign_amount and foreign_currency_code. ${GROUP_ID_HINT}`,
       inputSchema: {
         type: z.enum(['withdrawal', 'deposit', 'transfer']).describe('Transaction type'),
         date: dateOrDateTimeSchema.describe('Transaction date (YYYY-MM-DD or RFC 3339 date-time with timezone)'),
@@ -278,6 +300,8 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         category_name: z.string().optional().describe(`Category name to assign. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD). Defaults to account currency.'),
+        foreign_amount: z.string().optional().describe(FOREIGN_AMOUNT_HINT),
+        foreign_currency_code: z.string().optional().describe(FOREIGN_CURRENCY_CODE_HINT),
         notes: z.string().optional().describe('Additional notes'),
         tags: z.array(z.string()).optional().describe('Tags to attach'),
       },
@@ -306,6 +330,13 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         category_name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
         budget_id: z.string().optional().describe('Budget ID'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
+        foreign_amount: z
+          .string()
+          .optional()
+          .describe(
+            `${FOREIGN_AMOUNT_HINT} Firefly III enforces this only when creating, so an update missing it is accepted silently: when changing \`amount\` on a transaction that already has a foreign amount, send the new foreign_amount too.`,
+          ),
+        foreign_currency_code: z.string().optional().describe(FOREIGN_CURRENCY_CODE_HINT),
         notes: z.string().optional().describe('Additional notes'),
         tags: z.array(z.string()).optional().describe('Tags (replaces existing tags)'),
       },
@@ -366,11 +397,16 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         source_id: z.string().optional().describe('Source account ID (required for withdrawals and transfers)'),
         destination_id: z.string().optional().describe('Destination account ID (required for deposits and transfers)'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD). Defaults to account currency.'),
+        foreign_currency_code: z
+          .string()
+          .optional()
+          .describe(`${FOREIGN_CURRENCY_CODE_HINT} Shared across all splits; set foreign_amount on every split.`),
         group_title: z.string().optional().describe('Optional label for the transaction group'),
         splits: z
           .array(
             z.object({
               amount: z.string().describe('Amount as a positive number string, e.g. "42.50"'),
+              foreign_amount: z.string().optional().describe(`Foreign amount for this split. ${FOREIGN_AMOUNT_HINT}`),
               description: z.string().describe('Description for this split'),
               category_name: z.string().optional().describe(`Category name. ${CATEGORY_NAME_HINT}`),
               budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
