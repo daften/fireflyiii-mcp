@@ -83,7 +83,7 @@ FIREFLY_DEBUG     Set to "true" or "1" to emit verbose autocomplete tracing to s
 ```
 MCP_PRESET      String. Named preset; same values as --preset. Mutually exclusive with MCP_GROUPS.
 MCP_GROUPS      String. Comma-separated group names; same values as --groups. Empty/whitespace-only is treated as unset.
-MCP_READ_ONLY   "true" or "1" (case-insensitive, trimmed) enables read-only mode; any other value is ignored.
+MCP_READ_ONLY   "true" or "1" (case-insensitive, trimmed) enables read-only mode; "false", "0" or empty leave it off; any other value is an error.
 ```
 
 Store credentials in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
@@ -101,7 +101,9 @@ Parsed by `src/args.ts` and passed to `createServer` as `filterOptions`.
 | `--port <n>` | `3000` | Listen port (HTTP only; auto-increments on EADDRINUSE) |
 | `--preset <name>` | — | Load a named tool subset (see Filtering) |
 | `--groups <list>` | — | Comma-separated group names; cannot combine with `--preset` |
-| `--read-only` | false | Filter any selection to read-only tools (`get_*`, `search_*`, `test_*`) |
+| `--read-only` | false | Filter any selection to tools annotated `readOnlyHint: true` |
+
+Unknown flags, value flags without a value, a non-numeric `--port`, an empty `--groups` and inherited property names as presets (`toString`) are all errors. Value flags also accept `--flag=value`.
 
 ---
 
@@ -199,7 +201,7 @@ rules, recurring, attachments, currencies, exports, object-groups, transaction-l
 
 ### Read-only proxy
 
-`makeReadOnlyProxy(server)` wraps the `McpServer` with a `Proxy` that silently drops any `registerTool` call whose name does not start with `get_`, `search_`, or `test_`. Applied when `--read-only` is passed.
+`makeReadOnlyProxy(server)` wraps the `McpServer` with a `Proxy` that silently drops any `registerTool` call whose config is not annotated `readOnlyHint: true`. A test in `tool-filter.test.ts` keeps names and annotations consistent (`get_`/`search_`/`test_`/`export_`/`download_` tools are read-only, nothing else is). Applied when `--read-only` is passed.
 
 ---
 
@@ -556,7 +558,8 @@ Use the correct developer attribution matching the model's originating company:
 ## Security & Open Source
 
 - **No hardcoded secrets.** All credentials come from environment variables.
-- **Validate all input.** Use Zod schemas defined inline in each `defineTool()` call.
+- **Validate all input.** Use Zod schemas defined inline in each `defineTool()` call. Any value that becomes part of a URL path must be validated: numeric IDs use `idSchema` (or `parseId` for autocomplete labels), other strings are `encodeURIComponent`-ed. `FireflyClient` also refuses any path with dot segments, `?`, `#`, backslashes or control characters (`assertSafeApiPath`), because `new URL()` would otherwise resolve `../` and point a request at another resource.
+- **Bound what reaches the model.** `download_attachment` and the `export_*` tools refuse results over their limits (`MAX_IMAGE_ATTACHMENT_BYTES` / `MAX_FILE_ATTACHMENT_BYTES`, `EXPORT_MAX_BYTES`) rather than returning them.
 - **Error handling.** Every tool handler wraps in try/catch and returns `{ isError: true }` on failure.
 - **Dependencies.** Keep them minimal and up-to-date.
 - **License.** MIT — include LICENSE file.
