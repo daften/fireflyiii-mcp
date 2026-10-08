@@ -102,6 +102,11 @@ jobs:
 
       - run: npx tsc --noEmit
 
+      # tsconfig.json excludes src/tests from the build, and Vitest does not type-check, so without
+      # this step type errors in tests (and in what they assert about the tools) go unnoticed.
+      - name: Type-check tests
+        run: npx tsc -p tsconfig.test.json
+
       - name: Test automation scripts
         run: node --test tests/automation/*.node-test.mjs
 
@@ -116,8 +121,7 @@ jobs:
       - name: Report coverage on PR
         # always() so the comment also appears (with red numbers) when tests fail.
         if: always() && github.event_name == 'pull_request' && matrix.node-version == 22
-        uses: davelosert/vitest-coverage-report-action@v2
-
+        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2.13.0
   # Relative audit: a PR may not introduce moderate+ advisories that its base
   # doesn't already have. Deliberately NOT absolute — when several security
   # advisories are open at once, each fix-PR would fail an absolute audit
