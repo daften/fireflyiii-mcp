@@ -55,7 +55,11 @@ export function formatError(err: unknown): string {
       const details = parseFieldErrors(err.body);
       return details ? `Bad request: ${details}` : 'Bad request — check your input parameters.';
     }
-    if (err.status === 401) return 'Authentication failed. Check your FIREFLY_TOKEN.';
+    // Worded for both transports: stdio authenticates with FIREFLY_TOKEN, while HTTP mode never
+    // reads it and forwards the caller's own Bearer token instead.
+    if (err.status === 401) {
+      return 'Authentication failed: Firefly III rejected the access token. Over stdio, check FIREFLY_TOKEN; over HTTP, re-authenticate or check the Bearer token your MCP client sends.';
+    }
     if (err.status === 404) return 'Resource not found.';
     if (err.status === 422) {
       const details = parseFieldErrors(err.body);
@@ -107,39 +111,46 @@ export class FireflyClient {
     return url.toString();
   }
 
-  private async rawFetch(url: string, init: RequestInit): Promise<Response> {
+  /**
+   * Performs one request and reads its body under a single timeout. The timer must stay armed
+   * until `read` finishes: `fetch` resolves as soon as the response headers arrive, so a timer
+   * cleared at that point left a stalled body able to hang the tool call indefinitely.
+   */
+  private async send<T>(url: string, init: RequestInit, read: (response: Response) => Promise<T>): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    let response: Response;
     try {
-      response = await fetch(url, { ...init, signal: controller.signal });
+      const response = await fetch(url, { ...init, signal: controller.signal });
+      if (!response.ok) {
+        const responseBody = await response.text().catch(() => '');
+        throw new FireflyError(response.status, url, responseBody);
+      }
+      return await read(response);
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new Error(`Request to ${url} timed out after ${this.timeoutMs}ms.`);
+      if (!(err instanceof FireflyError) && controller.signal.aborted) {
+        // Query strings can carry search terms; keep them out of the message (as FireflyError does).
+        throw new Error(`Request to ${url.split('?')[0]} timed out after ${this.timeoutMs}ms.`);
       }
       throw err;
     } finally {
       clearTimeout(timer);
     }
-    if (!response.ok) {
-      const responseBody = await response.text().catch(() => '');
-      throw new FireflyError(response.status, url, responseBody);
-    }
-    return response;
   }
 
   private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
-    const response = await this.rawFetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-        Accept: 'application/json',
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    return this.send(
+      url,
+      {
+        method,
+        headers: {
+          Authorization: `Bearer ${this.getToken()}`,
+          Accept: 'application/json',
+          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
-    if (response.status === 204) return undefined as T;
-    return response.json() as T;
+      async (response) => (response.status === 204 ? (undefined as T) : ((await response.json()) as T)),
+    );
   }
 
   async get<T = unknown>(path: string, params?: QueryParams): Promise<T> {
@@ -159,42 +170,40 @@ export class FireflyClient {
   }
 
   async postBinary(path: string, body: Uint8Array): Promise<void> {
-    await this.rawFetch(this.buildUrl(path), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-        'Content-Type': 'application/octet-stream',
+    await this.send(
+      this.buildUrl(path),
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.getToken()}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: body as BodyInit,
       },
-      body: body as BodyInit,
-    });
+      async () => undefined,
+    );
   }
 
   async getText(path: string, params?: QueryParams): Promise<string> {
-    const response = await this.rawFetch(this.buildUrl(path, params), {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-        Accept: '*/*',
-      },
-    });
-    return response.text();
+    return this.send(
+      this.buildUrl(path, params),
+      { method: 'GET', headers: { Authorization: `Bearer ${this.getToken()}`, Accept: '*/*' } },
+      (response) => response.text(),
+    );
   }
 
   async getBinary(
     path: string,
     params?: QueryParams,
   ): Promise<{ data: Buffer; contentType: string; filename: string }> {
-    const response = await this.rawFetch(this.buildUrl(path, params), {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${this.getToken()}`,
-        Accept: '*/*',
-      },
-    });
-    const arrayBuffer = await response.arrayBuffer();
-    const data = Buffer.from(arrayBuffer);
-    const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
-    const filename = parseContentDispositionFilename(response.headers.get('Content-Disposition'));
-    return { data, contentType, filename };
+    return this.send(
+      this.buildUrl(path, params),
+      { method: 'GET', headers: { Authorization: `Bearer ${this.getToken()}`, Accept: '*/*' } },
+      async (response) => ({
+        data: Buffer.from(await response.arrayBuffer()),
+        contentType: response.headers.get('Content-Type') ?? 'application/octet-stream',
+        filename: parseContentDispositionFilename(response.headers.get('Content-Disposition')),
+      }),
+    );
   }
 }
