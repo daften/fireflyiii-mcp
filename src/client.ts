@@ -49,6 +49,77 @@ export function parseContentDispositionFilename(header: string | null | undefine
   return value || 'file';
 }
 
+/**
+ * Refuses an API path that could address something other than what it spells out. Tool arguments end
+ * up in these paths, and `new URL()` resolves dot segments (also percent-encoded ones) before the
+ * request is sent, so an ID of `../budgets/5` turned DELETE /accounts/{id} into DELETE /budgets/5,
+ * and enough `../` left /api/v1 entirely with the token attached. `?` and `#` would smuggle in a
+ * query or cut the path short; a backslash is treated as a slash by URL parsers.
+ */
+export function assertSafeApiPath(path: string): void {
+  const segments = path.split('/');
+  // Control characters matter as well: URL parsers silently strip tabs and newlines, so `.\n.` would
+  // pass the segment check below and still be resolved as `..`.
+  const hasControlCharacter = [...path].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
+  const unsafe =
+    !path.startsWith('/') ||
+    hasControlCharacter ||
+    /[?#\\]/.test(path) ||
+    segments.some((segment) => {
+      let decoded = segment;
+      try {
+        decoded = decodeURIComponent(segment);
+      } catch {
+        return true; // malformed percent-encoding
+      }
+      return decoded === '.' || decoded === '..';
+    });
+  if (unsafe) throw new Error(`Refusing to call an unsafe Firefly III API path: ${JSON.stringify(path)}`);
+}
+
+/** A response body larger than the caller's limit. `size` is set when Content-Length declared it. */
+export class ResponseTooLargeError extends Error {
+  constructor(
+    readonly limit: number,
+    readonly size?: number,
+  ) {
+    super(
+      size === undefined
+        ? `Response exceeds the ${limit}-byte limit.`
+        : `Response is ${size} bytes, over the ${limit}-byte limit.`,
+    );
+    this.name = 'ResponseTooLargeError';
+  }
+}
+
+/**
+ * Reads a response body, giving up as soon as it passes `maxBytes`: a declared Content-Length is
+ * checked before reading anything, and the stream is cancelled mid-way otherwise, so an oversized
+ * file is never downloaded in full.
+ */
+async function readLimited(response: Response, maxBytes: number): Promise<Buffer> {
+  const declared = Number(response.headers.get('Content-Length') ?? Number.NaN);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel().catch(() => {});
+    throw new ResponseTooLargeError(maxBytes, declared);
+  }
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new ResponseTooLargeError(maxBytes);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
 export function formatError(err: unknown): string {
   if (err instanceof FireflyError) {
     if (err.status === 400) {
@@ -61,6 +132,9 @@ export function formatError(err: unknown): string {
       return 'Authentication failed: Firefly III rejected the access token. Over stdio, check FIREFLY_TOKEN; over HTTP, re-authenticate or check the Bearer token your MCP client sends.';
     }
     if (err.status === 404) return 'Resource not found.';
+    if (err.status >= 300 && err.status < 400) {
+      return 'Firefly III redirected the request instead of answering it. Check that FIREFLY_URL points at Firefly III itself (not a login page or proxy).';
+    }
     if (err.status === 422) {
       const details = parseFieldErrors(err.body);
       return details ? `Validation failed: ${details}` : 'Invalid request parameters.';
@@ -97,6 +171,7 @@ export class FireflyClient {
   }
 
   private buildUrl(path: string, params?: QueryParams): string {
+    assertSafeApiPath(path);
     const url = new URL(`${this.baseUrl}/api/v1${path}`);
     if (params) {
       for (const [key, value] of Object.entries(params)) {
@@ -120,7 +195,10 @@ export class FireflyClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
+      // Never follow redirects. A Firefly III API route only redirects when something is wrong (Laravel
+      // answers a failed validation on a request that did not ask for JSON with a 302 to the home
+      // page), and following it handed that HTML page back as if it were the result.
+      const response = await fetch(url, { ...init, redirect: 'manual', signal: controller.signal });
       if (!response.ok) {
         const responseBody = await response.text().catch(() => '');
         throw new FireflyError(response.status, url, responseBody);
@@ -184,26 +262,42 @@ export class FireflyClient {
     );
   }
 
-  async getText(path: string, params?: QueryParams): Promise<string> {
+  // getText and getBinary ask for JSON even though the body is CSV or a file: Firefly III serves these
+  // routes either way, and only a request that accepts JSON gets a 422 with the reason when its
+  // input is rejected (anything else gets an HTML redirect).
+
+  /** Text body; with `maxBytes`, throws ResponseTooLargeError instead of reading past the limit. */
+  async getText(path: string, params?: QueryParams, options: { maxBytes?: number } = {}): Promise<string> {
+    const { maxBytes } = options;
     return this.send(
       this.buildUrl(path, params),
-      { method: 'GET', headers: { Authorization: `Bearer ${this.getToken()}`, Accept: '*/*' } },
-      (response) => response.text(),
+      { method: 'GET', headers: { Authorization: `Bearer ${this.getToken()}`, Accept: 'application/json' } },
+      async (response) =>
+        maxBytes === undefined ? response.text() : (await readLimited(response, maxBytes)).toString('utf8'),
     );
   }
 
+  /**
+   * Binary body plus its metadata. `maxBytes` may depend on the Content-Type (known once headers
+   * arrive); past it, ResponseTooLargeError is thrown without downloading the rest.
+   */
   async getBinary(
     path: string,
     params?: QueryParams,
+    options: { maxBytes?: number | ((contentType: string) => number) } = {},
   ): Promise<{ data: Buffer; contentType: string; filename: string }> {
     return this.send(
       this.buildUrl(path, params),
-      { method: 'GET', headers: { Authorization: `Bearer ${this.getToken()}`, Accept: '*/*' } },
-      async (response) => ({
-        data: Buffer.from(await response.arrayBuffer()),
-        contentType: response.headers.get('Content-Type') ?? 'application/octet-stream',
-        filename: parseContentDispositionFilename(response.headers.get('Content-Disposition')),
-      }),
+      { method: 'GET', headers: { Authorization: `Bearer ${this.getToken()}`, Accept: 'application/json' } },
+      async (response) => {
+        const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
+        const limit = typeof options.maxBytes === 'function' ? options.maxBytes(contentType) : options.maxBytes;
+        return {
+          data: limit === undefined ? Buffer.from(await response.arrayBuffer()) : await readLimited(response, limit),
+          contentType,
+          filename: parseContentDispositionFilename(response.headers.get('Content-Disposition')),
+        };
+      },
     );
   }
 }

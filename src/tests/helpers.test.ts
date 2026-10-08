@@ -24,12 +24,12 @@ function makeServer() {
 }
 
 describe('defineTool', () => {
-  it('serialises object result to pretty-printed JSON', async () => {
+  it('serialises object result to compact JSON', async () => {
     const server = makeServer();
     defineTool(server as unknown as McpServer, 'test_tool', { title: 'Test' }, async () => ({ foo: 'bar', n: 1 }));
     const result = await server.getHandler()({});
     expect(result).toEqual({
-      content: [{ type: 'text', text: '{\n  "foo": "bar",\n  "n": 1\n}' }],
+      content: [{ type: 'text', text: '{"foo":"bar","n":1}' }],
     });
   });
 
@@ -116,8 +116,9 @@ describe('parseId', () => {
     expect(parseId('5 (Groceries)')).toBe('5');
   });
 
-  it('falls back to input if no leading numeric ID is found', () => {
-    expect(parseId('no-numbers')).toBe('no-numbers');
+  it('rejects a value with no leading numeric ID instead of passing it into a URL path', () => {
+    expect(() => parseId('no-numbers')).toThrow('is not a valid ID');
+    expect(() => parseId('../budgets/5')).toThrow('is not a valid ID');
   });
 });
 

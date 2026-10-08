@@ -8,13 +8,13 @@ export interface ParsedArgs {
   filterOptions: ToolFilterOptions;
 }
 
-/**
- * Validate a preset name from either a CLI flag or an environment variable.
- * `source` is appended to the error message (e.g. " from MCP_PRESET") to make
- * misconfiguration easy to trace; pass "" for CLI flags.
- */
+const VALUE_FLAGS = ['--transport', '--host', '--port', '--preset', '--groups'] as const;
+const BOOLEAN_FLAGS = ['--read-only'] as const;
+type ValueFlag = (typeof VALUE_FLAGS)[number];
+
+/** Validate a preset name. Own keys only: `toString` or `__proto__` must not pass via the prototype. */
 function validatePreset(val: string, source = ''): PresetName {
-  if (!(val in PRESETS)) {
+  if (!Object.hasOwn(PRESETS, val)) {
     throw new Error(`Unknown preset "${val}"${source}. Valid presets: ${Object.keys(PRESETS).join(', ')}`);
   }
   return val as PresetName;
@@ -38,6 +38,17 @@ function parseGroups(raw: string, source = ''): ToolGroup[] {
   return parts as ToolGroup[];
 }
 
+/** Suggest the flag a typo was probably meant to be, e.g. `--readonly` → `--read-only`. */
+function suggestFlag(arg: string): string {
+  const normalize = (s: string) => s.replace(/^-+/, '').replace(/[-_]/g, '').toLowerCase();
+  const match = [...VALUE_FLAGS, ...BOOLEAN_FLAGS].find((flag) => normalize(flag) === normalize(arg.split('=')[0]));
+  return match ? ` Did you mean ${match}?` : '';
+}
+
+/**
+ * Parse CLI arguments. Anything not recognized is an error rather than being skipped: a mistyped
+ * `--read-only` used to start the server with full write access and no warning.
+ */
 export function parseArgs(args: string[]): ParsedArgs {
   let transport: 'stdio' | 'http' = 'stdio';
   let host = '127.0.0.1';
@@ -49,28 +60,55 @@ export function parseArgs(args: string[]): ParsedArgs {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-
-    if (arg === '--transport' && args[i + 1]) {
-      const val = args[++i];
-      if (val !== 'stdio' && val !== 'http') {
-        throw new Error(`--transport must be "stdio" or "http", got "${val}"`);
-      }
-      transport = val;
-    } else if (arg === '--host' && args[i + 1]) {
-      host = args[++i];
-    } else if (arg === '--port' && args[i + 1]) {
-      const parsed = parseInt(args[++i], 10);
-      if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
-        throw new Error('--port must be a valid port number (1–65535)');
-      }
-      port = parsed;
-      portWasExplicit = true;
-    } else if (arg === '--preset' && args[i + 1]) {
-      preset = validatePreset(args[++i]);
-    } else if (arg === '--groups' && args[i + 1]) {
-      groups = parseGroups(args[++i]);
-    } else if (arg === '--read-only') {
+    if ((BOOLEAN_FLAGS as readonly string[]).includes(arg)) {
       readOnly = true;
+      continue;
+    }
+
+    // Accept both `--flag value` and `--flag=value`.
+    const eq = arg.indexOf('=');
+    const flag = (eq === -1 ? arg : arg.slice(0, eq)) as ValueFlag;
+    if (!(VALUE_FLAGS as readonly string[]).includes(flag)) {
+      throw new Error(
+        `Unknown argument "${arg}".${suggestFlag(arg)} Valid flags: ${[...VALUE_FLAGS, ...BOOLEAN_FLAGS].join(', ')}`,
+      );
+    }
+    let val: string | undefined;
+    if (eq !== -1) {
+      val = arg.slice(eq + 1);
+    } else {
+      val = args[i + 1];
+      if (val === undefined || val.startsWith('--')) throw new Error(`${flag} requires a value`);
+      i++;
+    }
+    if (val === '') throw new Error(`${flag} requires a value`);
+
+    switch (flag) {
+      case '--transport':
+        if (val !== 'stdio' && val !== 'http') {
+          throw new Error(`--transport must be "stdio" or "http", got "${val}"`);
+        }
+        transport = val;
+        break;
+      case '--host':
+        host = val;
+        break;
+      case '--port': {
+        const parsed = /^\d+$/.test(val) ? Number(val) : Number.NaN;
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+          throw new Error(`--port must be a whole number between 1 and 65535, got "${val}"`);
+        }
+        port = parsed;
+        portWasExplicit = true;
+        break;
+      }
+      case '--preset':
+        preset = validatePreset(val);
+        break;
+      case '--groups':
+        groups = parseGroups(val);
+        if (groups.length === 0) throw new Error('--groups needs at least one group name');
+        break;
     }
   }
 
@@ -88,8 +126,12 @@ export function parseArgs(args: string[]): ParsedArgs {
   }
 
   if (!readOnly) {
-    const flag = process.env.MCP_READ_ONLY?.trim().toLowerCase();
+    // Unrecognized values are an error, not "off": MCP_READ_ONLY=yes must not quietly mean read-write.
+    const flag = process.env.MCP_READ_ONLY?.trim().toLowerCase() ?? '';
     if (flag === 'true' || flag === '1') readOnly = true;
+    else if (flag !== '' && flag !== 'false' && flag !== '0') {
+      throw new Error(`MCP_READ_ONLY must be "true", "1", "false" or "0", got "${process.env.MCP_READ_ONLY}"`);
+    }
   }
 
   if (preset !== undefined && groups !== undefined) {

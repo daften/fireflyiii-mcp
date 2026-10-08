@@ -10,7 +10,7 @@ import {
   unwrapSingle,
 } from '../transform.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS } from './_annotations.js';
-import { defineTool } from './_helpers.js';
+import { defineTool, idSchema } from './_helpers.js';
 
 // Firefly III has no API to create an object group: one is created implicitly the first time a bill or
 // piggy bank is saved with a new object_group_title (see create_bill / create_piggy_bank).
@@ -87,7 +87,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
     {
       title: 'Get Object Group',
       description: 'Get a single object group by ID. Use get_object_groups to find valid IDs.',
-      inputSchema: { id: z.string().describe('Object group ID') },
+      inputSchema: { id: idSchema.describe('Object group ID') },
       annotations: READ_ANNOTATIONS,
     },
     ({ id }) => fetchObjectGroup(client, id),
@@ -101,7 +101,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       description:
         'Update an existing object group. Only fields provided will be changed. Use get_object_groups to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Object group ID'),
+        id: idSchema.describe('Object group ID'),
         title: z.string().optional().describe('Object group title'),
         order: z.number().int().positive().optional().describe('Display order'),
       },
@@ -117,7 +117,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       title: 'Delete Object Group',
       description:
         'Permanently delete an object group. **This action cannot be undone.** Use get_object_groups to confirm the ID before deleting.',
-      inputSchema: { id: z.string().describe('Object group ID') },
+      inputSchema: { id: idSchema.describe('Object group ID') },
       annotations: DELETE_ANNOTATIONS,
     },
     ({ id }) => deleteObjectGroup(client, id),
@@ -130,7 +130,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       title: 'Get Object Group Bills',
       description: 'Get all bills belonging to a specific object group. Use get_object_groups to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Object group ID'),
+        id: idSchema.describe('Object group ID'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
         limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
       },
@@ -150,7 +150,7 @@ export function registerObjectGroupTools(server: McpServer, client: FireflyClien
       title: 'Get Object Group Piggy Banks',
       description: 'Get all piggy banks belonging to a specific object group. Use get_object_groups to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Object group ID'),
+        id: idSchema.describe('Object group ID'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
         limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
       },

@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import { dateSchema, defineTool, idSchema } from './_helpers.js';
 
 // Since Firefly III v6.2.0 a piggy bank can save from several asset accounts. Each link carries the
 // amount saved from that account; there is no separate "event" write API (piggy bank events are only
@@ -182,7 +182,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       description:
         'Update an existing piggy bank in Firefly III. Only fields provided will be changed. To put money in or take it out, pass accounts with the new current_amount (total saved) for that account; accounts you do not mention keep their link and amount. Use get_piggy_banks to find valid IDs and current amounts.',
       inputSchema: {
-        id: z.string().describe('Piggy bank ID: use get_piggy_banks to find valid IDs'),
+        id: idSchema.describe('Piggy bank ID: use get_piggy_banks to find valid IDs'),
         name: z.string().optional().describe('Piggy bank name'),
         accounts: z
           .array(accountLinkSchema)
@@ -211,7 +211,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       title: 'Delete Piggy Bank',
       description:
         'Permanently delete a piggy bank (savings goal) from Firefly III. **This action cannot be undone.** Use get_piggy_banks to confirm the ID before deleting.',
-      inputSchema: { id: z.string().describe('Piggy bank ID: use get_piggy_banks to find valid IDs') },
+      inputSchema: { id: idSchema.describe('Piggy bank ID: use get_piggy_banks to find valid IDs') },
       annotations: DELETE_ANNOTATIONS,
     },
     ({ id }) => deletePiggyBank(client, id),
@@ -225,7 +225,7 @@ export function registerPiggyBankTools(server: McpServer, client: FireflyClient)
       description:
         'Get the recorded deposit/withdrawal history of a specific piggy bank. Use get_piggy_banks to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Piggy bank ID'),
+        id: idSchema.describe('Piggy bank ID'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
         limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
       },

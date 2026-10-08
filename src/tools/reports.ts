@@ -88,12 +88,12 @@ export async function updateTag(
   id: string,
   params: { tag?: string; date?: string; description?: string },
 ): Promise<UnwrappedSingle> {
-  const response = await client.put<JsonApiSingleResponse>(`/tags/${id}`, params);
+  const response = await client.put<JsonApiSingleResponse>(`/tags/${encodeURIComponent(id)}`, params);
   return unwrapSingle(response);
 }
 
 export async function deleteTag(client: FireflyClient, id: string): Promise<{ deleted: true; id: string }> {
-  await client.delete(`/tags/${id}`);
+  await client.delete(`/tags/${encodeURIComponent(id)}`);
   return { deleted: true, id };
 }
 
@@ -259,7 +259,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       description:
         'Update an existing tag in Firefly III. Only fields provided will be changed. Use get_tags to find valid tag IDs.',
       inputSchema: {
-        id: z.string().describe('Tag ID — use get_tags to find valid IDs'),
+        id: z.string().min(1).describe('Tag ID or exact tag name: use get_tags to find them'),
         tag: z.string().optional().describe('Tag name'),
         date: dateSchema.optional().describe('Tag date (YYYY-MM-DD)'),
         description: z.string().optional().describe('Tag description'),
@@ -276,7 +276,7 @@ export function registerReportTools(server: McpServer, client: FireflyClient): v
       title: 'Delete Tag',
       description:
         'Permanently delete a tag from Firefly III. **This action cannot be undone.** Transactions with this tag will have it removed. Use get_tags to confirm the ID before deleting.',
-      inputSchema: { id: z.string().describe('Tag ID — use get_tags to find valid IDs') },
+      inputSchema: { id: z.string().min(1).describe('Tag ID or exact tag name: use get_tags to find them') },
       annotations: DELETE_ANNOTATIONS,
     },
     ({ id }) => deleteTag(client, id),

@@ -17,6 +17,7 @@ import {
   dateOrDateTimeSchema,
   dateSchema,
   defineTool,
+  idSchema,
   parseId,
 } from './_helpers.js';
 import { fetchAccountTransactions } from './accounts.js';
@@ -378,7 +379,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       title: 'Get Transaction',
       description: `Get a single Firefly III transaction by its numeric ID, including all splits. Use get_transactions to find valid transaction IDs. ${GROUP_ID_HINT}`,
       inputSchema: {
-        id: z.string().describe('Transaction ID'),
+        id: idSchema.describe('Transaction ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -417,7 +418,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Update one split of an existing transaction in Firefly III. Only fields provided will be changed; the other splits of a split transaction are left untouched. For a transaction with several splits, pass transaction_journal_id to pick the split (one split per call); a type change always applies to every split. Use get_transaction to confirm the IDs before updating.',
       inputSchema: {
-        id: z.string().describe(groupIdField('updates')),
+        id: idSchema.describe(groupIdField('updates')),
         transaction_journal_id: z
           .string()
           .optional()
@@ -451,7 +452,7 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
       description:
         'Permanently delete a transaction from Firefly III. **This action cannot be undone.** Use get_transaction to confirm the transaction before deleting.',
       inputSchema: {
-        id: z.string().describe(groupIdField('deletes')),
+        id: idSchema.describe(groupIdField('deletes')),
       },
       annotations: DELETE_ANNOTATIONS,
     },
