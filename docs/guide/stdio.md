@@ -27,7 +27,7 @@ Your AI assistant downloads and starts the server automatically on first use. No
 
 ## Optional: limit which tools are loaded
 
-With 140 tools, loading everything uses significant context window space. Use `MCP_PRESET` to load a named subset:
+With 137 tools, loading everything uses significant context window space. Use `MCP_PRESET` to load a named subset:
 
 ```json
 "env": {

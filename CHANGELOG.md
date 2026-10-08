@@ -7,9 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `object_group_title` on `create_bill`, `update_bill`, `create_piggy_bank` and `update_piggy_bank`. Firefly III has no API to create an object group; setting a new title is how one gets created. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- `create_rule` / `update_rule` accept the `manual-activation` trigger (a rule that only runs through `trigger_rule` / `trigger_rule_group`). ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- A contract test (`src/tests/firefly-contract.test.ts`) that calls every tool and checks each request's method and path against snapshots of Firefly III's route table for v6.4.0 and v6.7.7 (`scripts/update-firefly-routes.mjs` refreshes them), plus live integration tests for every request shape fixed below. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+
 ### Changed
 
 - Deduped six maintainability items flagged in the v0.4.6..develop pre-release review (#103): `get_transactions`' account-scoped delegation and `get_account_transactions` now share one query-builder helper; `create_account` and `update_account` now share one `liabilityFields()` schema factory instead of repeating the six-field liability block; the OAuth pending-flow expiry check in `src/http.ts` is defined once and used by both the periodic sweep and the read-time check; `GROUP_ID_HINT` and `groupIdField` in `transactions.ts` now derive from one shared warning fragment instead of two independently-worded copies; and `exports.ts`'s dated/undated tool variants are now registered through a single `defineTool` call instead of two near-identical branches. No behavior change to any tool's request/response shape or validation.
+- **Breaking:** `update_budget_limit` and `delete_budget_limit` take the limit's `budget_id`, since Firefly III only routes budget-limit writes under their budget. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- **Breaking:** `create_piggy_bank` takes `accounts` (or the `account_id` shortcut), `target_amount` and `currency_code`, matching what Firefly III has required since v6.2.0; `start_date` defaults to today. `update_piggy_bank` replaces its ignored `account_id` with `accounts`, merged over the existing links so accounts you don't mention keep their link and saved amount (Firefly III itself would unlink them). Set `accounts[].current_amount` to put money in or take it out. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- **Breaking:** `create_split_transaction` requires `group_title`, which Firefly III rejects a multi-split transaction without. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- `get_net_worth_summary` now reads the net-worth entries of `/summary/basic`; Firefly III v1 has no net-worth endpoint. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- The documented minimum Firefly III version is now v6.4.0, the oldest release that serves every route the tools call. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+
+### Removed
+
+- `create_piggy_bank_event`, `delete_piggy_bank_event` and `create_object_group`, which called routes no Firefly III v6 release has ever had. Use `update_piggy_bank` (`accounts[].current_amount`) and an `object_group_title` on a bill or piggy bank instead. The server now has 137 tools. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
 
 ### Fixed
 
@@ -17,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Firefly III request timeout now also covers reading the response body. `fetch()` resolves once the headers arrive, so the 30-second timer used to be cleared before a large or stalled body (an attachment download, an export) was read, and such a call could hang indefinitely. The timeout message no longer includes the URL's query string. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
 - The autocomplete cache now sweeps expired entries and holds at most 256 identities. In HTTP mode every refreshed OAuth token is a new cache key, so a long-running server used to keep one stale entry (up to 1,000 records) per token it had ever seen. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
 - A 401 from Firefly III no longer tells HTTP-mode users to check `FIREFLY_TOKEN`, which HTTP mode never reads; the message now covers both transports. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- **`update_transaction` no longer destroys split transactions.** It sent its fields as a single `transactions[]` entry without a `transaction_journal_id`, which Firefly III treats as a new split, then deletes every split the request didn't mention: on a two-split group, an amount/description/account update replaced both splits with one, and a category-only update silently did nothing while reporting success. It now re-reads the group and sends every split by ID, changing only the chosen one; `transaction_journal_id` picks the split and is required when there are several. A type change applies to every split, as Firefly requires. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- `bulk_update_transactions` never worked: Firefly III's `/data/bulk/transactions` only moves transactions between accounts and rejected (with a 500) the search-query payload the tool sent. It is now done client-side: search, re-read each matched group, and change only the matched splits (search returns partial groups, so sending them back as-is would delete the rest). It refuses to change anything when the query matches more than `max_transactions` (default 50). ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- `update_budget_limit`, `delete_budget_limit` and `get_net_worth_summary` called routes that do not exist (404 on every call). ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
+- The account filters of `get_insight_expenses_by_asset`, `get_insight_income_by_asset`, `get_insight_transfers_by_asset` and `get_insight_income_by_revenue` were silently ignored: they were sent as `assets[]` / `revenue[]`, but Firefly III only reads `accounts[]`, so filtered calls returned the unfiltered totals. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
 
 ### Security
 

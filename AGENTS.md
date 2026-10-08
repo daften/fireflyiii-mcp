@@ -6,7 +6,7 @@
 
 Users can query their finances in natural language through Claude, getting answers about accounts, transactions, budgets, categories, bills, piggy banks, and financial insights without writing queries themselves.
 
-**Current state:** 140 tools across 14 groups, full CRUD, stdio and HTTP (OAuth or PAT) transports, tool filtering via `--preset`/`--groups`/`--read-only`.
+**Current state:** 137 tools across 14 groups, full CRUD, stdio and HTTP (OAuth or PAT) transports, tool filtering via `--preset`/`--groups`/`--read-only`.
 
 ### Architecture at a glance
 
@@ -26,7 +26,7 @@ MCP client (Claude Code / Desktop / ...)
                      │  registerAllTools (src/tools/index.ts)
                      │  · TOOL_GROUPS / PRESETS filtering, read-only proxy
                      ▼
-      Tool groups (src/tools/*.ts, 14 groups / 140 tools)
+      Tool groups (src/tools/*.ts, 14 groups / 137 tools)
         · defineTool wrapper: zod validation, error formatting (src/tools/_helpers.ts)
         · autocomplete prompts with per-user TTL cache
                      │
@@ -131,7 +131,7 @@ fireflyiii-mcp/
 │   │   ├── attachments.ts       # get_attachments, get_attachment, create_attachment, update_attachment, delete_attachment, upload_attachment, download_attachment
 │   │   ├── currencies.ts        # get_currencies, get_currency, create_currency, update_currency, delete_currency, enable_currency, disable_currency, set_primary_currency
 │   │   ├── exports.ts           # export_transactions, export_accounts, export_bills, export_budgets, export_categories, export_tags, export_recurring, export_rules, export_piggy_banks
-│   │   ├── object-groups.ts     # get_object_groups, get_object_group, create_object_group, update_object_group, delete_object_group, get_object_group_bills, get_object_group_piggy_banks
+│   │   ├── object-groups.ts     # get_object_groups, get_object_group, update_object_group, delete_object_group, get_object_group_bills, get_object_group_piggy_banks
 │   │   └── transaction-links.ts # get_link_types, get_transaction_links, get_transaction_link, create_transaction_link, update_transaction_link, delete_transaction_link
 │   └── tests/
 │       ├── accounts.test.ts
@@ -192,10 +192,10 @@ rules, recurring, attachments, currencies, exports, object-groups, transaction-l
 |------|--------|-------|
 | `minimal` | accounts, transactions | 15 |
 | `default` | accounts, transactions, budgets, categories, bills | 37 |
-| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 44 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 42 |
 | `insights` | accounts, transactions, categories, reports | 57 |
 | `automation` | accounts, transactions, rules, recurring | 37 |
-| `full` | all 14 groups | 140 |
+| `full` | all 14 groups | 137 |
 
 ### Read-only proxy
 
@@ -457,7 +457,8 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 - **Unit tests** in `src/tests/` test fetch functions in isolation (mock `client.get`).
 - Fixtures use **realistic JSON:API envelopes** — the full `{ data: [{ id, type, attributes, links }], meta: { pagination } }` shape — so tests catch transform regressions.
-- **Integration tests** in `src/tests/integration.test.ts` run against a real Firefly III instance (only when `FIREFLY_INTEGRATION=true`).
+- **Contract test** in `src/tests/firefly-contract.test.ts` calls every tool against a recording client and checks each request's method and path against snapshots of Firefly III's route table (`src/tests/fixtures/firefly-routes-<tag>.json`, one for the oldest supported release and one for the newest tested). Mocked unit tests cannot catch a path Firefly does not serve; this one does. Refresh or add a snapshot with `node scripts/update-firefly-routes.mjs vX.Y.Z`, and keep the oldest snapshot equal to the minimum version stated in the docs (currently **v6.4.0**).
+- **Integration tests** in `src/tests/integration.test.ts` run against a real Firefly III instance (only when `FIREFLY_INTEGRATION=true`). Request *bodies* are only verified here, so any tool whose payload shape is non-obvious (split transactions, piggy bank accounts, insight filters) should get a live test. Everything a test creates must be deleted in `afterAll`: contributors run this suite against their own instance.
 - Run unit tests in CI; integration tests manually or in a staging environment.
 
 ---
@@ -573,7 +574,10 @@ Use the correct developer attribution matching the model's originating company:
 - The MCP SDK handles serialization; just return plain objects from tool handlers (via the `defineTool` helper, which JSON-stringifies the result into a text block). For tools that must emit native content blocks instead — e.g. `download_attachment` returns an `image` block for image attachments — use `defineContentTool` and return a ready-made `{ content: [...] }` result.
 - Firefly III API is REST; pagination is via query params (`limit`, `page`).
 - `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.
-- Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly.
+- Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly. Their account filters are only read from `accounts[]` (Firefly splits them by account type itself); any other parameter name is silently ignored.
+- **Transaction updates must name every split.** Firefly treats a `transactions[]` entry without `transaction_journal_id` as a new split and deletes every existing split the PUT does not mention, and `/search/transactions` returns *partial* groups (only the matching splits). Re-read the full group and send each split with its ID (`buildGroupUpdate` in `tools/transactions.ts`).
+- **Piggy bank `accounts` replace the linked set.** Any account left out of an update's `accounts` is unlinked along with the money saved from it, so `update_piggy_bank` merges the caller's entries over the current links.
+- The minimum supported Firefly III version is **v6.4.0** (the oldest release that serves every route the tools call).
 - `MCP_BASE_URL` must be set when the HTTP server is not on loopback (e.g. Docker); the server exits with code 1 otherwise.
 - **Internal planning docs (design specs, implementation plans) are local-only.** They live in `docs/superpowers/` (gitignored, and `srcExclude`d from the VitePress site) and must never be committed — do not create alternative locations like `docs/design/` for them.
 
