@@ -126,7 +126,11 @@ describe('FireflyClient', () => {
 describe('formatError', () => {
   it('returns auth message for 401', () => {
     const err = new FireflyError(401, 'https://example.com', 'Unauthorized');
-    expect(formatError(err)).toBe('Authentication failed. Check your FIREFLY_TOKEN.');
+    const message = formatError(err);
+    expect(message).toContain('Authentication failed');
+    // Must make sense on both transports: HTTP mode never reads FIREFLY_TOKEN.
+    expect(message).toContain('FIREFLY_TOKEN');
+    expect(message).toContain('Bearer token');
   });
 
   it('returns not found message for 404', () => {
@@ -398,5 +402,62 @@ describe('parseContentDispositionFilename', () => {
 
   it('falls back to the raw value when the extended form is malformed', () => {
     expect(parseContentDispositionFilename("attachment; filename*=UTF-8''bad%name.pdf")).toBe('bad%name.pdf');
+  });
+});
+
+describe('FireflyClient timeout', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  // fetch() resolves once headers arrive; a body that then stalls must still hit the timeout.
+  function stallingBodyFetch() {
+    return vi.fn(async (_url: string, init: RequestInit) => {
+      const body = new ReadableStream({
+        start(controller) {
+          init.signal?.addEventListener('abort', () =>
+            controller.error(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+  }
+
+  it.each([
+    ['get', (c: FireflyClient) => c.get('/accounts', { query: 'secret search' })],
+    ['getText', (c: FireflyClient) => c.getText('/data/export/transactions', { query: 'secret search' })],
+    ['getBinary', (c: FireflyClient) => c.getBinary('/attachments/1/download', { query: 'secret search' })],
+  ])('%s times out when the response body stalls after the headers', async (_name, run) => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', stallingBodyFetch());
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    const pending = run(client);
+    const assertion = expect(pending).rejects.toThrow(/timed out after 30000ms/);
+    await vi.advanceTimersByTimeAsync(30_001);
+    await assertion;
+  });
+
+  it('keeps the query string out of the timeout message', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', stallingBodyFetch());
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    const pending = client.get('/search/transactions', { query: 'secret search' });
+    const assertion = expect(pending).rejects.toThrow(
+      'Request to https://firefly.example.com/api/v1/search/transactions timed out after 30000ms.',
+    );
+    await vi.advanceTimersByTimeAsync(30_001);
+    await assertion;
+  });
+
+  it('does not report a timeout for a response that completes in time', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 })),
+    );
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    await expect(client.get('/accounts')).resolves.toEqual({ data: [] });
   });
 });

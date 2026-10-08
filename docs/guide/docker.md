@@ -99,3 +99,8 @@ A custom connector is driven by Anthropic's backend rather than by the Claude ap
 `MCP_BASE_URL` should be a hostname root with no path component. If it has one, RFC 9728's path-aware well-known URL (`/.well-known/oauth-protected-resource/<path>`) is not served by this server — only the 401 challenge's `resource_metadata` pointer keeps the discovery flow working.
 
 No extra configuration is needed for Claude's OAuth callbacks (`https://claude.ai/api/mcp/auth_callback` and the `claude.com` equivalent) — both are allowed by default. Other clients with non-loopback callbacks need [`MCP_ALLOWED_REDIRECT_PREFIXES`](/reference/env-vars).
+
+## Runtime notes
+
+- The image runs the server as the unprivileged `node` user (uid 1000), not root. If you mount files into the container, make sure that user can read them.
+- In HTTP mode, MCP request bodies over 16 MiB and OAuth request bodies over 64 KiB are rejected with `413 Payload Too Large`. The MCP limit leaves room for `upload_attachment` payloads of roughly 12 MB (base64 adds about a third).

@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `createOAuthHandler`'s pending-flow eviction timer no longer starts unconditionally for the life of every handler instance. It now starts lazily, only once an OAuth flow is actually pending, and clears itself again once the pending-flow map drains — harmless in production (the handler is created once), but it was leaking one live interval per instantiation in the test suite, which creates the handler dozens of times per run.
+- The Firefly III request timeout now also covers reading the response body. `fetch()` resolves once the headers arrive, so the 30-second timer used to be cleared before a large or stalled body (an attachment download, an export) was read, and such a call could hang indefinitely. The timeout message no longer includes the URL's query string. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- The autocomplete cache now sweeps expired entries and holds at most 256 identities. In HTTP mode every refreshed OAuth token is a new cache key, so a long-running server used to keep one stale entry (up to 1,000 records) per token it had ever seen. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- A 401 from Firefly III no longer tells HTTP-mode users to check `FIREFLY_TOKEN`, which HTTP mode never reads; the message now covers both transports. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+
+### Security
+
+- HTTP transport: `/oauth/register` and `/oauth/token` read request bodies with no size limit, so a single unauthenticated ~600 MB POST crashed the server (`RangeError: Invalid string length`) in OAuth mode. OAuth request bodies over 64 KiB are now rejected with `413`. MCP requests are capped at 16 MiB (room for `upload_attachment` payloads of about 12 MB) instead of being buffered in full, which let any caller with any Bearer string make the server hold arbitrarily large bodies in memory. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- `MCP_ALLOWED_REDIRECT_PREFIXES` entries are now compared in canonical form. A prefix spelled non-canonically (`https://Example.com`, an explicit `:443`, an IDN) fell back to a raw string-prefix match, so `https://Example.com` also admitted `https://Example.com.attacker.test/...`. A redirect URI must now share the entry's parsed origin and start with its normalized URL; the trailing-colon form (`http://192.168.1.10:`) explicitly means "this scheme and host, any port". ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- At most 1,000 OAuth flows can be pending at once (the oldest is dropped beyond that), so unauthenticated `/oauth/authorize` traffic can no longer grow the pending-flow map without bound. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- The Docker image now runs the server as the unprivileged `node` user instead of root. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+
 ## [0.5.2] - 2026-09-29
 
 ### Security
