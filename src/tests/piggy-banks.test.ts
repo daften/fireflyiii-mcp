@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
   createPiggyBank,
-  createPiggyBankEvent,
   deletePiggyBank,
-  deletePiggyBankEvent,
   fetchPiggyBankEvents,
   fetchPiggyBanks,
   registerPiggyBankTools,
@@ -56,23 +54,96 @@ const piggyBankSingleFixture = {
 };
 
 describe('createPiggyBank', () => {
-  it('posts to /piggy-banks', async () => {
+  it('sends the multi-account shape Firefly III has required since v6.2.0', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(piggyBankSingleFixture);
-    await createPiggyBank(mockClient, { name: 'Vacation', account_id: '1' });
-    expect(mockClient.post).toHaveBeenCalledWith('/piggy-banks', { name: 'Vacation', account_id: '1' });
+    await createPiggyBank(mockClient, {
+      name: 'Vacation',
+      accounts: [{ account_id: '1', current_amount: '50' }],
+      target_amount: '1000',
+      currency_code: 'EUR',
+      start_date: '2026-01-01',
+    });
+    expect(mockClient.post).toHaveBeenCalledWith('/piggy-banks', {
+      name: 'Vacation',
+      accounts: [{ account_id: '1', current_amount: '50' }],
+      target_amount: '1000',
+      transaction_currency_code: 'EUR',
+      start_date: '2026-01-01',
+    });
   });
+
+  it('turns the account_id shortcut into a one-account list and defaults start_date to today', async () => {
+    vi.useFakeTimers({ now: new Date('2026-03-04T10:00:00Z'), toFake: ['Date'] });
+    mockClient.post = vi.fn().mockResolvedValueOnce(piggyBankSingleFixture);
+    await createPiggyBank(mockClient, { name: 'Vacation', account_id: '1', target_amount: '0', currency_code: 'EUR' });
+    vi.useRealTimers();
+    expect(mockClient.post).toHaveBeenCalledWith('/piggy-banks', {
+      name: 'Vacation',
+      accounts: [{ account_id: '1' }],
+      target_amount: '0',
+      transaction_currency_code: 'EUR',
+      start_date: '2026-03-04',
+    });
+  });
+
+  it('refuses to create a piggy bank without an account', async () => {
+    mockClient.post = vi.fn();
+    await expect(
+      createPiggyBank(mockClient, { name: 'Vacation', target_amount: '0', currency_code: 'EUR' }),
+    ).rejects.toThrow('Pass accounts (or account_id)');
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
   it('returns unwrapped single', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(piggyBankSingleFixture);
-    const result = await createPiggyBank(mockClient, { name: 'Vacation', account_id: '1' });
+    const result = await createPiggyBank(mockClient, {
+      name: 'Vacation',
+      account_id: '1',
+      target_amount: '1000',
+      currency_code: 'EUR',
+    });
     expect(result).toEqual({ name: 'Vacation', target_amount: '1000.00', account_id: '1', id: '4' });
   });
 });
 
 describe('updatePiggyBank', () => {
-  it('puts to /piggy-banks/:id', async () => {
+  it('puts only the given fields when no accounts change', async () => {
+    mockClient.get = vi.fn();
     mockClient.put = vi.fn().mockResolvedValueOnce(piggyBankSingleFixture);
-    await updatePiggyBank(mockClient, '4', { target_amount: '2000.00' });
-    expect(mockClient.put).toHaveBeenCalledWith('/piggy-banks/4', { target_amount: '2000.00' });
+    await updatePiggyBank(mockClient, '4', { target_amount: '2000.00', currency_code: 'USD' });
+    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(mockClient.put).toHaveBeenCalledWith('/piggy-banks/4', {
+      target_amount: '2000.00',
+      transaction_currency_code: 'USD',
+    });
+  });
+
+  it('merges account changes over the existing links so unmentioned accounts stay linked', async () => {
+    // Firefly III unlinks (and drops the money saved from) any account an update leaves out of
+    // `accounts`, so the tool re-sends the existing links with only the requested change applied.
+    mockClient.get = vi.fn().mockResolvedValueOnce({
+      data: {
+        id: '4',
+        type: 'piggy_banks',
+        attributes: {
+          name: 'Vacation',
+          accounts: [
+            { account_id: '1', name: 'Checking', current_amount: '100.00' },
+            { account_id: '2', name: 'Savings', current_amount: '250.00' },
+          ],
+        },
+        links: {},
+      },
+    });
+    mockClient.put = vi.fn().mockResolvedValueOnce(piggyBankSingleFixture);
+    await updatePiggyBank(mockClient, '4', { accounts: [{ account_id: '2', current_amount: '300.00' }] });
+    expect(mockClient.get).toHaveBeenCalledWith('/piggy-banks/4');
+    expect(mockClient.put).toHaveBeenCalledWith('/piggy-banks/4', {
+      accounts: [
+        { account_id: '1', current_amount: '100.00' },
+        { account_id: '2', current_amount: '300.00' },
+      ],
+    });
   });
 });
 
@@ -89,32 +160,11 @@ const piggyEventFixture = {
   data: [{ id: '1', type: 'piggy_bank_events', attributes: { amount: '50.00', date: '2026-01-15' }, links: {} }],
   meta: { pagination: { current_page: 1, total_pages: 1, total: 1 } },
 };
-const piggyEventSingle = {
-  data: { id: '2', type: 'piggy_bank_events', attributes: { amount: '25.00', date: '2026-01-20' }, links: {} },
-};
-
 describe('fetchPiggyBankEvents', () => {
   it('calls /piggy-banks/:id/events', async () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(piggyEventFixture);
     await fetchPiggyBankEvents(mockClient, '3', { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/piggy-banks/3/events', { page: 1, limit: 50 });
-  });
-});
-
-describe('createPiggyBankEvent', () => {
-  it('posts to /piggy-banks/:id/events', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(piggyEventSingle);
-    await createPiggyBankEvent(mockClient, '3', { amount: '50.00', date: '2026-01-20' });
-    expect(mockClient.post).toHaveBeenCalledWith('/piggy-banks/3/events', { amount: '50.00', date: '2026-01-20' });
-  });
-});
-
-describe('deletePiggyBankEvent', () => {
-  it('calls delete and returns confirmation', async () => {
-    mockClient.delete = vi.fn().mockResolvedValueOnce(undefined);
-    const result = await deletePiggyBankEvent(mockClient, '3', '1');
-    expect(mockClient.delete).toHaveBeenCalledWith('/piggy-banks/3/events/1');
-    expect(result).toEqual({ deleted: true, id: '1' });
   });
 });
 

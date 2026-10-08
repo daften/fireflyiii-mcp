@@ -236,21 +236,76 @@ describe('fetchAbout', () => {
 });
 
 describe('fetchNetWorth', () => {
-  it('calls /summary/net-worth with params', async () => {
-    const fixture = [{ key: 'net-worth-in-EUR', value: { monetary_value: '5000' } }];
-    mockClient.get = vi.fn().mockResolvedValueOnce(fixture);
+  // Firefly III v1 has no net-worth endpoint; net worth is the `net-worth-in-*` part of /summary/basic.
+  const summaryFixture = {
+    'balance-in-EUR': { key: 'balance-in-EUR', title: 'Balance', monetary_value: '10', currency_code: 'EUR' },
+    'net-worth-in-EUR': { key: 'net-worth-in-EUR', title: 'Net worth', monetary_value: '5000', currency_code: 'EUR' },
+    'net-worth-in-USD': { key: 'net-worth-in-USD', title: 'Net worth', monetary_value: '20', currency_code: 'USD' },
+  };
+
+  it('reads /summary/basic and keeps only the net-worth entries', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(summaryFixture);
     const result = await fetchNetWorth(mockClient, '2026-01-01', '2026-01-31');
-    expect(mockClient.get).toHaveBeenCalledWith('/summary/net-worth', { start: '2026-01-01', end: '2026-01-31' });
-    expect(result).toEqual(fixture);
+    expect(mockClient.get).toHaveBeenCalledWith('/summary/basic', { start: '2026-01-01', end: '2026-01-31' });
+    expect(result.map((item) => item.key)).toEqual(['net-worth-in-EUR', 'net-worth-in-USD']);
+    expect(result[0].value.monetary_value).toBe('5000');
   });
-  it('includes currency_code when provided', async () => {
-    mockClient.get = vi.fn().mockResolvedValueOnce([]);
+
+  it('passes currency_code through', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce({});
     await fetchNetWorth(mockClient, '2026-01-01', '2026-01-31', 'EUR');
-    expect(mockClient.get).toHaveBeenCalledWith('/summary/net-worth', {
+    expect(mockClient.get).toHaveBeenCalledWith('/summary/basic', {
       start: '2026-01-01',
       end: '2026-01-31',
       currency_code: 'EUR',
     });
+  });
+});
+
+describe('insight tools: account filters', () => {
+  // Firefly III's insight endpoints read account filters from `accounts[]` only; anything else is
+  // silently ignored and the unfiltered totals come back.
+  it.each([
+    ['get_insight_expenses_by_asset', 'assets', '/insight/expense/asset'],
+    ['get_insight_income_by_asset', 'assets', '/insight/income/asset'],
+    ['get_insight_transfers_by_asset', 'assets', '/insight/transfer/asset'],
+    ['get_insight_income_by_revenue', 'revenue', '/insight/income/revenue'],
+    ['get_insight_expenses_by_expense_account', 'accounts', '/insight/expense/expense'],
+  ])('%s sends its %s filter as accounts[]', async (tool, param, endpoint) => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce([]) } as unknown as FireflyClient;
+    registerReportTools(server, client);
+    await handlers.get(tool)!({ start: '2026-01-01', end: '2026-01-31', [param]: ['4', '9'] });
+    expect(client.get).toHaveBeenCalledWith(endpoint, {
+      start: '2026-01-01',
+      end: '2026-01-31',
+      'accounts[]': ['4', '9'],
+    });
+  });
+
+  it.each([
+    ['get_insight_expenses_by_bill', 'bills'],
+    ['get_insight_expenses_by_budget', 'budgets'],
+    ['get_insight_expenses_by_tag', 'tags'],
+    ['get_insight_transfers_by_category', 'categories'],
+  ])('%s keeps its own %s[] filter name', async (tool, param) => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce([]) } as unknown as FireflyClient;
+    registerReportTools(server, client);
+    await handlers.get(tool)!({ start: '2026-01-01', end: '2026-01-31', [param]: ['4'] });
+    expect(client.get).toHaveBeenCalledWith(expect.any(String), {
+      start: '2026-01-01',
+      end: '2026-01-31',
+      [`${param}[]`]: ['4'],
+    });
+  });
+
+  it('sends no filter at all for an empty list', async () => {
+    const { server, handlers } = createMockServer();
+    const client = { get: vi.fn().mockResolvedValueOnce([]) } as unknown as FireflyClient;
+    registerReportTools(server, client);
+    await handlers.get('get_insight_expenses_by_asset')!({ start: '2026-01-01', end: '2026-01-31', assets: [] });
+    expect(client.get).toHaveBeenCalledWith('/insight/expense/asset', { start: '2026-01-01', end: '2026-01-31' });
   });
 });
 

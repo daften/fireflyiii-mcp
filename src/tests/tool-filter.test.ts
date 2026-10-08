@@ -30,7 +30,7 @@ describe('registerAllTools — no options', () => {
     expect(registered).toContain('get_recurring');
     expect(registered).toContain('get_attachments');
     expect(registered).toContain('get_currencies');
-    expect(registered.length).toBe(140);
+    expect(registered.length).toBe(137);
   });
 });
 
@@ -71,7 +71,7 @@ describe('registerAllTools — presets', () => {
     expect(registered.length).toBe(37);
   });
 
-  it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (39 tools)', () => {
+  it('budgeting preset registers accounts, transactions, budgets, categories, bills, piggy-banks (42 tools)', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'budgeting' });
     expect(registered).toContain('get_accounts');
@@ -83,7 +83,7 @@ describe('registerAllTools — presets', () => {
     expect(registered).not.toContain('get_rule_groups');
     expect(registered).not.toContain('get_recurring');
     expect(registered).not.toContain('get_attachments');
-    expect(registered.length).toBe(44);
+    expect(registered.length).toBe(42);
   });
 
   it('insights preset registers accounts, transactions, categories, reports (56 tools)', () => {
@@ -120,10 +120,10 @@ describe('registerAllTools — presets', () => {
     expect(registered.length).toBe(37);
   });
 
-  it('full preset registers all 140 tools', () => {
+  it('full preset registers all 137 tools', () => {
     const { server, registered } = createMockServer();
     registerAllTools(server, mockClient, { preset: 'full' });
-    expect(registered.length).toBe(140);
+    expect(registered.length).toBe(137);
   });
 });
 
@@ -137,7 +137,7 @@ describe('registerAllTools — groups', () => {
     expect(registered).toContain('get_piggy_banks');
     expect(registered).not.toContain('get_transactions');
     expect(registered).not.toContain('get_budgets');
-    expect(registered.length).toBe(14);
+    expect(registered.length).toBe(12);
   });
 
   it('single group registers only that group', () => {

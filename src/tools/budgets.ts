@@ -94,8 +94,11 @@ export async function createBudgetLimit(
   return unwrapSingle(response);
 }
 
+// Budget limits only have write routes nested under their budget (/budgets/{id}/limits/{limitId});
+// /budget-limits has nothing but a GET index, in every Firefly III v6 release.
 export async function updateBudgetLimit(
   client: FireflyClient,
+  budgetId: string,
   id: string,
   params: {
     start?: string;
@@ -105,12 +108,16 @@ export async function updateBudgetLimit(
     period?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half_year' | 'yearly';
   },
 ): Promise<UnwrappedSingle> {
-  const response = await client.put<JsonApiSingleResponse>(`/budget-limits/${id}`, params);
+  const response = await client.put<JsonApiSingleResponse>(`/budgets/${budgetId}/limits/${id}`, params);
   return unwrapSingle(response);
 }
 
-export async function deleteBudgetLimit(client: FireflyClient, id: string): Promise<{ deleted: true; id: string }> {
-  await client.delete(`/budget-limits/${id}`);
+export async function deleteBudgetLimit(
+  client: FireflyClient,
+  budgetId: string,
+  id: string,
+): Promise<{ deleted: true; id: string }> {
+  await client.delete(`/budgets/${budgetId}/limits/${id}`);
   return { deleted: true, id };
 }
 
@@ -305,7 +312,8 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       description:
         'Update an existing budget limit in Firefly III. Only fields provided will be changed. Use get_budget_limits to find valid limit IDs.',
       inputSchema: {
-        id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs'),
+        budget_id: budgetIdSchema,
+        id: z.string().describe('Budget limit ID: use get_budget_limits to find valid IDs'),
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         amount: z.string().optional().describe('Limit amount as a number string'),
@@ -317,7 +325,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       },
       annotations: UPDATE_ANNOTATIONS,
     },
-    ({ id, ...params }) => updateBudgetLimit(client, id, params),
+    ({ budget_id, id, ...params }) => updateBudgetLimit(client, parseId(budget_id), id, params),
   );
 
   defineTool(
@@ -327,10 +335,13 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       title: 'Delete Budget Limit',
       description:
         'Permanently delete a budget limit from Firefly III. **This action cannot be undone.** Use get_budget_limits to confirm the ID before deleting.',
-      inputSchema: { id: z.string().describe('Budget limit ID — use get_budget_limits to find valid IDs') },
+      inputSchema: {
+        budget_id: budgetIdSchema,
+        id: z.string().describe('Budget limit ID: use get_budget_limits to find valid IDs'),
+      },
       annotations: DELETE_ANNOTATIONS,
     },
-    ({ id }) => deleteBudgetLimit(client, id),
+    ({ budget_id, id }) => deleteBudgetLimit(client, parseId(budget_id), id),
   );
 
   defineTool(
