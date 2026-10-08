@@ -470,7 +470,10 @@ describe('FireflyClient redirects', () => {
   it('never follows a redirect: a 3xx is an error, not a result', async () => {
     // Firefly III answers a rejected non-JSON request with a 302 to its HTML home page; following it
     // used to hand that page back as export CSV.
-    const fetchSpy = vi.fn(async () => new Response('', { status: 302, headers: { Location: 'http://ff/' } }));
+    const fetchSpy = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response('', { status: 302, headers: { Location: 'http://ff/' } }),
+    );
     vi.stubGlobal('fetch', fetchSpy);
     const client = new FireflyClient('https://firefly.example.com', 'token');
     const err = await client.getText('/data/export/transactions').catch((e: unknown) => e);

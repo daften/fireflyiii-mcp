@@ -179,7 +179,7 @@ describe('category name guidance', () => {
     const { server, toolConfigs } = createMockServer();
     registerCategoryTools(server, {} as FireflyClient);
     for (const tool of ['create_category', 'update_category']) {
-      expect(toolConfigs.get(tool).inputSchema.name.description).toContain('&amp;');
+      expect(toolConfigs.get(tool)!.inputSchema.name.description).toContain('&amp;');
     }
   });
 });

@@ -40,7 +40,25 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
+      # The job-level `contains()` above sees the whole merge message, whose third line is the PR
+      # title, so a PR merely *titled* "... from daften/dependabot/..." would pass it. Only the
+      # subject line names the merged branch; every later step requires this check.
+      - name: Confirm a Dependabot merge from the subject line
+        id: guard
+        env:
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          SUBJECT=$(printf '%s\n' "$HEAD_MSG" | head -n 1)
+          if [ "$EVENT" = "workflow_dispatch" ] || printf '%s\n' "$SUBJECT" | grep -Eq '^Merge pull request #[0-9]+ from daften/dependabot/'; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not a Dependabot merge (subject: ${SUBJECT}); nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v7
+        if: steps.guard.outputs.release == 'true'
         with:
           ref: main
           fetch-depth: 0
@@ -48,10 +66,12 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: actions/setup-node@v7
+        if: steps.guard.outputs.release == 'true'
         with:
           node-version: 24
 
       - name: Bump patch version
+        if: steps.guard.outputs.release == 'true'
         id: bump
         run: |
           NEW_VERSION=$(npm version patch --no-git-tag-version)
@@ -59,6 +79,7 @@ jobs:
           echo "Releasing ${NEW_VERSION}"
 
       - name: Write changelog entry
+        if: steps.guard.outputs.release == 'true'
         env:
           # env indirection, not inline ${{ }} interpolation: the commit
           # message is attacker-influenceable text and must never be
@@ -89,7 +110,7 @@ jobs:
           bash scripts/release-changelog.sh "$VERSION" "$BULLET"
 
       - name: Commit, tag, push (skipped in dry-run)
-        if: github.event_name == 'push' || inputs.dry-run == false
+        if: steps.guard.outputs.release == 'true' && (github.event_name == 'push' || inputs.dry-run == false)
         env:
           VERSION: ${{ steps.bump.outputs.version }}
         run: |
