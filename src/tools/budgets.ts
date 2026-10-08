@@ -19,6 +19,7 @@ import {
   dateSchema,
   debugLog,
   defineTool,
+  idSchema,
   parseId,
 } from './_helpers.js';
 
@@ -313,7 +314,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
         'Update an existing budget limit in Firefly III. Only fields provided will be changed. Use get_budget_limits to find valid limit IDs.',
       inputSchema: {
         budget_id: budgetIdSchema,
-        id: z.string().describe('Budget limit ID: use get_budget_limits to find valid IDs'),
+        id: idSchema.describe('Budget limit ID: use get_budget_limits to find valid IDs'),
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         amount: z.string().optional().describe('Limit amount as a number string'),
@@ -337,7 +338,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
         'Permanently delete a budget limit from Firefly III. **This action cannot be undone.** Use get_budget_limits to confirm the ID before deleting.',
       inputSchema: {
         budget_id: budgetIdSchema,
-        id: z.string().describe('Budget limit ID: use get_budget_limits to find valid IDs'),
+        id: idSchema.describe('Budget limit ID: use get_budget_limits to find valid IDs'),
       },
       annotations: DELETE_ANNOTATIONS,
     },
@@ -367,7 +368,7 @@ export function registerBudgetTools(server: McpServer, client: FireflyClient): v
       title: 'Get Available Budget',
       description: 'Get a single available budget amount by ID. Use get_available_budgets to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Available budget ID'),
+        id: idSchema.describe('Available budget ID'),
       },
       annotations: READ_ANNOTATIONS,
     },

@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import { dateSchema, defineTool, idSchema } from './_helpers.js';
 
 export async function fetchRecurrences(
   client: FireflyClient,
@@ -218,7 +218,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       title: 'Get Recurring Transaction',
       description: 'Get a single recurring transaction by its numeric ID. Use get_recurring to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Recurrence ID'),
+        id: idSchema.describe('Recurrence ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -287,7 +287,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       description:
         'Update an existing recurring transaction in Firefly III. Only fields provided will be changed. Use get_recurrence to confirm the ID before updating.',
       inputSchema: {
-        id: z.string().describe('Recurrence ID — use get_recurring to find valid IDs'),
+        id: idSchema.describe('Recurrence ID — use get_recurring to find valid IDs'),
         type: z.enum(['withdrawal', 'deposit', 'transfer']).optional().describe('Transaction type'),
         title: z.string().optional().describe('Name of the recurring transaction'),
         description: z.string().optional().describe('Description of the recurrence'),
@@ -336,7 +336,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       description:
         'Permanently delete a recurring transaction from Firefly III. **This action cannot be undone.** This deletes the recurrence schedule only — previously generated transactions are not affected. Use get_recurrence to confirm before deleting.',
       inputSchema: {
-        id: z.string().describe('Recurrence ID — use get_recurring to find valid IDs'),
+        id: idSchema.describe('Recurrence ID — use get_recurring to find valid IDs'),
       },
       annotations: DELETE_ANNOTATIONS,
     },
@@ -351,7 +351,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       description:
         'Get all transactions that have been created by a recurring transaction rule. Use get_recurring to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Recurring transaction ID'),
+        id: idSchema.describe('Recurring transaction ID'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
         limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
       },
@@ -372,7 +372,7 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
       description:
         'Manually fire a recurring transaction rule to create its transaction immediately. Optionally specify a date (YYYY-MM-DD) to use instead of today.',
       inputSchema: {
-        id: z.string().describe('Recurring transaction ID'),
+        id: idSchema.describe('Recurring transaction ID'),
         date: dateSchema
           .optional()
           .describe('Date to use for the triggered transaction (YYYY-MM-DD). Defaults to today.'),

@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import { dateSchema, defineTool, idSchema } from './_helpers.js';
 
 export async function fetchBills(
   client: FireflyClient,
@@ -139,7 +139,7 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       description:
         'Update an existing bill in Firefly III. Only fields provided will be changed. Use get_bills to find valid bill IDs.',
       inputSchema: {
-        id: z.string().describe('Bill ID — use get_bills to find valid IDs'),
+        id: idSchema.describe('Bill ID — use get_bills to find valid IDs'),
         name: z.string().optional().describe('Bill name'),
         amount_min: z.string().optional().describe('Minimum expected amount as a number string'),
         amount_max: z.string().optional().describe('Maximum expected amount as a number string'),
@@ -169,7 +169,7 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       title: 'Delete Bill',
       description:
         'Permanently delete a bill from Firefly III. **This action cannot be undone.** Use get_bills to confirm the ID before deleting.',
-      inputSchema: { id: z.string().describe('Bill ID — use get_bills to find valid IDs') },
+      inputSchema: { id: idSchema.describe('Bill ID — use get_bills to find valid IDs') },
       annotations: DELETE_ANNOTATIONS,
     },
     ({ id }) => deleteBill(client, id),
@@ -182,7 +182,7 @@ export function registerBillTools(server: McpServer, client: FireflyClient): voi
       title: 'Get Bill Transactions',
       description: 'Get all transactions linked to a specific bill. Use get_bills to find valid bill IDs.',
       inputSchema: {
-        id: z.string().describe('Bill ID'),
+        id: idSchema.describe('Bill ID'),
         start: dateSchema.optional().describe('Start date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('End date (YYYY-MM-DD)'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
