@@ -237,7 +237,7 @@ describe('liability input schemas', () => {
   function schemaFor(tool: string): Record<string, z.ZodTypeAny> {
     const { server, toolConfigs } = createMockServer();
     registerAccountTools(server, {} as FireflyClient);
-    return toolConfigs.get(tool).inputSchema;
+    return toolConfigs.get(tool)!.inputSchema;
   }
 
   // Firefly III validates interest_period against config('firefly.interest_periods') on store but

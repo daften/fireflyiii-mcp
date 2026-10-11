@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { z } from 'zod';
 import { type FireflyClient, FireflyError } from '../client.js';
 import {
   bulkUpdateTransactions,
@@ -565,7 +566,7 @@ describe('handler smoke — transactions', () => {
     const { server, toolConfigs } = createMockServer();
     registerTransactionTools(server, {} as unknown as FireflyClient);
     for (const name of ['get_transaction', 'create_transaction', 'update_transaction', 'delete_transaction']) {
-      const config = toolConfigs.get(name);
+      const config = toolConfigs.get(name)!;
       const text =
         name === 'update_transaction' || name === 'delete_transaction'
           ? config.inputSchema.id.description
@@ -580,9 +581,12 @@ describe('category_name guidance', () => {
     const { server, toolConfigs } = createMockServer();
     registerTransactionTools(server, {} as FireflyClient);
     for (const tool of ['create_transaction', 'update_transaction', 'bulk_update_transactions']) {
-      expect(toolConfigs.get(tool).inputSchema.category_name.description).toContain('&amp;');
+      expect(toolConfigs.get(tool)!.inputSchema.category_name.description).toContain('&amp;');
     }
-    const splitShape = toolConfigs.get('create_split_transaction').inputSchema.splits.element.shape;
+    const splits = toolConfigs.get('create_split_transaction')!.inputSchema.splits as z.ZodArray<
+      z.ZodObject<Record<string, z.ZodType>>
+    >;
+    const splitShape = splits.element.shape;
     expect(splitShape.category_name.description).toContain('&amp;');
   });
 });

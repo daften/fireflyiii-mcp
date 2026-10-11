@@ -112,22 +112,24 @@ Unknown flags, value flags without a value, a non-numeric `--port`, an empty `--
 ```
 fireflyiii-mcp/
 ├── src/
-│   ├── index.ts                 # Entry point — validates env, wires client + server + transport
+│   ├── index.ts                 # Entry point: validates env, wires client + server + transport
 │   ├── server.ts                # Server factory: createServer(client, filterOptions) → McpServer
-│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth; accepts token string or getter fn)
-│   ├── http.ts                  # HTTP server + OAuth proxy (authorize, token, callback, register stubs)
+│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth, timeouts, size limits, path guard)
+│   ├── http.ts                  # HTTP server + OAuth proxy (authorize, token, callback, register stubs), body limits
 │   ├── args.ts                  # CLI argument parser (--transport, --host, --port, --preset, --groups, --read-only)
 │   ├── transform.ts             # JSON:API response transforms (unwrapList, unwrapSingle, cleanSummary)
 │   ├── types.ts                 # Shared utility types (QueryParams)
 │   ├── tools/
 │   │   ├── index.ts             # TOOL_GROUPS, PRESETS, ToolFilterOptions, makeReadOnlyProxy, registerAllTools
-│   │   ├── accounts.ts          # get_accounts, get_account, create_account, update_account, delete_account
-│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction, bulk_update_transactions
-│   │   ├── budgets.ts           # get_budgets, get_budget, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit
-│   │   ├── categories.ts        # get_categories, get_category, get_category_transactions, create_category, update_category, delete_category
-│   │   ├── bills.ts             # get_bills, get_bill, create_bill, update_bill, delete_bill
-│   │   ├── piggy-banks.ts       # get_piggy_banks, get_piggy_bank, create_piggy_bank, update_piggy_bank, delete_piggy_bank
-│   │   ├── reports.ts           # get_tags, get_tag, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag
+│   │   ├── _helpers.ts          # defineTool / defineContentTool, idSchema, parseId, date schemas, autocomplete TTL cache
+│   │   ├── _annotations.ts      # READ/WRITE/UPDATE/DELETE_ANNOTATIONS
+│   │   ├── accounts.ts          # get_accounts, get_account, create_account, update_account, delete_account, get_account_transactions, search_accounts
+│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction, search_transactions, create_split_transaction, bulk_update_transactions
+│   │   ├── budgets.ts           # get_budgets, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit, get_available_budgets, get_available_budget, get_budget_transactions, get_transactions_without_budget
+│   │   ├── categories.ts        # get_categories, get_category_transactions, create_category, update_category, delete_category
+│   │   ├── bills.ts             # get_bills, create_bill, update_bill, delete_bill, get_bill_transactions
+│   │   ├── piggy-banks.ts       # get_piggy_banks, create_piggy_bank, update_piggy_bank, delete_piggy_bank, get_piggy_bank_events
+│   │   ├── reports.ts           # get_tags, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag, get_insight_expenses_no_bill, get_insight_expenses_no_budget, get_insight_expenses_no_category, get_insight_expenses_no_tag, get_insight_income_no_category, get_insight_income_no_tag, get_insight_transfer_no_category, get_insight_transfer_no_tag, get_about, get_net_worth_summary, get_account_overview_chart, get_balance_chart, get_budget_chart, get_category_chart, get_exchange_rate, get_insight_expenses_by_bill, get_insight_expenses_by_budget, get_insight_expenses_by_tag, get_insight_expenses_by_asset, get_insight_expenses_by_expense_account, get_insight_expenses_total, get_insight_income_by_revenue, get_insight_income_by_tag, get_insight_income_by_asset, get_insight_income_total, get_insight_transfers_by_category, get_insight_transfers_by_tag, get_insight_transfers_by_asset, get_insight_transfers_total
 │   │   ├── rules.ts             # get_rule_groups, get_rule_group, create_rule_group, update_rule_group, delete_rule_group, get_rules, get_rule, create_rule, update_rule, delete_rule, get_rule_group_rules, trigger_rule_group, trigger_rule, test_rule_group, test_rule
 │   │   ├── recurring.ts         # get_recurring, get_recurrence, create_recurring, update_recurring, delete_recurring, get_recurrence_transactions, trigger_recurrence
 │   │   ├── attachments.ts       # get_attachments, get_attachment, create_attachment, update_attachment, delete_attachment, upload_attachment, download_attachment
@@ -136,35 +138,43 @@ fireflyiii-mcp/
 │   │   ├── object-groups.ts     # get_object_groups, get_object_group, update_object_group, delete_object_group, get_object_group_bills, get_object_group_piggy_banks
 │   │   └── transaction-links.ts # get_link_types, get_transaction_links, get_transaction_link, create_transaction_link, update_transaction_link, delete_transaction_link
 │   └── tests/
-│       ├── accounts.test.ts
-│       ├── args.test.ts
-│       ├── attachments.test.ts
-│       ├── bills.test.ts
-│       ├── budgets.test.ts
-│       ├── categories.test.ts
-│       ├── client.test.ts
-│       ├── currencies.test.ts
-│       ├── exports.test.ts
-│       ├── http.test.ts
+│       ├── _helpers.ts          # createMockServer (captures handlers, tool configs, prompts)
+│       ├── fixtures/            # firefly-routes-<tag>.json: Firefly III route snapshots for the contract test
+│       ├── firefly-contract.test.ts   # Every tool's requests vs. Firefly III's route table
 │       ├── integration.test.ts  # Live Firefly III tests (skipped unless FIREFLY_INTEGRATION=true)
-│       ├── object-groups.test.ts
-│       ├── piggy-banks.test.ts
-│       ├── recurring.test.ts
-│       ├── reports.test.ts
-│       ├── rules.test.ts
-│       ├── tool-filter.test.ts
-│       ├── transaction-links.test.ts
-│       ├── transactions.test.ts
-│       └── transform.test.ts
-├── dist/                        # Compiled output — gitignored (not committed)
+│       ├── tool-filter.test.ts  # Presets, groups, read-only filter, name/annotation consistency
+│       ├── tool-input-safety.test.ts  # Path-ID validation through a real MCP client + server
+│       ├── docs-consistency.test.ts   # AGENTS.md / docs tool lists and counts vs. the registered tools
+│       └── <group>.test.ts      # One unit-test file per tool group, plus args, client, http, helpers, transform
+├── tests/
+│   └── automation/              # node:test suites for scripts/ (run with node --test tests/automation/*.node-test.mjs)
+├── scripts/
+│   ├── changelog-guard.mjs      # Guards CHANGELOG.md against silent merge=union corruption
+│   ├── changelog-guard-allowed-edits.json  # Reviewed exemptions to the guard's immutability rule
+│   ├── security-pr-alerts.mjs   # Matches Dependabot security PRs to vulnerability alerts (auto-merge gate)
+│   ├── audit-compare.sh         # Relative npm audit: no new moderate+ advisories vs. the base branch
+│   ├── release-changelog.sh     # Writes the automated security-release changelog section
+│   ├── update-firefly-routes.mjs  # Snapshots Firefly III's route table for the contract test
+│   └── ci-create-token.sh       # Creates a Firefly III user + token in the CI container
+├── dist/                        # Compiled output, gitignored (not committed)
+├── docs/                        # VitePress documentation site (deployed by docs.yml)
 ├── .github/
+│   ├── dependabot.yml           # Security PRs against main, version updates against develop
 │   └── workflows/
-│       ├── ci.yml               # Runs tests on every PR and push to main
-│       └── publish.yml          # Publishes npm + Docker on v* tags (gated on tests)
+│       ├── ci.yml               # Lint, type-check (src + tests), unit + automation tests, changelog checks, relative audit
+│       ├── codeql.yml           # CodeQL for TypeScript and workflows
+│       ├── nightly.yml          # Nightly live integration tests (Firefly III in Docker) + strict audit
+│       ├── publish.yml          # npm + GHCR publishing: release channel on v* tags, nightly channel from develop
+│       ├── auto-merge.yml       # Enables auto-merge on matched Dependabot security PRs
+│       ├── auto-release.yml     # Patch release after a Dependabot security merge to main
+│       ├── backmerge.yml        # Merges main back into develop after every push to main
+│       └── docs.yml             # Builds and deploys the docs site
 ├── package.json
-├── tsconfig.json
+├── tsconfig.json                # Build config (excludes src/tests)
+├── tsconfig.test.json           # Type-checks src/tests too (npm run typecheck:tests; part of npm run check)
 ├── Dockerfile
 ├── docker-compose.yml
+├── docker-compose.ci.yml        # Firefly III container for the nightly integration tests
 ├── .env.example
 ├── LICENSE
 ├── README.md
@@ -417,7 +427,7 @@ npm run dev -- --preset default          # Load only the default tool subset
    - Wire `registerXxxTools` inside `registerAllTools`.
    - Consider which presets it belongs in (`PRESETS` map in the same file).
 4. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
-5. **Update the tool table** in `docs/reference/tools.md` (the canonical tool reference; the README links to it and no longer keeps its own table). If the total or a preset count changed, bump the hardcoded numbers — the total appears in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`; preset counts live in `docs/reference/filtering.md`.
+5. **Update the tool table** in `docs/reference/tools.md` (the canonical tool reference; the README links to it and no longer keeps its own table). If the total or a preset count changed, bump the hardcoded numbers — the total appears in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`; preset counts live in `docs/reference/filtering.md`. Also add the tool to its file's line in this file's File Structure section. `src/tests/docs-consistency.test.ts` fails if any of these lists or counts disagree with the registered tools, and `src/tests/firefly-contract.test.ts` fails if the tool calls a route Firefly III does not serve.
 6. **Run `npm run build`** to verify the TypeScript compiles cleanly.
 
 Example — adding `get_account` (single account by ID):

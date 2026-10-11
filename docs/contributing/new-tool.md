@@ -100,7 +100,8 @@ If the tool belongs to a new group file:
 ## Step 6: Update docs
 
 1. Add the tool to the table in `docs/reference/tools.md` — the canonical tool reference. (The README links to it and no longer keeps its own table.)
-2. If you changed the total tool count or a preset's count, update the hardcoded numbers. The total ("137 tools") is repeated in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`. Preset counts live in the tables in `docs/reference/filtering.md` and `AGENTS.md`.
+2. If you changed the total tool count or a preset's count, update the hardcoded numbers. The total ("137 tools") is repeated in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`. Preset counts live in the tables in `docs/reference/filtering.md` and `AGENTS.md`, and `AGENTS.md`'s File Structure section lists every tool per file.
+3. `npm run check` catches anything you miss: `src/tests/docs-consistency.test.ts` compares these lists and counts with the registered tools, and `src/tests/firefly-contract.test.ts` checks that every request your tool makes is a route Firefly III serves.
 
 ## Step 7: Build and commit
 
