@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MCP_ALLOWED_REDIRECT_PREFIXES` entries are now compared in canonical form. A prefix spelled non-canonically (`https://Example.com`, an explicit `:443`, an IDN) fell back to a raw string-prefix match, so `https://Example.com` also admitted `https://Example.com.attacker.test/...`. A redirect URI must now share the entry's parsed origin and start with its normalized URL; the trailing-colon form (`http://192.168.1.10:`) explicitly means "this scheme and host, any port". ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
 - At most 1,000 OAuth flows can be pending at once (the oldest is dropped beyond that), so unauthenticated `/oauth/authorize` traffic can no longer grow the pending-flow map without bound. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
 - The Docker image now runs the server as the unprivileged `node` user instead of root. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
+- **Bumped transitive `proxy-addr` from 2.0.7 to 2.0.8**, resolving [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical severity), IP spoofing via an IPv4-mapped IPv6 address matching a trusted subnet. It comes in through `@modelcontextprotocol/sdk`'s `express` dependency; this server's HTTP transport does not use Express or its trust-proxy logic, so it was not exploitable here.
+- **Bumped transitive `fast-uri` from 3.1.7 to 3.1.8**, resolving [GHSA-hrr3-gc8f-f4qj](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj) (moderate severity), inconsistent host case normalization via percent-encoded octets.
 
 ## [0.5.2] - 2026-09-29
 
