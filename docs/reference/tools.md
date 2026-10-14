@@ -116,7 +116,7 @@
 | `update_attachment` | Update attachment metadata |
 | `delete_attachment` | Delete an attachment and its file data. This action cannot be undone. |
 | `upload_attachment` | Upload base64-encoded file content for an existing attachment record (step 2 of 2) |
-| `download_attachment` | Download an attachment by ID; images are returned as a rendered image, other files as their filename, MIME type, and Base64 content |
+| `download_attachment` | Download an attachment by ID; images (up to 3 MiB) are returned as a rendered image, other files (up to 256 KiB) as their filename, MIME type, and Base64 content |
 
 ## Tags & Reports
 
@@ -175,9 +175,11 @@
 
 ## Data Export
 
+Every export returns raw CSV text of at most 512 KiB; a larger export is refused with advice (a shorter date range, or the paging `get_*` tool) instead of being returned.
+
 | Tool | Description |
 |------|-------------|
-| `export_transactions` | Export all transactions as CSV (supports date filters) |
+| `export_transactions` | Export all transactions as CSV (supports a start/end range, start before end) |
 | `export_accounts` | Export all accounts as CSV |
 | `export_bills` | Export all bills as CSV |
 | `export_budgets` | Export all budgets as CSV |

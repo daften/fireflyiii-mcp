@@ -26,7 +26,7 @@ In HTTP mode, `FIREFLY_TOKEN` is not used. The Bearer token is resolved per-requ
 |----------|---------------------|-------------|
 | `MCP_PRESET` | `--preset <name>` | Named tool subset. See [Tool filtering](/reference/filtering). Mutually exclusive with `MCP_GROUPS`. |
 | `MCP_GROUPS` | `--groups <list>` | Comma-separated group names. Mutually exclusive with `MCP_PRESET`. |
-| `MCP_READ_ONLY` | `--read-only` | Set to `true` or `1` (case-insensitive) to restrict to read-only tools. |
+| `MCP_READ_ONLY` | `--read-only` | Set to `true` or `1` (case-insensitive) to restrict to read-only tools. `false`, `0` or empty leave it off; any other value stops the server with an error, so a typo can't silently leave write access on. |
 
 The CLI flag always takes precedence over its environment variable equivalent.
 

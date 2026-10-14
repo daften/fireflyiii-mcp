@@ -461,3 +461,33 @@ describe('FireflyClient timeout', () => {
     await expect(client.get('/accounts')).resolves.toEqual({ data: [] });
   });
 });
+
+describe('FireflyClient redirects', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('never follows a redirect: a 3xx is an error, not a result', async () => {
+    // Firefly III answers a rejected non-JSON request with a 302 to its HTML home page; following it
+    // used to hand that page back as export CSV.
+    const fetchSpy = vi.fn(async () => new Response('', { status: 302, headers: { Location: 'http://ff/' } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    const err = await client.getText('/data/export/transactions').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(FireflyError);
+    expect((err as FireflyError).status).toBe(302);
+    expect(formatError(err)).toContain('redirected the request');
+    expect(fetchSpy.mock.calls[0][1]).toMatchObject({ redirect: 'manual' });
+  });
+
+  it('asks for JSON on text and binary requests, so a rejected input comes back as a 422', async () => {
+    const fetchSpy = vi.fn(async () => new Response('a,b', { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const client = new FireflyClient('https://firefly.example.com', 'token');
+    await client.getText('/data/export/bills');
+    await client.getBinary('/attachments/1/download');
+    for (const [, init] of fetchSpy.mock.calls as unknown as Array<[string, RequestInit]>) {
+      expect(init.headers).toMatchObject({ Accept: 'application/json' });
+    }
+  });
+});

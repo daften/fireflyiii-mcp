@@ -32,7 +32,9 @@ node dist/index.js --groups accounts,transactions,reports
 
 ## --read-only
 
-Filter any selection down to read-only tools (`get_*`, `search_*`, `test_*`). All create, update, delete, trigger, and upload tools are excluded. Can combine with `--preset` or `--groups`.
+Filter any selection down to read-only tools: every tool annotated `readOnlyHint: true`, which is all `get_*`, `search_*` and `test_*` tools plus the `export_*` tools and `download_attachment` (84 tools with no other filter). All create, update, delete, trigger, and upload tools are excluded. Can combine with `--preset` or `--groups`.
+
+Unrecognized flags are an error rather than being ignored, so a typo such as `--readonly` stops the server with a suggestion instead of starting it with write access. Value flags accept both `--flag value` and `--flag=value`.
 
 ```bash
 node dist/index.js --preset default --read-only
@@ -49,7 +51,7 @@ Each flag has an environment variable fallback, useful for npm/stdio and Docker 
 |----------|-----------------|---------|
 | `MCP_PRESET` | `--preset <name>` | `MCP_PRESET=default` |
 | `MCP_GROUPS` | `--groups <list>` | `MCP_GROUPS=accounts,transactions` |
-| `MCP_READ_ONLY` | `--read-only` | `MCP_READ_ONLY=true` (also accepts `1`) |
+| `MCP_READ_ONLY` | `--read-only` | `MCP_READ_ONLY=true` (also accepts `1`; `false`, `0` or empty mean off; any other value is an error) |
 
 `MCP_PRESET` and `MCP_GROUPS` are mutually exclusive.
 

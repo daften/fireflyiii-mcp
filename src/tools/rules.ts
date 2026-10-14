@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool } from './_helpers.js';
+import { dateSchema, defineTool, idSchema } from './_helpers.js';
 
 // ---- Rule group fetch + CRUD ----
 
@@ -251,7 +251,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       title: 'Get Rule Group',
       description: 'Get a single rule group by its numeric ID. Use get_rule_groups to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Rule group ID'),
+        id: idSchema.describe('Rule group ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -287,7 +287,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Update an existing rule group. Only fields provided will be changed. Use get_rule_group to confirm the ID before updating.',
       inputSchema: {
-        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        id: idSchema.describe('Rule group ID — use get_rule_groups to find valid IDs'),
         title: z.string().optional().describe('Rule group name'),
         description: z.string().optional().describe('Description'),
         active: z.boolean().optional().describe('Whether the group is active'),
@@ -310,7 +310,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Permanently delete a rule group and all its rules from Firefly III. **This action cannot be undone.** Use get_rule_group to confirm before deleting.',
       inputSchema: {
-        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        id: idSchema.describe('Rule group ID — use get_rule_groups to find valid IDs'),
       },
       annotations: DELETE_ANNOTATIONS,
     },
@@ -341,7 +341,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       title: 'Get Rule',
       description: 'Get a single automation rule by its numeric ID. Use get_rules to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Rule ID'),
+        id: idSchema.describe('Rule ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -397,7 +397,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Update an existing automation rule. Only fields provided will be changed. Use get_rule to confirm the ID before updating.',
       inputSchema: {
-        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        id: idSchema.describe('Rule ID — use get_rules to find valid IDs'),
         title: z.string().optional().describe('Rule name'),
         rule_group_id: z.string().optional().describe('Rule group ID'),
         trigger: z.enum(RULE_TRIGGERS).optional().describe('When this rule fires'),
@@ -432,7 +432,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Permanently delete an automation rule from Firefly III. **This action cannot be undone.** Use get_rule to confirm before deleting.',
       inputSchema: {
-        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        id: idSchema.describe('Rule ID — use get_rules to find valid IDs'),
       },
       annotations: DELETE_ANNOTATIONS,
     },
@@ -449,7 +449,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Get all rules belonging to a specific rule group. Use get_rule_groups to find valid rule group IDs.',
       inputSchema: {
-        id: z.string().describe('Rule group ID'),
+        id: idSchema.describe('Rule group ID'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
         limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
       },
@@ -470,7 +470,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Manually run all rules in a rule group against existing transactions. Use get_rule_groups to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        id: idSchema.describe('Rule group ID — use get_rule_groups to find valid IDs'),
         start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
         accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
@@ -492,7 +492,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       title: 'Trigger Rule',
       description: 'Manually run a single rule against existing transactions. Use get_rules to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        id: idSchema.describe('Rule ID — use get_rules to find valid IDs'),
         start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
         accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
@@ -515,7 +515,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Dry-run a rule group against existing transactions and return matching transactions without applying any changes. Use get_rule_groups to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Rule group ID — use get_rule_groups to find valid IDs'),
+        id: idSchema.describe('Rule group ID — use get_rule_groups to find valid IDs'),
         start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
         accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),
@@ -547,7 +547,7 @@ export function registerRuleTools(server: McpServer, client: FireflyClient): voi
       description:
         'Dry-run a single rule against existing transactions and return matching transactions without applying any changes. Use get_rules to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Rule ID — use get_rules to find valid IDs'),
+        id: idSchema.describe('Rule ID — use get_rules to find valid IDs'),
         start: dateSchema.optional().describe('Filter transactions from this date (YYYY-MM-DD)'),
         end: dateSchema.optional().describe('Filter transactions to this date (YYYY-MM-DD)'),
         accounts: z.array(z.number().int().positive()).optional().describe('Limit to these account IDs'),

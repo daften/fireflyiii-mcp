@@ -5,13 +5,15 @@ import { makeReadOnlyProxy, PRESETS, registerAllTools, TOOL_GROUPS } from '../to
 
 function createMockServer() {
   const registered: string[] = [];
+  const toolConfigs = new Map<string, unknown>();
   const server = {
-    registerTool: vi.fn((name: string) => {
+    registerTool: vi.fn((name: string, config: unknown) => {
       registered.push(name);
+      toolConfigs.set(name, config);
     }),
     registerPrompt: vi.fn(),
   } as unknown as McpServer;
-  return { server, registered };
+  return { server, registered, toolConfigs };
 }
 
 const mockClient = {} as FireflyClient;
@@ -153,7 +155,7 @@ describe('registerAllTools — groups', () => {
 
 describe('registerAllTools — readOnly', () => {
   it('filters out all write tools (no options + readOnly)', () => {
-    const { server, registered } = createMockServer();
+    const { server, registered, toolConfigs } = createMockServer();
     registerAllTools(server, mockClient, { readOnly: true });
     // Read tools are present
     expect(registered).toContain('get_accounts');
@@ -167,13 +169,40 @@ describe('registerAllTools — readOnly', () => {
     expect(registered).not.toContain('trigger_rule');
     expect(registered).not.toContain('trigger_rule_group');
     expect(registered).not.toContain('upload_attachment');
-    // Every registered tool must be a read tool
+    // Read-only tools that are not named get_/search_/test_ are kept too: the filter follows the
+    // readOnlyHint annotation, not the name.
+    expect(registered).toContain('export_transactions');
+    expect(registered).toContain('download_attachment');
+    // Every registered tool must be annotated read-only
     for (const name of registered) {
       expect(
-        name.startsWith('get_') || name.startsWith('search_') || name.startsWith('test_'),
+        (toolConfigs.get(name) as { annotations?: { readOnlyHint?: boolean } }).annotations?.readOnlyHint,
         `"${name}" should not be registered in readOnly mode`,
       ).toBe(true);
     }
+    expect(registered.length).toBe(84);
+  });
+
+  it('tool names and readOnlyHint annotations agree, so the read-only filter stays meaningful', () => {
+    const { server, registered, toolConfigs } = createMockServer();
+    registerAllTools(server, mockClient);
+    const readNamed = (name: string) => /^(get|search|test|export|download)_/.test(name);
+    for (const name of registered) {
+      const annotations = (toolConfigs.get(name) as { annotations?: { readOnlyHint?: boolean } }).annotations;
+      expect(annotations?.readOnlyHint === true, `${name}: name and readOnlyHint disagree`).toBe(readNamed(name));
+    }
+  });
+
+  it('rejects a preset name inherited from Object.prototype', () => {
+    const { server } = createMockServer();
+    expect(() => registerAllTools(server, mockClient, { preset: 'toString' as never })).toThrow(
+      'Unknown preset "toString"',
+    );
+  });
+
+  it('rejects an empty group list instead of registering nothing', () => {
+    const { server } = createMockServer();
+    expect(() => registerAllTools(server, mockClient, { groups: [] })).toThrow('No tool groups selected');
   });
 
   it('readOnly combined with preset filters both groups and tools', () => {

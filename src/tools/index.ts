@@ -34,14 +34,14 @@ export const TOOL_GROUPS = [
 
 export type ToolGroup = (typeof TOOL_GROUPS)[number];
 
-export const PRESETS: Record<string, ToolGroup[]> = {
+export const PRESETS = {
   minimal: ['accounts', 'transactions'],
   default: ['accounts', 'transactions', 'budgets', 'categories', 'bills'],
   budgeting: ['accounts', 'transactions', 'budgets', 'categories', 'bills', 'piggy-banks'],
   insights: ['accounts', 'transactions', 'categories', 'reports'],
   automation: ['accounts', 'transactions', 'rules', 'recurring'],
   full: [...TOOL_GROUPS],
-};
+} satisfies Record<string, ToolGroup[]>;
 
 export type PresetName = keyof typeof PRESETS;
 
@@ -51,8 +51,13 @@ export interface ToolFilterOptions {
   readOnly?: boolean;
 }
 
-function isReadOnlyTool(name: string): boolean {
-  return name.startsWith('get_') || name.startsWith('search_') || name.startsWith('test_');
+/**
+ * A tool is read-only when its annotations say so. The name used to decide this (get_/search_/test_),
+ * which dropped read-only tools named otherwise (every export_* tool, download_attachment) and would
+ * have kept a mis-named writer. A test keeps names and annotations consistent.
+ */
+function isReadOnlyTool(config: unknown): boolean {
+  return (config as { annotations?: { readOnlyHint?: boolean } } | undefined)?.annotations?.readOnlyHint === true;
 }
 
 export function makeReadOnlyProxy(server: McpServer): McpServer {
@@ -60,7 +65,7 @@ export function makeReadOnlyProxy(server: McpServer): McpServer {
     get(target, prop) {
       if (prop === 'registerTool') {
         return (name: string, config: unknown, handler: unknown) => {
-          if (isReadOnlyTool(name)) {
+          if (isReadOnlyTool(config)) {
             (target.registerTool as (n: string, c: unknown, h: unknown) => void)(name, config, handler);
           }
         };
@@ -73,6 +78,9 @@ export function makeReadOnlyProxy(server: McpServer): McpServer {
 
 export function registerAllTools(server: McpServer, client: FireflyClient, options: ToolFilterOptions = {}): void {
   const { preset, groups, readOnly = false } = options;
+  // Own keys only: a name inherited from Object.prototype (toString, __proto__) is not a preset.
+  if (preset !== undefined && !Object.hasOwn(PRESETS, preset)) throw new Error(`Unknown preset "${preset}"`);
+  if (groups !== undefined && groups.length === 0) throw new Error('No tool groups selected');
 
   const activeGroups: Set<ToolGroup> = preset
     ? new Set(PRESETS[preset])
