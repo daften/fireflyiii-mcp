@@ -25,8 +25,12 @@ jobs:
     permissions:
       contents: read
     outputs:
-      # The exact commit every later job checks out. Each job used to check out `develop` on its own,
-      # so a push landing mid-run could publish a commit that `verify` never tested.
+      # The exact commit every later job builds. Each job used to check out `develop` on its own,
+      # so a push landing mid-run could publish a commit that `verify` never tested. Later jobs check
+      # out the same trusted ref as this job, then pin to this commit once `git merge-base` confirms
+      # it is on that ref. (Passing it to actions/checkout's `ref` directly trips CodeQL's
+      # actions/cache-poisoning/poisonable-step, which treats a job output named like a SHA as a
+      # pull request head it cannot trust.)
       sha: ${{ steps.resolve.outputs.sha }}
       channel: ${{ steps.resolve.outputs.channel }}
       should_publish: ${{ steps.resolve.outputs.should_publish }}
@@ -95,10 +99,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.setup.outputs.sha }}
-          # Tags needed by the changelog guard below, which compares each released section
-          # against the tag that published it.
+          ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
+          # Full history for the pin below, and tags for the changelog guard, which compares each
+          # released section against the tag that published it.
           fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - uses: actions/setup-node@v7
         with:
@@ -157,7 +168,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.setup.outputs.sha }}
+          ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
+          fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - uses: actions/setup-node@v7
         with:
@@ -192,7 +211,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.setup.outputs.sha }}
+          ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
+          fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
@@ -237,8 +264,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.setup.outputs.sha }}
+          ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - name: Resolve built commit
         id: built

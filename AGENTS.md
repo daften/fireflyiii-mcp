@@ -536,7 +536,9 @@ Nightly publishing lives in the **same `publish.yml` workflow** as tagged releas
 - **release** when triggered by a `v*` tag push (`github.event_name == 'push'`);
 - **nightly** when triggered by the `0 3 * * *` UTC cron or manual `workflow_dispatch` (with an optional `force` input).
 
-`setup` outputs `channel`, `should_publish`, `version`, and `npm_tag`; the downstream `verify` / `publish-npm` / `publish-docker` / `release` jobs are single-copy and parameterized by those outputs (Docker uses `metadata-action`'s per-tag `enable=` to select release vs nightly tags).
+`setup` outputs `sha`, `channel`, `should_publish`, `version`, and `npm_tag`; the downstream `verify` / `publish-npm` / `publish-docker` / `release` jobs are single-copy and parameterized by those outputs (Docker uses `metadata-action`'s per-tag `enable=` to select release vs nightly tags).
+
+Every downstream job builds the one commit `setup` resolved (`sha`), so a push to `develop` mid-run cannot publish a commit `verify` never tested. Each job checks out the same trusted ref as `setup` (the tag, or `develop`), then a "Pin to the commit setup resolved" step runs `git merge-base --is-ancestor` to confirm `sha` is on that ref before checking it out. Keep that shape: passing `sha` straight to `actions/checkout`'s `ref` fails CodeQL's `actions/cache-poisoning/poisonable-step`, which treats any job output named like a SHA as an untrusted pull request head.
 
 For the nightly channel `setup` also runs the change-guard: it publishes only when `develop`'s HEAD differs from the commit the rolling `nightly` git tag points at (so it builds only on nights `develop` changed; `force=true` bypasses). A nightly run:
 - computes a prerelease version `<next-patch>-nightly.<UTCstamp>` (in-CI only, never committed);
