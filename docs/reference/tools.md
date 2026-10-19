@@ -21,9 +21,9 @@
 | `get_transactions` | List transactions with filters (account, date, type) |
 | `get_transaction` | Get a single transaction by ID with all splits |
 | `search_transactions` | Keyword search across transactions |
-| `create_transaction` | Create a new transaction |
-| `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets); requires a group title |
-| `update_transaction` | Update one split of a transaction; the other splits are left untouched (pass `transaction_journal_id` for split transactions) |
+| `create_transaction` | Create a new transaction, including transfers between accounts in different currencies (`foreign_amount` + `foreign_currency_code`) |
+| `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets); requires a group title; supports a shared `foreign_currency_code` with a `foreign_amount` per split |
+| `update_transaction` | Update one split of a transaction, including its foreign amount and currency; the other splits are left untouched (pass `transaction_journal_id` for split transactions) |
 | `bulk_update_transactions` | Set category, budget, tags or notes on every transaction a search query matches (only the matching splits; refuses above `max_transactions`) |
 | `delete_transaction` | Delete a transaction. This action cannot be undone. |
 
