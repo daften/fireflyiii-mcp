@@ -495,7 +495,7 @@ Routine dependency-CVE fixes ship with no human in the loop:
    - The changelog bullet is **line 3 of the merge commit** — the merged PR's title, because the repo's `merge_commit_message` setting is `PR_TITLE`. If that setting is ever changed, the workflow fails loudly (a guard rejects any line 3 that is not a `chore(deps…` subject) instead of shipping a `Merge pull request #N` bullet. Fixing it means restoring the setting, not editing the workflow.
 4. The tag push runs `publish.yml`'s normal release path (npm `latest`, Docker semver/`latest`, GitHub Release).
 
-Manual (non-Dependabot) hotfixes: PR to `main`, merge, then cut the release manually per "Releasing a New Version" below — `auto-release.yml` only fires on Dependabot merges.
+Manual (non-Dependabot) hotfixes: PR to `main`, merge, then cut the release manually per "Hotfix releases" below — `auto-release.yml` only fires on Dependabot merges. Don't rely on Dependabot to catch every advisory: GitHub can publish a reviewed npm advisory without ever raising a Dependabot alert for a repo whose dependency graph lists the vulnerable version, and then no security PR is opened. The nightly `strict-audit` job is the backstop — when it goes red with no open Dependabot PR, fix it by hand as a hotfix to `main`.
 
 The PR audit check is **relative** (`scripts/audit-compare.sh`: no new moderate+ advisories vs the base branch) so a partial security fix stays mergeable; the strict absolute audit runs in `nightly.yml` and alerts without blocking.
 
@@ -519,6 +519,15 @@ The release branch also keeps `main` at **one push per release**. `backmerge.yml
 7. Create an annotated git tag on the resulting merge commit on `main`, with the `## [X.Y.Z]` block from `CHANGELOG.md` as its message (a git-native record of what shipped). The publish workflow validates that this section exists before publishing; it reads the version from the changelog, so tagging a merge commit rather than the release commit is fine.
 8. Push the tag: `git push origin v<version>` — this triggers the publish workflow, which validates the changelog, runs tests, publishes to npm + GHCR, and creates a GitHub Release whose notes are extracted from the matching `CHANGELOG.md` section.
 9. `backmerge.yml` merges the released section straight back into `develop`. `CHANGELOG.md`'s `merge=union` driver resolves the usual case automatically even if `develop` has already collected new `[Unreleased]` entries; a back-merge PR only appears if git still can't reconcile it, and that needs manual resolution. Delete the release branch once it's merged.
+
+### Hotfix releases
+
+A manual hotfix (a fix merged straight to `main`, typically a dependency CVE Dependabot didn't raise) ships through the same `release/X.Y.Z` → `main` PR and tag, with these differences:
+
+1. **Land the fix on `main` first** — a PR from a branch cut from `origin/main`, with its bullets under `## [Unreleased]` in `main`'s `CHANGELOG.md`. Change only what the fix needs: for a transitive dependency, update just the vulnerable lockfile entries (`npm update <pkg>`) rather than `npm audit fix`, which refreshes unrelated packages too.
+2. **Back-merge the fix before releasing.** If `develop`'s `[Unreleased]` already has a heading the fix adds (typically `### Security`), the union merge leaves two of them, `changelog-guard` rejects the result, and `backmerge.yml` opens a back-merge PR whose head is `main` — which can't be edited. Resolve it on a branch cut from `origin/develop`: `git merge --no-ff origin/main`, fold the bullets under `develop`'s existing heading, and PR that into `develop`. The automated PR is marked merged once `develop` contains `main`.
+3. **Cut the release branch from `main`, not `develop`** (`git checkout -b release/X.Y.Z origin/main`), so the release contains only the hotfix and none of `develop`'s unreleased work. Promote `main`'s `[Unreleased]` and bump the patch version as in steps 3–5 above, then PR, merge, tag and push the tag as in steps 6–8.
+4. **Expect the post-release back-merge to fail too** whenever `develop` has pending `[Unreleased]` entries: the union merge splices them into the section that just shipped, and the guard rejects the edit to a released section. Resolve it the same way as in step 2, but make the released `## [X.Y.Z]` section identical to the tag (`git show vX.Y.Z:CHANGELOG.md`), remove the bullets that just shipped from `develop`'s `[Unreleased]`, keep `develop`'s own pending entries there, and add the `[X.Y.Z]:` link reference. `node scripts/changelog-guard.mjs` must report the file consistent with the new tag before you push.
 
 ### Nightly builds
 

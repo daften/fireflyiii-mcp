@@ -55,6 +55,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool ID arguments could address other resources: `parseId` passed non-numeric input through, and `new URL()` resolves dot segments, so `delete_account` with id `../budgets/5` sent `DELETE /api/v1/budgets/5`, and enough `../` left `/api/v1` with the token attached. Under prompt injection this let an enabled tool act outside the groups selected with `--preset`/`--groups`. Every path ID is now validated as a number (`idSchema`, a strict `parseId`), other path segments are percent-encoded, and `FireflyClient` refuses any API path containing dot segments (including `%2e%2e`), `?`, `#`, backslashes or control characters. ([#118](https://github.com/daften/fireflyiii-mcp/issues/118))
 - Release pipeline: every `publish.yml` job now checks out the one commit `setup` resolved, so a push to `develop` during a nightly run can no longer publish a commit `verify` never tested; a release tag that doesn't match `package.json` now fails `verify` instead of shipping different npm and Docker versions; and workflow values are passed to shell through `env:` rather than `${{ }}` interpolation. `auto-release.yml` now checks the merge commit's subject line, not the whole message (whose PR title could contain the trigger text). The third-party actions that receive privileged tokens (`dependabot/fetch-metadata`, `davelosert/vitest-coverage-report-action`, `softprops/action-gh-release`, and the `docker/*` actions) are pinned to commit SHAs. ([#119](https://github.com/daften/fireflyiii-mcp/issues/119))
 
+## [0.5.3] - 2026-10-14
+
+### Security
+
+- **Bumped transitive `proxy-addr` from 2.0.7 to 2.0.8**, resolving [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical severity), IP spoofing via an IPv4-mapped IPv6 address matching a trusted subnet. It comes in through `@modelcontextprotocol/sdk`'s `express` dependency; this server's HTTP transport does not use Express or its trust-proxy logic, so it was not exploitable here.
+- **Bumped transitive `fast-uri` from 3.1.7 to 3.1.8**, resolving [GHSA-hrr3-gc8f-f4qj](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj) (moderate severity), inconsistent host case normalization via percent-encoded octets.
+- **Bumped `@modelcontextprotocol/sdk` from 1.30.0 to 1.32.1**, resolving [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high severity), where the SDK's OAuth client could send credentials to an authorization server chosen by the MCP server. This server only uses the SDK's server side, never its OAuth client, so it was not exploitable here.
+- **Bumped dev-only `vue` from 3.5.41 to 3.5.44 and `source-map-js` from 1.2.1 to 1.2.2** (both via the VitePress docs toolchain), resolving [GHSA-g2v6-rqmx-r4w6](https://github.com/advisories/GHSA-g2v6-rqmx-r4w6) (high severity, XSS in `@vue/server-renderer` via a missing CR in its attribute-name blacklist) and [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high severity, event-loop denial of service through indexed source-map section offsets). Neither ships in the published package.
+
 ## [0.5.2] - 2026-09-29
 
 ### Security
@@ -268,7 +277,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/daften/fireflyiii-mcp/compare/v0.4.6...v0.5.0
