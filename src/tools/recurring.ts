@@ -11,7 +11,7 @@ import {
 } from '../transform.js';
 import type { QueryParams } from '../types.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { dateSchema, defineTool, idSchema } from './_helpers.js';
+import { dateSchema, defineTool, FOREIGN_AMOUNT_HINT, FOREIGN_CURRENCY_CODE_HINT, idSchema } from './_helpers.js';
 
 export async function fetchRecurrences(
   client: FireflyClient,
@@ -50,6 +50,8 @@ export async function createRecurrence(
     category_id?: string;
     budget_id?: string;
     currency_code?: string;
+    foreign_amount?: string;
+    foreign_currency_code?: string;
     tags?: string[];
     transaction_notes?: string;
   },
@@ -67,6 +69,8 @@ export async function createRecurrence(
   if (params.category_id !== undefined) transaction.category_id = params.category_id;
   if (params.budget_id !== undefined) transaction.budget_id = params.budget_id;
   if (params.currency_code !== undefined) transaction.currency_code = params.currency_code;
+  if (params.foreign_amount !== undefined) transaction.foreign_amount = params.foreign_amount;
+  if (params.foreign_currency_code !== undefined) transaction.foreign_currency_code = params.foreign_currency_code;
   if (params.tags !== undefined) transaction.tags = params.tags;
   if (params.transaction_notes !== undefined) transaction.notes = params.transaction_notes;
 
@@ -112,10 +116,19 @@ export async function updateRecurrence(
     category_id?: string;
     budget_id?: string;
     currency_code?: string;
+    foreign_amount?: string;
+    foreign_currency_code?: string;
     tags?: string[];
     transaction_notes?: string;
   },
 ): Promise<UnwrappedSingle> {
+  // Firefly III rejects a recurrence update carrying only one of these, even when the recurrence
+  // already has the other, and its error does not say the unchanged one has to be resent.
+  if ((params.foreign_amount === undefined) !== (params.foreign_currency_code === undefined)) {
+    throw new Error(
+      'Pass foreign_amount and foreign_currency_code together, even if one of them is unchanged: Firefly III rejects a recurrence update that sends only one.',
+    );
+  }
   const body: Record<string, unknown> = {};
   if (params.type !== undefined) body.type = params.type;
   if (params.title !== undefined) body.title = params.title;
@@ -149,6 +162,7 @@ export async function updateRecurrence(
     params.category_id !== undefined ||
     params.budget_id !== undefined ||
     params.currency_code !== undefined ||
+    params.foreign_amount !== undefined ||
     params.tags !== undefined ||
     params.transaction_notes !== undefined;
   if (hasTransactionFields) {
@@ -160,6 +174,8 @@ export async function updateRecurrence(
     if (params.category_id !== undefined) transaction.category_id = params.category_id;
     if (params.budget_id !== undefined) transaction.budget_id = params.budget_id;
     if (params.currency_code !== undefined) transaction.currency_code = params.currency_code;
+    if (params.foreign_amount !== undefined) transaction.foreign_amount = params.foreign_amount;
+    if (params.foreign_currency_code !== undefined) transaction.foreign_currency_code = params.foreign_currency_code;
     if (params.tags !== undefined) transaction.tags = params.tags;
     if (params.transaction_notes !== undefined) transaction.notes = params.transaction_notes;
     body.transactions = [transaction];
@@ -271,6 +287,8 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
         category_id: z.string().optional().describe('Category ID — use get_categories to find valid IDs'),
         budget_id: z.string().optional().describe('Budget ID — use get_budgets to find valid IDs'),
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
+        foreign_amount: z.string().optional().describe(FOREIGN_AMOUNT_HINT),
+        foreign_currency_code: z.string().optional().describe(FOREIGN_CURRENCY_CODE_HINT),
         tags: z.array(z.string()).optional().describe('Tags'),
         transaction_notes: z.string().optional().describe('Notes for each generated transaction'),
       },
@@ -320,6 +338,16 @@ export function registerRecurringTools(server: McpServer, client: FireflyClient)
         category_id: z.string().optional().describe('Category ID'),
         budget_id: z.string().optional().describe('Budget ID'),
         currency_code: z.string().optional().describe('Currency code'),
+        foreign_amount: z
+          .string()
+          .optional()
+          .describe(
+            `${FOREIGN_AMOUNT_HINT} On update, always send foreign_currency_code with it. Firefly III cannot remove a recurrence's foreign amount once set; delete and recreate the recurrence instead.`,
+          ),
+        foreign_currency_code: z
+          .string()
+          .optional()
+          .describe(`${FOREIGN_CURRENCY_CODE_HINT} On update, always send foreign_amount with it, even if unchanged.`),
         tags: z.array(z.string()).optional().describe('Tags'),
         transaction_notes: z.string().optional().describe('Notes for each generated transaction'),
       },

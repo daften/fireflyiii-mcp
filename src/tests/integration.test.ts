@@ -15,6 +15,7 @@ import { fetchCategories } from '../tools/categories.js';
 import { fetchCurrencies } from '../tools/currencies.js';
 import { deleteObjectGroup, fetchObjectGroups } from '../tools/object-groups.js';
 import { createPiggyBank, deletePiggyBank, updatePiggyBank } from '../tools/piggy-banks.js';
+import { createRecurrence, deleteRecurrence, updateRecurrence } from '../tools/recurring.js';
 import { fetchAbout, fetchNetWorth, fetchSummary, fetchTags, registerReportTools } from '../tools/reports.js';
 import { createRule, createRuleGroup, deleteRuleGroup } from '../tools/rules.js';
 import {
@@ -453,6 +454,95 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
         actions: [{ type: 'set_notes', value: 'touched' }],
       });
       expect(rule.trigger).toBe('manual-activation');
+    });
+  });
+
+  describe('foreign amounts (#124)', () => {
+    const run = `CI124${Date.now().toString(36)}`;
+    const accounts: Record<'checking' | 'shop', string> = { checking: '', shop: '' };
+    const recurrences: string[] = [];
+
+    type Foreign = { foreign_amount: string | null; foreign_currency_code: string | null };
+    const foreignOf = (record: Record<string, unknown>) => {
+      const [first] = record.transactions as Foreign[];
+      return [first.foreign_amount === null ? null : Number(first.foreign_amount), first.foreign_currency_code];
+    };
+
+    beforeAll(async () => {
+      await client.post('/currencies/USD/enable', {});
+      accounts.checking = (
+        await createAccount(client, {
+          name: `${run} Checking`,
+          type: 'asset',
+          account_role: 'defaultAsset',
+          currency_code: 'EUR',
+        })
+      ).id as string;
+      accounts.shop = (await createAccount(client, { name: `${run} US shop`, type: 'expense', currency_code: 'EUR' }))
+        .id as string;
+    });
+
+    afterAll(async () => {
+      for (const id of recurrences) await deleteRecurrence(client, id).catch(() => {});
+      // Deleting an account also deletes its transactions.
+      for (const id of Object.values(accounts)) if (id) await deleteAccount(client, id).catch(() => {});
+    });
+
+    // A EUR card payment to a shop that charged USD: Firefly III does not require the foreign side
+    // here, so nothing on its end catches a half-filled pair.
+    const cardPayment = (foreign: { foreign_amount?: string; foreign_currency_code?: string } = {}) =>
+      createTransaction(client, {
+        type: 'withdrawal',
+        date: today,
+        amount: '18.00',
+        description: `${run} card payment`,
+        source_id: accounts.checking,
+        destination_id: accounts.shop,
+        ...foreign,
+      });
+
+    it('update_transaction refuses a half-filled foreign pair that Firefly III would silently ignore', async () => {
+      const tx = await cardPayment();
+      await expect(updateTransaction(client, tx.id, { foreign_amount: '20.00' })).rejects.toThrow(
+        /has no foreign amount yet/,
+      );
+      await expect(updateTransaction(client, tx.id, { foreign_currency_code: 'USD' })).rejects.toThrow(
+        /Pass foreign_amount together/,
+      );
+      expect(foreignOf(await fetchTransaction(client, tx.id))).toEqual([null, null]);
+    });
+
+    it('update_transaction changes the foreign amount on its own, and null removes the foreign side', async () => {
+      const tx = await cardPayment({ foreign_amount: '20.00', foreign_currency_code: 'USD' });
+      await updateTransaction(client, tx.id, { foreign_amount: '25.00' });
+      expect(foreignOf(await fetchTransaction(client, tx.id))).toEqual([25, 'USD']);
+      await updateTransaction(client, tx.id, { foreign_amount: null });
+      expect(foreignOf(await fetchTransaction(client, tx.id))).toEqual([null, null]);
+    });
+
+    it('create_recurring and update_recurring carry the foreign amount', async () => {
+      const recurrence = await createRecurrence(client, {
+        type: 'withdrawal',
+        title: `${run} streaming`,
+        first_date: today,
+        active: false,
+        apply_rules: false,
+        repeat_type: 'monthly',
+        repeat_moment: '1',
+        amount: '9.00',
+        transaction_description: `${run} streaming`,
+        source_id: accounts.checking,
+        destination_id: accounts.shop,
+        foreign_amount: '10.00',
+        foreign_currency_code: 'USD',
+      });
+      const id = recurrence.id as string;
+      recurrences.push(id);
+      expect(foreignOf(recurrence)).toEqual([10, 'USD']);
+
+      await expect(updateRecurrence(client, id, { foreign_amount: '11.00' })).rejects.toThrow(/together/);
+      const updated = await updateRecurrence(client, id, { foreign_amount: '11.00', foreign_currency_code: 'USD' });
+      expect(foreignOf(updated)).toEqual([11, 'USD']);
     });
   });
 });
