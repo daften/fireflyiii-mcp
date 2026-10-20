@@ -503,6 +503,7 @@ describe('createSplitTransaction', () => {
       source_id: '1',
       destination_id: '2',
       foreign_currency_code: 'USD',
+      group_title: 'Move to USD',
       splits: [
         { amount: '5300.00', foreign_amount: '1000.00', description: 'Savings' },
         { amount: '2650.00', foreign_amount: '500.00', description: 'Travel' },
@@ -700,11 +701,12 @@ describe('foreign currency guidance', () => {
   it('documents the destination-currency rule and the lack of conversion on every write tool', () => {
     const { server, toolConfigs } = createMockServer();
     registerTransactionTools(server, {} as FireflyClient);
-    const splitTool = toolConfigs.get('create_split_transaction');
+    const splitSchema = toolConfigs.get('create_split_transaction')!.inputSchema;
+    const splits = splitSchema.splits as z.ZodArray<z.ZodObject<Record<string, z.ZodType>>>;
     const fields = [
-      toolConfigs.get('create_transaction').inputSchema,
-      toolConfigs.get('update_transaction').inputSchema,
-      { ...splitTool.inputSchema, foreign_amount: splitTool.inputSchema.splits.element.shape.foreign_amount },
+      toolConfigs.get('create_transaction')!.inputSchema,
+      toolConfigs.get('update_transaction')!.inputSchema,
+      { ...splitSchema, foreign_amount: splits.element.shape.foreign_amount },
     ];
     for (const schema of fields) {
       expect(schema.foreign_amount.description).toContain('does not convert');
