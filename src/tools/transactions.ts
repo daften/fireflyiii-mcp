@@ -17,6 +17,8 @@ import {
   dateOrDateTimeSchema,
   dateSchema,
   defineTool,
+  FOREIGN_AMOUNT_HINT,
+  FOREIGN_CURRENCY_CODE_HINT,
   idSchema,
   parseId,
 } from './_helpers.js';
@@ -36,16 +38,6 @@ const GROUP_ID_HINT = `update_transaction and delete_transaction take ${GROUP_VS
 
 const groupIdField = (verb: string): string =>
   `Transaction group ID — ${GROUP_VS_JOURNAL_ID}. That is usually an adjacent number, so the wrong one silently ${verb} a different transaction.`;
-
-// Firefly III rejects a transfer (or a withdrawal/deposit between asset and liability accounts)
-// whose two accounts hold different currencies unless foreign_amount and a foreign currency
-// matching the destination account are both present. It never converts between currencies, so the
-// foreign amount has to be the amount actually received, not an estimate.
-const FOREIGN_AMOUNT_HINT =
-  'Amount in foreign_currency_code as a positive number string, e.g. "1000.00". Required, together with foreign_currency_code, when the source and destination accounts hold different currencies (e.g. a transfer from a BRL account to a USD account); `amount` stays in the source account\'s currency. Firefly III does not convert between currencies, so pass the amount actually received by the destination account.';
-
-const FOREIGN_CURRENCY_CODE_HINT =
-  "Foreign currency code (e.g. USD). Required together with foreign_amount. When the source and destination accounts hold different currencies it must be the destination account's `currency_code` — read it from get_account or get_accounts.";
 
 export async function fetchTransactions(
   client: FireflyClient,
@@ -125,6 +117,7 @@ interface GroupSplit {
   transaction_journal_id: string;
   description?: string;
   amount?: string;
+  foreign_currency_code?: string | null;
 }
 
 interface GroupSplits {
@@ -185,7 +178,7 @@ export async function updateTransaction(
     category_name?: string;
     budget_id?: string;
     currency_code?: string;
-    foreign_amount?: string;
+    foreign_amount?: string | null;
     foreign_currency_code?: string;
     notes?: string;
     tags?: string[];
@@ -210,6 +203,26 @@ export async function updateTransaction(
     throw new Error(
       `Transaction group ${id} has ${group.splits.length} splits; pass transaction_journal_id to choose which one to update (one split per call). Splits: ${describeSplits(group.splits)}.`,
     );
+  }
+
+  // Firefly III checks foreign_amount and foreign_currency_code as a pair only when creating. On
+  // update it answers 200 and stores nothing for a currency without an amount, or for an amount on
+  // a split that has no foreign currency yet; an amount alone does update a split that has one.
+  // It also ignores null; a foreign amount of "0" is what removes the foreign amount and currency.
+  if (changes.foreign_amount === null) changes.foreign_amount = '0';
+  if (changes.foreign_currency_code !== undefined && changes.foreign_amount === undefined) {
+    throw new Error(
+      'Pass foreign_amount together with foreign_currency_code: Firefly III ignores a foreign currency sent on its own.',
+    );
+  }
+  const clearsForeign = changes.foreign_amount !== undefined && Number(changes.foreign_amount) === 0;
+  const splitHasForeign = Boolean(group.splits.find((s) => s.transaction_journal_id === target)?.foreign_currency_code);
+  if (changes.foreign_amount !== undefined && changes.foreign_currency_code === undefined) {
+    if (!clearsForeign && !splitHasForeign) {
+      throw new Error(
+        `Split ${target} has no foreign amount yet, so pass foreign_currency_code with foreign_amount: Firefly III ignores a foreign amount without a currency.`,
+      );
+    }
   }
 
   const response = await client.put<JsonApiSingleResponse>(
@@ -460,11 +473,15 @@ export function registerTransactionTools(server: McpServer, client: FireflyClien
         currency_code: z.string().optional().describe('Currency code (e.g. EUR, USD)'),
         foreign_amount: z
           .string()
+          .nullable()
           .optional()
           .describe(
-            `${FOREIGN_AMOUNT_HINT} Firefly III enforces this only when creating, so an update missing it is accepted silently: when changing \`amount\` on a transaction that already has a foreign amount, send the new foreign_amount too.`,
+            `${FOREIGN_AMOUNT_HINT} Firefly III enforces this only when creating, so an update missing it is accepted silently: when changing \`amount\` on a transaction that already has a foreign amount, send the new foreign_amount too. On its own it changes the foreign amount of a split that already has a foreign currency. Pass null to remove the foreign amount and its currency.`,
           ),
-        foreign_currency_code: z.string().optional().describe(FOREIGN_CURRENCY_CODE_HINT),
+        foreign_currency_code: z
+          .string()
+          .optional()
+          .describe(`${FOREIGN_CURRENCY_CODE_HINT} On update, always send foreign_amount with it, even if unchanged.`),
         notes: z.string().optional().describe('Additional notes'),
         tags: z.array(z.string()).optional().describe('Tags (replaces existing tags)'),
       },

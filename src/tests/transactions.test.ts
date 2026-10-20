@@ -219,7 +219,7 @@ describe('createTransaction', () => {
 /** A JSON:API transaction-group envelope with the given splits. */
 function groupFixture(
   id: string,
-  splits: Array<[journalId: string, description: string, amount: string]>,
+  splits: Array<[journalId: string, description: string, amount: string, foreignCurrencyCode?: string]>,
   title: string | null,
 ) {
   return {
@@ -228,10 +228,11 @@ function groupFixture(
       type: 'transactions',
       attributes: {
         group_title: title,
-        transactions: splits.map(([transaction_journal_id, description, amount]) => ({
+        transactions: splits.map(([transaction_journal_id, description, amount, foreignCurrencyCode]) => ({
           transaction_journal_id,
           description,
           amount,
+          ...(foreignCurrencyCode === undefined ? {} : { foreign_currency_code: foreignCurrencyCode }),
         })),
       },
       links: {},
@@ -368,6 +369,50 @@ describe('updateTransaction', () => {
         { transaction_journal_id: '10', amount: '5400.00', foreign_amount: '1000.00', foreign_currency_code: 'USD' },
       ],
     });
+  });
+
+  // Firefly III answers these updates with 200 and stores nothing (verified on 6.7.7), so the tool
+  // has to refuse them itself or it reports a change that never happened.
+  it('refuses a foreign currency without a foreign amount', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Card', '18.00', 'USD']], null));
+    mockClient.put = vi.fn();
+    await expect(updateTransaction(mockClient, '5', { foreign_currency_code: 'GBP' })).rejects.toThrow(
+      'Pass foreign_amount together with foreign_currency_code',
+    );
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+
+  it('refuses a foreign amount on a split that has no foreign currency yet', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Card', '18.00']], null));
+    mockClient.put = vi.fn();
+    await expect(updateTransaction(mockClient, '5', { foreign_amount: '20.00' })).rejects.toThrow(
+      'Split 10 has no foreign amount yet, so pass foreign_currency_code with foreign_amount',
+    );
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+
+  it('changes only the foreign amount of a split that already has a foreign currency', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Card', '18.00', 'USD']], null));
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '5', { foreign_amount: '25.00' });
+    expect(vi.mocked(mockClient.put).mock.calls[0][1]).toMatchObject({
+      transactions: [{ transaction_journal_id: '10', foreign_amount: '25.00' }],
+    });
+  });
+
+  it('sends "0" for a null foreign_amount, which is how Firefly III removes the foreign amount and currency', async () => {
+    mockClient.get = vi.fn().mockResolvedValueOnce(groupFixture('5', [['10', 'Card', '18.00', 'USD']], null));
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateTransaction(mockClient, '5', { foreign_amount: null });
+    expect(vi.mocked(mockClient.put).mock.calls[0][1]).toMatchObject({
+      transactions: [{ transaction_journal_id: '10', foreign_amount: '0' }],
+    });
+  });
+
+  it('accepts null for foreign_amount in the update_transaction schema', () => {
+    const { server, toolConfigs } = createMockServer();
+    registerTransactionTools(server, {} as FireflyClient);
+    expect(toolConfigs.get('update_transaction')!.inputSchema.foreign_amount.safeParse(null).success).toBe(true);
   });
 });
 

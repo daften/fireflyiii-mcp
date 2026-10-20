@@ -23,7 +23,7 @@
 | `search_transactions` | Keyword search across transactions |
 | `create_transaction` | Create a new transaction, including transfers between accounts in different currencies (`foreign_amount` + `foreign_currency_code`) |
 | `create_split_transaction` | Create a split transaction (one receipt across multiple categories/budgets); requires a group title; supports a shared `foreign_currency_code` with a `foreign_amount` per split |
-| `update_transaction` | Update one split of a transaction, including its foreign amount and currency; the other splits are left untouched (pass `transaction_journal_id` for split transactions) |
+| `update_transaction` | Update one split of a transaction, including its foreign amount and currency (`foreign_amount: null` removes them); the other splits are left untouched (pass `transaction_journal_id` for split transactions) |
 | `bulk_update_transactions` | Set category, budget, tags or notes on every transaction a search query matches (only the matching splits; refuses above `max_transactions`) |
 | `delete_transaction` | Delete a transaction. This action cannot be undone. |
 
@@ -80,8 +80,8 @@
 |------|-------------|
 | `get_recurring` | List all recurring transaction rules |
 | `get_recurrence` | Get a single recurring transaction rule by ID |
-| `create_recurring` | Create a new recurring transaction rule |
-| `update_recurring` | Update an existing recurring transaction rule |
+| `create_recurring` | Create a new recurring transaction rule, optionally in a foreign currency (`foreign_amount` + `foreign_currency_code`) |
+| `update_recurring` | Update an existing recurring transaction rule; `foreign_amount` and `foreign_currency_code` are sent together |
 | `delete_recurring` | Delete a recurring transaction rule. This action cannot be undone. |
 | `get_recurrence_transactions` | Get transactions created by a recurring transaction rule |
 | `trigger_recurrence` | Manually fire a recurring rule to create its transaction immediately |

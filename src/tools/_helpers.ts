@@ -103,6 +103,17 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be 
 export const CATEGORY_NAME_HINT =
   'Matched by exact string — pass literal text, since HTML entities like &amp; or &#039; are not decoded and would create a separate category.';
 
+// Firefly III rejects a transfer (or a withdrawal/deposit between asset and liability accounts)
+// whose two accounts hold different currencies unless foreign_amount and a foreign currency
+// matching the destination account are both present. It never converts between currencies, so the
+// foreign amount has to be the amount actually received, not an estimate. Shared by the
+// transaction and recurring tools.
+export const FOREIGN_AMOUNT_HINT =
+  'Amount in foreign_currency_code as a positive number string, e.g. "1000.00". Required, together with foreign_currency_code, when the source and destination accounts hold different currencies (e.g. a transfer from a BRL account to a USD account); `amount` stays in the source account\'s currency. Firefly III does not convert between currencies, so pass the amount actually received by the destination account.';
+
+export const FOREIGN_CURRENCY_CODE_HINT =
+  "Foreign currency code (e.g. USD). Required together with foreign_amount. When the source and destination accounts hold different currencies it must be the destination account's `currency_code`; read it from get_account or get_accounts.";
+
 const dateTimeSchema = z.iso.datetime({ offset: true });
 export const dateOrDateTimeSchema = z
   .string()
