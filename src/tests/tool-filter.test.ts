@@ -230,13 +230,14 @@ describe('makeReadOnlyProxy — this-binding', () => {
   it('non-registerTool methods are bound to the underlying server, not the proxy', () => {
     const inner = {
       value: 42,
-      getValue(this: typeof inner) {
+      getValue(this: { value: number }) {
         return this.value;
       },
       registerTool: vi.fn(),
     };
     const proxy = makeReadOnlyProxy(inner as unknown as McpServer);
-    const method = (proxy as unknown as typeof inner).getValue;
+    // Detached on purpose: the proxy must have bound it to the underlying server already.
+    const method = (proxy as unknown as { getValue: () => number }).getValue;
     expect(method()).toBe(42);
   });
 });

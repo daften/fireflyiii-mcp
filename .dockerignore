@@ -27,3 +27,4 @@ SUPPORT.md
 
 # Tooling config
 biome.json
+tsconfig.test.json

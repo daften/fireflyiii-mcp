@@ -1965,7 +1965,7 @@ describe('createMcpRequestHandler: request body handling', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  const post = (body: string | Uint8Array) =>
+  const post = (body: BodyInit) =>
     fetch(url, {
       method: 'POST',
       body,
