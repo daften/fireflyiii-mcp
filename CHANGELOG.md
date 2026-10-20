@@ -58,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Docker image now runs the server as the unprivileged `node` user instead of root. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
 - Tool ID arguments could address other resources: `parseId` passed non-numeric input through, and `new URL()` resolves dot segments, so `delete_account` with id `../budgets/5` sent `DELETE /api/v1/budgets/5`, and enough `../` left `/api/v1` with the token attached. Under prompt injection this let an enabled tool act outside the groups selected with `--preset`/`--groups`. Every path ID is now validated as a number (`idSchema`, a strict `parseId`), other path segments are percent-encoded, and `FireflyClient` refuses any API path containing dot segments (including `%2e%2e`), `?`, `#`, backslashes or control characters. ([#118](https://github.com/daften/fireflyiii-mcp/issues/118))
 - Release pipeline: every `publish.yml` job now builds the one commit `setup` resolved, after confirming it is on the release tag or `develop`, so a push to `develop` during a nightly run can no longer publish a commit `verify` never tested; a release tag that doesn't match `package.json` now fails `verify` instead of shipping different npm and Docker versions; and workflow values are passed to shell through `env:` rather than `${{ }}` interpolation. `auto-release.yml` now checks the merge commit's subject line, not the whole message (whose PR title could contain the trigger text). The third-party actions that receive privileged tokens (`dependabot/fetch-metadata`, `davelosert/vitest-coverage-report-action`, `softprops/action-gh-release`, and the `docker/*` actions) are pinned to commit SHAs. ([#119](https://github.com/daften/fireflyiii-mcp/issues/119))
+## [0.5.4] - 2026-10-20
+
+### Security
+
+- chore(deps-dev): Bump vite from 8.2.1 to 8.3.4 in the security-fixes group across 1 directory (automated security release)
 
 ## [0.5.3] - 2026-10-14
 
@@ -281,7 +286,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.0...v0.5.1
