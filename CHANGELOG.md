@@ -58,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Docker image now runs the server as the unprivileged `node` user instead of root. ([#116](https://github.com/daften/fireflyiii-mcp/issues/116))
 - Tool ID arguments could address other resources: `parseId` passed non-numeric input through, and `new URL()` resolves dot segments, so `delete_account` with id `../budgets/5` sent `DELETE /api/v1/budgets/5`, and enough `../` left `/api/v1` with the token attached. Under prompt injection this let an enabled tool act outside the groups selected with `--preset`/`--groups`. Every path ID is now validated as a number (`idSchema`, a strict `parseId`), other path segments are percent-encoded, and `FireflyClient` refuses any API path containing dot segments (including `%2e%2e`), `?`, `#`, backslashes or control characters. ([#118](https://github.com/daften/fireflyiii-mcp/issues/118))
 - Release pipeline: every `publish.yml` job now builds the one commit `setup` resolved, after confirming it is on the release tag or `develop`, so a push to `develop` during a nightly run can no longer publish a commit `verify` never tested; a release tag that doesn't match `package.json` now fails `verify` instead of shipping different npm and Docker versions; and workflow values are passed to shell through `env:` rather than `${{ }}` interpolation. `auto-release.yml` now checks the merge commit's subject line, not the whole message (whose PR title could contain the trigger text). The third-party actions that receive privileged tokens (`dependabot/fetch-metadata`, `davelosert/vitest-coverage-report-action`, `softprops/action-gh-release`, and the `docker/*` actions) are pinned to commit SHAs. ([#119](https://github.com/daften/fireflyiii-mcp/issues/119))
+
+## [0.5.5] - 2026-10-21
+
+### Security
+
 - **Bumped transitive `hono` from 4.13.7 to 4.13.13**, resolving [GHSA-5r4p-p66f-jhc7](https://github.com/advisories/GHSA-5r4p-p66f-jhc7) (moderate severity), where `serveStatic` decodes the request path a second time and middleware on static paths can be bypassed. It comes in through `@modelcontextprotocol/sdk`, which uses only `@hono/node-server`'s request listener for its Streamable HTTP transport; neither this server nor the SDK calls `serveStatic`, so it was not exploitable here.
 
 ## [0.5.4] - 2026-10-20
@@ -288,7 +293,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.1...v0.5.2
