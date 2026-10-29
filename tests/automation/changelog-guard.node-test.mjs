@@ -340,7 +340,7 @@ const withPrerelease = `# Changelog
 
 test('a prerelease section above its predecessor is in order, and below its own stable release is not', () => {
   assert.deepEqual(sectionOrder(withPrerelease), []);
-  const wrong = withPrerelease.replace('## [1.0.0-alpha.1] - 2026-11-01', '## [1.0.0-alpha.1] - 2026-11-01').replace(
+  const wrong = withPrerelease.replace(
     '## [0.5.5] - 2026-10-21',
     '## [1.0.0] - 2026-12-01\n\n### Added\n\n- Stable\n\n## [0.5.5] - 2026-10-21',
   );
