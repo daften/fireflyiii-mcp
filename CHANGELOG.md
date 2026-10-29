@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.1] - 2026-10-29
+
+First prerelease of 1.0. It is published to the `next` channel only, so `latest` stays on 0.5.5 until the stable release: install it with `npm install @daften/fireflyiii-mcp@next` or `docker pull ghcr.io/daften/fireflyiii-mcp:next`, or pin `1.0.0-alpha.1`. It contains **breaking changes** (see Changed and Removed), fixes that stop `update_transaction` from destroying split transactions, and several security fixes.
+
 ### Added
 
 - `object_group_title` on `create_bill`, `update_bill`, `create_piggy_bank` and `update_piggy_bank`. Firefly III has no API to create an object group; setting a new title is how one gets created. ([#117](https://github.com/daften/fireflyiii-mcp/issues/117))
@@ -301,7 +305,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0-alpha.1...HEAD
+[1.0.0-alpha.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.5...v1.0.0-alpha.1
 [0.5.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.2...v0.5.3
