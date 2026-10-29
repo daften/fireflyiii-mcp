@@ -36,6 +36,12 @@ jobs:
       should_publish: ${{ steps.resolve.outputs.should_publish }}
       version: ${{ steps.resolve.outputs.version }}
       npm_tag: ${{ steps.resolve.outputs.npm_tag }}
+      # 'true' for a prerelease tag (v1.0.0-alpha.1, -beta.N, -rc.N): it publishes to the npm
+      # `next` dist-tag, never moves `latest`, and the GitHub Release is marked a pre-release.
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      # 'true' when `next` (npm dist-tag and Docker tag) should point at this release: every
+      # prerelease, and a stable release only when it is newer than every existing tag.
+      update_next: ${{ steps.resolve.outputs.update_next }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -52,21 +58,36 @@ jobs:
         run: |
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ "$EVENT" = "push" ]; then
-            # Tag push -> release. Version comes from the tag; npm 'latest' dist-tag.
+            # Tag push -> release. Version comes from the tag. A stable tag publishes to npm
+            # 'latest'; a prerelease tag (v1.0.0-alpha.1, -beta.N, -rc.N) publishes to 'next' and
+            # leaves `latest` alone. classify rejects a tag that is not semver or not one of those
+            # three prerelease forms, before anything is written to the outputs.
             VERSION="${GITHUB_REF_NAME#v}"
+            CLASS=$(node scripts/release-version.mjs classify "$VERSION")
+            printf '%s\n' "$CLASS" >> "$GITHUB_OUTPUT"
+            # `next` is the newest tagged release of any kind, so it only moves forward: a stable
+            # release moves it only when nothing newer is tagged (a 0.5.7 hotfix must not pull it
+            # back from 1.0.0-rc.1), and a prerelease older than an existing tag is refused.
+            NEWEST=$(node scripts/release-version.mjs is-newest "$VERSION" $(git tag --list 'v*'))
+            if [ "$NEWEST" != "true" ] && printf '%s\n' "$CLASS" | grep -qx 'prerelease=true'; then
+              echo "::error::v${VERSION} is a prerelease older than an existing tag; refusing to publish it to 'next'."
+              exit 1
+            fi
+            echo "update_next=$NEWEST" >> "$GITHUB_OUTPUT"
             echo "channel=release" >> "$GITHUB_OUTPUT"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
             echo "Release channel: v$VERSION"
           else
             # schedule / workflow_dispatch -> nightly. Prerelease version, 'nightly' dist-tag.
-            NEXT=$(node -p "const [a,b,c]=require('./package.json').version.split('.').map(Number); [a,b,c+1].join('.')")
+            NEXT=$(node scripts/release-version.mjs nightly-base "$(node -p "require('./package.json').version")")
             STAMP=$(date -u +%Y%m%dT%H%M)
             VERSION="${NEXT}-nightly.${STAMP}"
             echo "channel=nightly" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "npm_tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "update_next=false" >> "$GITHUB_OUTPUT"
             echo "Nightly channel: $VERSION"
             # Change-guard: publish only if HEAD differs from the rolling nightly tag.
             HEAD_SHA=$(git rev-parse HEAD)
@@ -202,6 +223,22 @@ jobs:
             npm publish --provenance --tag "$NPM_TAG"
           fi
 
+      # A prerelease already published to `next` above. A stable release publishes to `latest`, so
+      # `next` has to be pointed at it separately, or `@next` would trail `@latest`. Moving a
+      # dist-tag needs the "Allow npm dist-tag" permission on the package's trusted-publisher
+      # config (or a token). When that is missing the release is still good, so this step must not
+      # fail the run: it prints the exact command to run by hand instead.
+      - name: Point the next dist-tag at this stable release
+        if: needs.setup.outputs.channel == 'release' && needs.setup.outputs.npm_tag == 'latest' && needs.setup.outputs.update_next == 'true'
+        continue-on-error: true
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          if ! npm dist-tag add "@daften/fireflyiii-mcp@${VERSION}" next; then
+            echo "::warning::Could not move the npm 'next' dist-tag. Run: npm dist-tag add @daften/fireflyiii-mcp@${VERSION} next"
+            exit 1
+          fi
+
   publish-docker:
     needs: [setup, verify]
     runs-on: ubuntu-latest
@@ -233,7 +270,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Release pushes semver + latest; nightly pushes only nightly tags. The
-      # `enable` flag selects per channel so neither leaks into the other.
+      # `enable` flag selects per channel so neither leaks into the other. A prerelease release
+      # pushes only its exact version and `:next`: `latest`, `1` and `1.0` keep pointing at the
+      # newest stable image. `:next` follows the newest tagged release of any kind, so a stable
+      # release that is the newest tag moves it too.
       - name: Docker tags + labels
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -241,9 +281,10 @@ jobs:
           images: ghcr.io/daften/fireflyiii-mcp
           tags: |
             type=semver,pattern={{version}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=raw,value=next,enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.update_next == 'true' }}
             type=raw,value=nightly,enable=${{ needs.setup.outputs.channel == 'nightly' }}
             type=raw,value=nightly-{{date 'YYYYMMDD'}},enable=${{ needs.setup.outputs.channel == 'nightly' }}
 
@@ -304,6 +345,10 @@ jobs:
         with:
           body_path: release-notes.md
           generate_release_notes: false
+          # A prerelease is flagged as such and never becomes the repository's "latest release".
+          # For a stable release make_latest is left empty, i.e. the action's own default.
+          prerelease: ${{ needs.setup.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.setup.outputs.prerelease == 'true' && 'false' || '' }}
 
       - name: Move rolling nightly tag to HEAD
         if: needs.setup.outputs.channel == 'nightly'
