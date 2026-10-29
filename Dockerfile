@@ -16,6 +16,9 @@ COPY package*.json ./
 # (simple-git-hooks devDependency) is absent; skip lifecycle scripts entirely.
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
+# Drop root for the running server. The node image ships an unprivileged `node` user; the app only
+# reads its files and listens on an unprivileged port, so it needs nothing more.
+USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1

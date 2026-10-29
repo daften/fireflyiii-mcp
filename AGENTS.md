@@ -6,7 +6,7 @@
 
 Users can query their finances in natural language through Claude, getting answers about accounts, transactions, budgets, categories, bills, piggy banks, and financial insights without writing queries themselves.
 
-**Current state:** 140 tools across 14 groups, full CRUD, stdio and HTTP (OAuth or PAT) transports, tool filtering via `--preset`/`--groups`/`--read-only`.
+**Current state:** 137 tools across 14 groups, full CRUD, stdio and HTTP (OAuth or PAT) transports, tool filtering via `--preset`/`--groups`/`--read-only`.
 
 ### Architecture at a glance
 
@@ -26,7 +26,7 @@ MCP client (Claude Code / Desktop / ...)
                      │  registerAllTools (src/tools/index.ts)
                      │  · TOOL_GROUPS / PRESETS filtering, read-only proxy
                      ▼
-      Tool groups (src/tools/*.ts, 14 groups / 140 tools)
+      Tool groups (src/tools/*.ts, 14 groups / 137 tools)
         · defineTool wrapper: zod validation, error formatting (src/tools/_helpers.ts)
         · autocomplete prompts with per-user TTL cache
                      │
@@ -83,7 +83,7 @@ FIREFLY_DEBUG     Set to "true" or "1" to emit verbose autocomplete tracing to s
 ```
 MCP_PRESET      String. Named preset; same values as --preset. Mutually exclusive with MCP_GROUPS.
 MCP_GROUPS      String. Comma-separated group names; same values as --groups. Empty/whitespace-only is treated as unset.
-MCP_READ_ONLY   "true" or "1" (case-insensitive, trimmed) enables read-only mode; any other value is ignored.
+MCP_READ_ONLY   "true" or "1" (case-insensitive, trimmed) enables read-only mode; "false", "0" or empty leave it off; any other value is an error.
 ```
 
 Store credentials in `.env` file (which is gitignored). The `.env.example` template shows what's needed.
@@ -101,7 +101,9 @@ Parsed by `src/args.ts` and passed to `createServer` as `filterOptions`.
 | `--port <n>` | `3000` | Listen port (HTTP only; auto-increments on EADDRINUSE) |
 | `--preset <name>` | — | Load a named tool subset (see Filtering) |
 | `--groups <list>` | — | Comma-separated group names; cannot combine with `--preset` |
-| `--read-only` | false | Filter any selection to read-only tools (`get_*`, `search_*`, `test_*`) |
+| `--read-only` | false | Filter any selection to tools annotated `readOnlyHint: true` |
+
+Unknown flags, value flags without a value, a non-numeric `--port`, an empty `--groups` and inherited property names as presets (`toString`) are all errors. Value flags also accept `--flag=value`.
 
 ---
 
@@ -110,59 +112,69 @@ Parsed by `src/args.ts` and passed to `createServer` as `filterOptions`.
 ```
 fireflyiii-mcp/
 ├── src/
-│   ├── index.ts                 # Entry point — validates env, wires client + server + transport
+│   ├── index.ts                 # Entry point: validates env, wires client + server + transport
 │   ├── server.ts                # Server factory: createServer(client, filterOptions) → McpServer
-│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth; accepts token string or getter fn)
-│   ├── http.ts                  # HTTP server + OAuth proxy (authorize, token, callback, register stubs)
+│   ├── client.ts                # Firefly III HTTP client (fetch wrapper + Bearer auth, timeouts, size limits, path guard)
+│   ├── http.ts                  # HTTP server + OAuth proxy (authorize, token, callback, register stubs), body limits
 │   ├── args.ts                  # CLI argument parser (--transport, --host, --port, --preset, --groups, --read-only)
 │   ├── transform.ts             # JSON:API response transforms (unwrapList, unwrapSingle, cleanSummary)
 │   ├── types.ts                 # Shared utility types (QueryParams)
 │   ├── tools/
 │   │   ├── index.ts             # TOOL_GROUPS, PRESETS, ToolFilterOptions, makeReadOnlyProxy, registerAllTools
-│   │   ├── accounts.ts          # get_accounts, get_account, create_account, update_account, delete_account
-│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction, bulk_update_transactions
-│   │   ├── budgets.ts           # get_budgets, get_budget, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit
-│   │   ├── categories.ts        # get_categories, get_category, get_category_transactions, create_category, update_category, delete_category
-│   │   ├── bills.ts             # get_bills, get_bill, create_bill, update_bill, delete_bill
-│   │   ├── piggy-banks.ts       # get_piggy_banks, get_piggy_bank, create_piggy_bank, update_piggy_bank, delete_piggy_bank
-│   │   ├── reports.ts           # get_tags, get_tag, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag
+│   │   ├── _helpers.ts          # defineTool / defineContentTool, idSchema, parseId, date schemas, autocomplete TTL cache
+│   │   ├── _annotations.ts      # READ/WRITE/UPDATE/DELETE_ANNOTATIONS
+│   │   ├── accounts.ts          # get_accounts, get_account, create_account, update_account, delete_account, get_account_transactions, search_accounts
+│   │   ├── transactions.ts      # get_transactions, get_transaction, create_transaction, update_transaction, delete_transaction, search_transactions, create_split_transaction, bulk_update_transactions
+│   │   ├── budgets.ts           # get_budgets, get_budget_limits, create_budget, update_budget, delete_budget, create_budget_limit, update_budget_limit, delete_budget_limit, get_available_budgets, get_available_budget, get_budget_transactions, get_transactions_without_budget
+│   │   ├── categories.ts        # get_categories, get_category_transactions, create_category, update_category, delete_category
+│   │   ├── bills.ts             # get_bills, create_bill, update_bill, delete_bill, get_bill_transactions
+│   │   ├── piggy-banks.ts       # get_piggy_banks, create_piggy_bank, update_piggy_bank, delete_piggy_bank, get_piggy_bank_events
+│   │   ├── reports.ts           # get_tags, get_tag_transactions, get_summary, get_insight_expenses, get_insight_income, create_tag, update_tag, delete_tag, get_insight_expenses_no_bill, get_insight_expenses_no_budget, get_insight_expenses_no_category, get_insight_expenses_no_tag, get_insight_income_no_category, get_insight_income_no_tag, get_insight_transfer_no_category, get_insight_transfer_no_tag, get_about, get_net_worth_summary, get_account_overview_chart, get_balance_chart, get_budget_chart, get_category_chart, get_exchange_rate, get_insight_expenses_by_bill, get_insight_expenses_by_budget, get_insight_expenses_by_tag, get_insight_expenses_by_asset, get_insight_expenses_by_expense_account, get_insight_expenses_total, get_insight_income_by_revenue, get_insight_income_by_tag, get_insight_income_by_asset, get_insight_income_total, get_insight_transfers_by_category, get_insight_transfers_by_tag, get_insight_transfers_by_asset, get_insight_transfers_total
 │   │   ├── rules.ts             # get_rule_groups, get_rule_group, create_rule_group, update_rule_group, delete_rule_group, get_rules, get_rule, create_rule, update_rule, delete_rule, get_rule_group_rules, trigger_rule_group, trigger_rule, test_rule_group, test_rule
 │   │   ├── recurring.ts         # get_recurring, get_recurrence, create_recurring, update_recurring, delete_recurring, get_recurrence_transactions, trigger_recurrence
 │   │   ├── attachments.ts       # get_attachments, get_attachment, create_attachment, update_attachment, delete_attachment, upload_attachment, download_attachment
 │   │   ├── currencies.ts        # get_currencies, get_currency, create_currency, update_currency, delete_currency, enable_currency, disable_currency, set_primary_currency
 │   │   ├── exports.ts           # export_transactions, export_accounts, export_bills, export_budgets, export_categories, export_tags, export_recurring, export_rules, export_piggy_banks
-│   │   ├── object-groups.ts     # get_object_groups, get_object_group, create_object_group, update_object_group, delete_object_group, get_object_group_bills, get_object_group_piggy_banks
+│   │   ├── object-groups.ts     # get_object_groups, get_object_group, update_object_group, delete_object_group, get_object_group_bills, get_object_group_piggy_banks
 │   │   └── transaction-links.ts # get_link_types, get_transaction_links, get_transaction_link, create_transaction_link, update_transaction_link, delete_transaction_link
 │   └── tests/
-│       ├── accounts.test.ts
-│       ├── args.test.ts
-│       ├── attachments.test.ts
-│       ├── bills.test.ts
-│       ├── budgets.test.ts
-│       ├── categories.test.ts
-│       ├── client.test.ts
-│       ├── currencies.test.ts
-│       ├── exports.test.ts
-│       ├── http.test.ts
+│       ├── _helpers.ts          # createMockServer (captures handlers, tool configs, prompts)
+│       ├── fixtures/            # firefly-routes-<tag>.json: Firefly III route snapshots for the contract test
+│       ├── firefly-contract.test.ts   # Every tool's requests vs. Firefly III's route table
 │       ├── integration.test.ts  # Live Firefly III tests (skipped unless FIREFLY_INTEGRATION=true)
-│       ├── object-groups.test.ts
-│       ├── piggy-banks.test.ts
-│       ├── recurring.test.ts
-│       ├── reports.test.ts
-│       ├── rules.test.ts
-│       ├── tool-filter.test.ts
-│       ├── transaction-links.test.ts
-│       ├── transactions.test.ts
-│       └── transform.test.ts
-├── dist/                        # Compiled output — gitignored (not committed)
+│       ├── tool-filter.test.ts  # Presets, groups, read-only filter, name/annotation consistency
+│       ├── tool-input-safety.test.ts  # Path-ID validation through a real MCP client + server
+│       ├── docs-consistency.test.ts   # AGENTS.md / docs tool lists and counts vs. the registered tools
+│       └── <group>.test.ts      # One unit-test file per tool group, plus args, client, http, helpers, transform
+├── tests/
+│   └── automation/              # node:test suites for scripts/ (run with node --test tests/automation/*.node-test.mjs)
+├── scripts/
+│   ├── changelog-guard.mjs      # Guards CHANGELOG.md against silent merge=union corruption
+│   ├── changelog-guard-allowed-edits.json  # Reviewed exemptions to the guard's immutability rule
+│   ├── security-pr-alerts.mjs   # Matches Dependabot security PRs to vulnerability alerts (auto-merge gate)
+│   ├── audit-compare.sh         # Relative npm audit: no new moderate+ advisories vs. the base branch
+│   ├── release-changelog.sh     # Writes the automated security-release changelog section
+│   ├── update-firefly-routes.mjs  # Snapshots Firefly III's route table for the contract test
+│   └── ci-create-token.sh       # Creates a Firefly III user + token in the CI container
+├── dist/                        # Compiled output, gitignored (not committed)
+├── docs/                        # VitePress documentation site (deployed by docs.yml)
 ├── .github/
+│   ├── dependabot.yml           # Security PRs against main, version updates against develop
 │   └── workflows/
-│       ├── ci.yml               # Runs tests on every PR and push to main
-│       └── publish.yml          # Publishes npm + Docker on v* tags (gated on tests)
+│       ├── ci.yml               # Lint, type-check (src + tests), unit + automation tests, changelog checks, relative audit
+│       ├── codeql.yml           # CodeQL for TypeScript and workflows
+│       ├── nightly.yml          # Nightly live integration tests (Firefly III in Docker) + strict audit
+│       ├── publish.yml          # npm + GHCR publishing: release channel on v* tags, nightly channel from develop
+│       ├── auto-merge.yml       # Enables auto-merge on matched Dependabot security PRs
+│       ├── auto-release.yml     # Patch release after a Dependabot security merge to main
+│       ├── backmerge.yml        # Merges main back into develop after every push to main
+│       └── docs.yml             # Builds and deploys the docs site
 ├── package.json
-├── tsconfig.json
+├── tsconfig.json                # Build config (excludes src/tests)
+├── tsconfig.test.json           # Type-checks src/tests too (npm run typecheck:tests; part of npm run check)
 ├── Dockerfile
 ├── docker-compose.yml
+├── docker-compose.ci.yml        # Firefly III container for the nightly integration tests
 ├── .env.example
 ├── LICENSE
 ├── README.md
@@ -192,14 +204,14 @@ rules, recurring, attachments, currencies, exports, object-groups, transaction-l
 |------|--------|-------|
 | `minimal` | accounts, transactions | 15 |
 | `default` | accounts, transactions, budgets, categories, bills | 37 |
-| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 44 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 42 |
 | `insights` | accounts, transactions, categories, reports | 57 |
 | `automation` | accounts, transactions, rules, recurring | 37 |
-| `full` | all 14 groups | 140 |
+| `full` | all 14 groups | 137 |
 
 ### Read-only proxy
 
-`makeReadOnlyProxy(server)` wraps the `McpServer` with a `Proxy` that silently drops any `registerTool` call whose name does not start with `get_`, `search_`, or `test_`. Applied when `--read-only` is passed.
+`makeReadOnlyProxy(server)` wraps the `McpServer` with a `Proxy` that silently drops any `registerTool` call whose config is not annotated `readOnlyHint: true`. A test in `tool-filter.test.ts` keeps names and annotations consistent (`get_`/`search_`/`test_`/`export_`/`download_` tools are read-only, nothing else is). Applied when `--read-only` is passed.
 
 ---
 
@@ -378,7 +390,9 @@ Routes handled by the proxy (no auth required):
 - `POST /oauth/token` — substitutes `redirect_uri` back to our stable callback, proxies token exchange to Firefly III (30 s AbortController timeout)
 - `GET /oauth/callback` — receives Firefly III's redirect, forwards `code`+`state` to the MCP client's original dynamic callback URL
 
-All other requests require a `Bearer` token in the `Authorization` header. The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
+All other requests require a `Bearer` token in the `Authorization` header.
+
+Every request body is read through `readBody(req, maxBytes)`: OAuth routes are capped at 64 KiB (`OAUTH_MAX_BODY_BYTES`) and MCP requests at 16 MiB (`MCP_MAX_BODY_BYTES`, read by `createMcpRequestHandler` and handed to the SDK pre-parsed, because the SDK buffers without a limit). Over-limit requests get `413` with `Connection: close`. Pending OAuth flows are capped at `MAX_PENDING_FLOWS` (1,000, oldest dropped first). The token is propagated via `AsyncLocalStorage` so `FireflyClient` can read it without it being passed through every call chain.
 
 **Limitation:** OAuth state lives in-process — single replica only. Horizontal scaling breaks the auth flow.
 
@@ -413,7 +427,7 @@ npm run dev -- --preset default          # Load only the default tool subset
    - Wire `registerXxxTools` inside `registerAllTools`.
    - Consider which presets it belongs in (`PRESETS` map in the same file).
 4. **Write test** in `src/tests/{category}.test.ts` — mock `client.get` with a realistic JSON:API envelope fixture, assert both call args and return value shape.
-5. **Update the tool table** in `docs/reference/tools.md` (the canonical tool reference; the README links to it and no longer keeps its own table). If the total or a preset count changed, bump the hardcoded numbers — the total appears in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`; preset counts live in `docs/reference/filtering.md`.
+5. **Update the tool table** in `docs/reference/tools.md` (the canonical tool reference; the README links to it and no longer keeps its own table). If the total or a preset count changed, bump the hardcoded numbers — the total appears in `README.md`, `docs/index.md`, `docs/guide/index.md`, `docs/guide/stdio.md`, `docs/reference/tools.md`, and `docs/reference/filtering.md`; preset counts live in `docs/reference/filtering.md`. Also add the tool to its file's line in this file's File Structure section. `src/tests/docs-consistency.test.ts` fails if any of these lists or counts disagree with the registered tools, and `src/tests/firefly-contract.test.ts` fails if the tool calls a route Firefly III does not serve.
 6. **Run `npm run build`** to verify the TypeScript compiles cleanly.
 
 Example — adding `get_account` (single account by ID):
@@ -455,7 +469,8 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 
 - **Unit tests** in `src/tests/` test fetch functions in isolation (mock `client.get`).
 - Fixtures use **realistic JSON:API envelopes** — the full `{ data: [{ id, type, attributes, links }], meta: { pagination } }` shape — so tests catch transform regressions.
-- **Integration tests** in `src/tests/integration.test.ts` run against a real Firefly III instance (only when `FIREFLY_INTEGRATION=true`).
+- **Contract test** in `src/tests/firefly-contract.test.ts` calls every tool against a recording client and checks each request's method and path against snapshots of Firefly III's route table (`src/tests/fixtures/firefly-routes-<tag>.json`, one for the oldest supported release and one for the newest tested). Mocked unit tests cannot catch a path Firefly does not serve; this one does. Refresh or add a snapshot with `node scripts/update-firefly-routes.mjs vX.Y.Z`, and keep the oldest snapshot equal to the minimum version stated in the docs (currently **v6.4.0**).
+- **Integration tests** in `src/tests/integration.test.ts` run against a real Firefly III instance (only when `FIREFLY_INTEGRATION=true`). Request *bodies* are only verified here, so any tool whose payload shape is non-obvious (split transactions, piggy bank accounts, insight filters) should get a live test. Everything a test creates must be deleted in `afterAll`: contributors run this suite against their own instance.
 - Run unit tests in CI; integration tests manually or in a staging environment.
 
 ---
@@ -465,6 +480,7 @@ expect(result).toEqual({ name: 'Checking', current_balance: '1000', id: '1' });
 - **`main`** — default branch, always releasable. Receives only: Dependabot security PRs (auto-merged), manual hotfix PRs, and `release/X.Y.Z` PRs (which carry both the promoted `develop` commits and the release commit — see "Releasing a New Version"). Never commit directly to `main`; `auto-release.yml` is the sole exception, and it is automated and gated.
 - **`develop`** — integration branch. All feature PRs and routine dependency bumps target `develop`. The nightly npm/Docker channel builds from `develop`.
 - **Every PR in this repo merges as a merge commit — never squash, never rebase.** That applies to feature PRs into `develop`, `release/X.Y.Z` PRs into `main`, back-merges, and automated Dependabot merges alike. Shared history is what keeps back-merges conflict-free; a squash rewrites the commits and makes `main` and `develop` diverge on content they actually share.
+- **Every PR is linked to an issue.** Open or find the issue first and put `Fixes #N` in the PR body. GitHub only links a PR to an issue, and closes the issue on merge, when the PR targets the default branch (`main`). A PR into `develop` gets neither: the issue's timeline shows the mention, but its "Development" field stays empty and it stays open. So when a PR into `develop` merges, close its issues by hand with a comment naming the PR, or link them in the PR's "Development" sidebar.
 - **Dependabot reads `.github/dependabot.yml` from the default branch (`main`) only.** Changes to it sitting on `develop` govern nothing until they are promoted — until then Dependabot keeps following whatever `main` says. The same applies to the `security-fixes` grouping and the `target-branch` retargeting.
 - After every push to `main`, `backmerge.yml` merges `main` into `develop` and pushes directly, so `develop` stays a superset of `main`. No PR is involved on the clean path — `develop` has no required status checks, so a PR there would be opened and merged seconds later for nothing. It pushes with `RELEASE_TOKEN` rather than `GITHUB_TOKEN` so `develop`'s push CI actually runs, uses `--no-ff` so the back-merge is a merge commit like everything else, and retries up to three times in case a feature PR lands on `develop` between its fetch and its push.
 - **`CHANGELOG.md` has a `merge=union` driver in `.gitattributes`.** Releases and feature PRs both edit the top of the file (`## [Unreleased]` on one side, a freshly-cut `## [X.Y.Z]` section on the other) — without it, that pattern conflicts on nearly every back-merge. Union merge keeps both sides' additions instead of raising a conflict, so this resolves automatically. **A back-merge PR appearing means git couldn't do that** — a conflict outside that pattern (e.g. a real edit collision) — and needs manual resolution: that's the only path that opens one, and the job fails so it surfaces. Resolve by keeping both sides. Still, one push to `main` means one back-merge, which is why a release is shaped as a single `release/X.Y.Z` PR rather than a promotion merge followed by a release commit.
@@ -476,6 +492,8 @@ Routine dependency-CVE fixes ship with no human in the loop:
 
 1. Dependabot opens a **grouped** security PR against `main` (`security-fixes` group in `dependabot.yml`).
 2. `auto-merge.yml` enables auto-merge (merge commit); branch protection's required checks gate the merge. `dependabot/fetch-metadata` verifies the PR author and signed first commit and supplies dependency metadata. `scripts/security-pr-alerts.mjs`, loaded from the trusted PR base commit, separately queries all pages of GitHub vulnerability alerts and matches npm alerts by package, manifest path, and previous version across every grouped dependency. It accepts bare exact versions and `= `-prefixed versions; unknown ranges fail closed. The action's built-in lookup assumes the prefix and can miss valid alerts. `RELEASE_TOKEN` needs **Dependabot alerts: Read only** in both the Actions and Dependabot secret stores. Matching retains the previous workflow’s OPEN, FIXED, and DISMISSED alert states. The metadata step continues to use `RELEASE_TOKEN` as established in commit `54a05ba`. API failures and a successful lookup with no matching advisory have distinct diagnostics; an empty match is not proof of a token problem. Auto-merge is tied to the event's head SHA to avoid merging a different revision after a concurrent push.
+   - **Auto-merge waits for the required checks even though `RELEASE_TOKEN` can bypass them.** The `main` ruleset lets the admin role bypass its required checks (`auto-release.yml`'s direct push to `main` needs that), and `RELEASE_TOKEN` acts as the owner. Verified on #111 (2026-09-29): auto-merge was enabled at 07:18:59 while three required checks were still running, they finished by 07:19:15, and the PR merged at 07:19:50. ([#59](https://github.com/daften/fireflyiii-mcp/issues/59))
+   - **Keep the ruleset's required check names in step with `ci.yml`.** It requires `test (node 22)`, `test (node 24)`, `test (node 26)` and `audit` by name. When the Node matrix changes, update the ruleset in the same change: a required check that never reports leaves every security PR waiting forever, and the only signal is `nightly.yml`'s `strict-audit` job staying red, because the fix never reaches `develop`.
 3. On merge, `auto-release.yml` fires. Because merges are merge commits, it identifies these pushes by the merge subject `Merge pull request #N from daften/dependabot/…` — creating a branch under that name requires push access to the repo, which is a stronger gate than commit authorship (the head commit is authored by whoever merged, and a commit's author field is only a git config value anyway). It bumps the patch version, writes the `### Security` changelog section (via `scripts/release-changelog.sh`), commits `chore(release): X.Y.Z`, tags `vX.Y.Z`, and pushes both with the `RELEASE_TOKEN` PAT (a plain `GITHUB_TOKEN` push would not trigger downstream workflows).
    - The changelog bullet is **line 3 of the merge commit** — the merged PR's title, because the repo's `merge_commit_message` setting is `PR_TITLE`. If that setting is ever changed, the workflow fails loudly (a guard rejects any line 3 that is not a `chore(deps…` subject) instead of shipping a `Merge pull request #N` bullet. Fixing it means restoring the setting, not editing the workflow.
 4. The tag push runs `publish.yml`'s normal release path (npm `latest`, Docker semver/`latest`, GitHub Release).
@@ -514,6 +532,22 @@ A manual hotfix (a fix merged straight to `main`, typically a dependency CVE Dep
 3. **Cut the release branch from `main`, not `develop`** (`git checkout -b release/X.Y.Z origin/main`), so the release contains only the hotfix and none of `develop`'s unreleased work. Promote `main`'s `[Unreleased]` and bump the patch version as in steps 3–5 above, then PR, merge, tag and push the tag as in steps 6–8.
 4. **Expect the post-release back-merge to fail too** whenever `develop` has pending `[Unreleased]` entries: the union merge splices them into the section that just shipped, and the guard rejects the edit to a released section. Resolve it the same way as in step 2, but make the released `## [X.Y.Z]` section identical to the tag (`git show vX.Y.Z:CHANGELOG.md`), remove the bullets that just shipped from `develop`'s `[Unreleased]`, keep `develop`'s own pending entries there, and add the `[X.Y.Z]:` link reference. `node scripts/changelog-guard.mjs` must report the file consistent with the new tag before you push.
 
+### Prerelease releases (alpha / beta / rc)
+
+A prerelease ships through the normal `release/X.Y.Z-alpha.N` → `main` PR and tag flow above; only the version string and what the tag publishes differ. `scripts/release-version.mjs` is the single place that decides what a version means, and `publish.yml`, `auto-release.yml` and `changelog-guard.mjs` all go through it or share its rules.
+
+- **The vocabulary is closed: `X.Y.Z-alpha.N`, `X.Y.Z-beta.N`, `X.Y.Z-rc.N`, with a dot and a number without leading zeros.** Anything else (`-alpha1`, `-dev.1`, `-foo.2`, `-1`) fails the tag push before anything is published. The dot matters: semver compares `alpha.2 < alpha.10` numerically, but the single identifier `alpha10` sorts *before* `alpha2`. The three stages sort in maturity order on their own (`alpha < beta < rc < stable`). Tag it `vX.Y.Z-alpha.N`; the changelog section is `## [X.Y.Z-alpha.N]` and it gets a link reference like any other.
+- **One prerelease channel, `next`, not one per stage.** `next` is "the newest tagged release of any kind". A prerelease moves it, and so does a stable release that is newer than every existing tag, so `@next` never trails `@latest`.
+  - npm: a prerelease publishes with `--tag next` and never touches `latest`; install with `npm i @daften/fireflyiii-mcp@next`.
+  - Docker: a prerelease pushes `:X.Y.Z-alpha.N` and `:next`; `:latest`, `:X` and `:X.Y` keep pointing at the newest stable image. A stable release that is the newest tag also pushes `:next`.
+  - GitHub Release: marked a pre-release and never the repository's "latest release".
+- **`next` only moves forward.** `is-newest` compares the tag being released with every existing `v*` tag. A stable hotfix on an old line (`0.5.7` while `1.0.0-rc.1` exists) leaves `next` alone, and a prerelease older than an existing tag (`1.0.0-rc.2` after `1.0.0`) is refused outright.
+- **Moving `next` on a stable release is a separate npm call** (`npm dist-tag add`), which trusted publishing only performs when the package's trusted-publisher config has the "Allow npm dist-tag" permission enabled. The step is `continue-on-error`: the release stays good if it is missing, and the run prints the command to run by hand: `npm dist-tag add @daften/fireflyiii-mcp@X.Y.Z next`.
+- **`auto-release.yml` refuses to run while `package.json` is a prerelease** (`npm version patch` on `1.0.0-alpha.1` yields the stable `1.0.0`, so an unattended security release would publish it by accident). The workflow fails loudly on the Dependabot merge; cut that release by hand, as the next prerelease or as the stable version.
+- **Graduating:** the next release branch sets `version` to `X.Y.Z` and adds `## [X.Y.Z]`. The prerelease sections stay below it, immutable like any other.
+- **Nightlies** are a different channel (`develop`, never tagged) and keep working: on a prerelease `package.json` the nightly version is `X.Y.Z-nightly.<stamp>`, which sorts after every `X.Y.Z-alpha.*` and before `X.Y.Z`.
+- `changelog-guard` orders sections and picks its baseline tag by semver precedence (`1.0.0-alpha.1 < 1.0.0-rc.1 < 1.0.0`) rather than git's version sort, which ranks `v1.0.0-alpha.1` *above* `v1.0.0`.
+
 ### Nightly builds
 
 Nightly publishing lives in the **same `publish.yml` workflow** as tagged releases — deliberately, because npm trusted publishing (OIDC) allows only one trusted-publisher workflow file per package, so both channels must publish from `publish.yml` to share that config (no `NPM_TOKEN` needed). A `setup` job resolves the *channel* per run:
@@ -521,7 +555,9 @@ Nightly publishing lives in the **same `publish.yml` workflow** as tagged releas
 - **release** when triggered by a `v*` tag push (`github.event_name == 'push'`);
 - **nightly** when triggered by the `0 3 * * *` UTC cron or manual `workflow_dispatch` (with an optional `force` input).
 
-`setup` outputs `channel`, `should_publish`, `version`, and `npm_tag`; the downstream `verify` / `publish-npm` / `publish-docker` / `release` jobs are single-copy and parameterized by those outputs (Docker uses `metadata-action`'s per-tag `enable=` to select release vs nightly tags).
+`setup` outputs `sha`, `channel`, `should_publish`, `version`, and `npm_tag`; the downstream `verify` / `publish-npm` / `publish-docker` / `release` jobs are single-copy and parameterized by those outputs (Docker uses `metadata-action`'s per-tag `enable=` to select release vs nightly tags).
+
+Every downstream job builds the one commit `setup` resolved (`sha`), so a push to `develop` mid-run cannot publish a commit `verify` never tested. Each job checks out the same trusted ref as `setup` (the tag, or `develop`), then a "Pin to the commit setup resolved" step runs `git merge-base --is-ancestor` to confirm `sha` is on that ref before checking it out. Keep that shape: passing `sha` straight to `actions/checkout`'s `ref` fails CodeQL's `actions/cache-poisoning/poisonable-step`, which treats any job output named like a SHA as an untrusted pull request head.
 
 For the nightly channel `setup` also runs the change-guard: it publishes only when `develop`'s HEAD differs from the commit the rolling `nightly` git tag points at (so it builds only on nights `develop` changed; `force=true` bypasses). A nightly run:
 - computes a prerelease version `<next-patch>-nightly.<UTCstamp>` (in-CI only, never committed);
@@ -562,7 +598,8 @@ Use the correct developer attribution matching the model's originating company:
 ## Security & Open Source
 
 - **No hardcoded secrets.** All credentials come from environment variables.
-- **Validate all input.** Use Zod schemas defined inline in each `defineTool()` call.
+- **Validate all input.** Use Zod schemas defined inline in each `defineTool()` call. Any value that becomes part of a URL path must be validated: numeric IDs use `idSchema` (or `parseId` for autocomplete labels), other strings are `encodeURIComponent`-ed. `FireflyClient` also refuses any path with dot segments, `?`, `#`, backslashes or control characters (`assertSafeApiPath`), because `new URL()` would otherwise resolve `../` and point a request at another resource.
+- **Bound what reaches the model.** `download_attachment` and the `export_*` tools refuse results over their limits (`MAX_IMAGE_ATTACHMENT_BYTES` / `MAX_FILE_ATTACHMENT_BYTES`, `EXPORT_MAX_BYTES`) rather than returning them.
 - **Error handling.** Every tool handler wraps in try/catch and returns `{ isError: true }` on failure.
 - **Dependencies.** Keep them minimal and up-to-date.
 - **License.** MIT — include LICENSE file.
@@ -580,7 +617,10 @@ Use the correct developer attribution matching the model's originating company:
 - The MCP SDK handles serialization; just return plain objects from tool handlers (via the `defineTool` helper, which JSON-stringifies the result into a text block). For tools that must emit native content blocks instead — e.g. `download_attachment` returns an `image` block for image attachments — use `defineContentTool` and return a ready-made `{ content: [...] }` result.
 - Firefly III API is REST; pagination is via query params (`limit`, `page`).
 - `/summary/basic` returns a dict (`Record<string, {...}>`), not an array — use `cleanSummary`.
-- Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly.
+- Insight endpoints (`/insight/expense/category`, `/insight/income/category`) return flat arrays with no JSON:API envelope — pass through directly. Their account filters are only read from `accounts[]` (Firefly splits them by account type itself); any other parameter name is silently ignored.
+- **Transaction updates must name every split.** Firefly treats a `transactions[]` entry without `transaction_journal_id` as a new split and deletes every existing split the PUT does not mention, and `/search/transactions` returns *partial* groups (only the matching splits). Re-read the full group and send each split with its ID (`buildGroupUpdate` in `tools/transactions.ts`).
+- **Piggy bank `accounts` replace the linked set.** Any account left out of an update's `accounts` is unlinked along with the money saved from it, so `update_piggy_bank` merges the caller's entries over the current links.
+- The minimum supported Firefly III version is **v6.4.0** (the oldest release that serves every route the tools call).
 - `MCP_BASE_URL` must be set when the HTTP server is not on loopback (e.g. Docker); the server exits with code 1 otherwise.
 - **Internal planning docs (design specs, implementation plans) are local-only.** They live in `docs/superpowers/` (gitignored, and `srcExclude`d from the VitePress site) and must never be committed — do not create alternative locations like `docs/design/` for them.
 

@@ -155,8 +155,13 @@ describe('parseArgs — environment variables fallbacks', () => {
     expect(parseArgs([]).filterOptions.readOnly).toBe(true);
   });
 
-  it('ignores non-truthy MCP_READ_ONLY values', () => {
+  it('rejects an unrecognized MCP_READ_ONLY value instead of silently staying read-write', () => {
     process.env.MCP_READ_ONLY = 'yes';
+    expect(() => parseArgs([])).toThrow('MCP_READ_ONLY must be "true", "1", "false" or "0", got "yes"');
+  });
+
+  it.each(['false', '0', ' FALSE ', ''])('treats MCP_READ_ONLY=%j as read-write', (value) => {
+    process.env.MCP_READ_ONLY = value;
     expect(parseArgs([]).filterOptions.readOnly).toBeUndefined();
   });
 
@@ -181,5 +186,49 @@ describe('parseArgs — environment variables fallbacks', () => {
     const result = parseArgs([]);
     expect(result.filterOptions.preset).toBe('default');
     expect(result.filterOptions.readOnly).toBe(true);
+  });
+});
+
+describe('parseArgs: unrecognized and malformed arguments are errors', () => {
+  it.each([
+    ['--readonly', 'Did you mean --read-only?'],
+    ['--read_only', 'Did you mean --read-only?'],
+    ['--Read-Only', 'Did you mean --read-only?'],
+    ['--preset=default --oops', 'Unknown argument "--oops"'],
+    ['positional', 'Unknown argument "positional"'],
+  ])('%s', (argv, message) => {
+    expect(() => parseArgs(argv.split(' '))).toThrow(message);
+  });
+
+  it.each([['--transport'], ['--port'], ['--preset', '--read-only'], ['--groups='], ['--host', '--port', '3000']])(
+    'rejects a value flag without its value: %j',
+    (...argv) => {
+      expect(() => parseArgs(argv)).toThrow('requires a value');
+    },
+  );
+
+  it.each(['3000abc', '0', '65536', '-1', '3e3', ' 3000'])('rejects --port %j', (port) => {
+    expect(() => parseArgs(['--port', port])).toThrow('--port must be a whole number between 1 and 65535');
+  });
+
+  it.each(['toString', '__proto__', 'constructor', 'hasOwnProperty'])(
+    'rejects the inherited property name %j as a preset',
+    (name) => {
+      expect(() => parseArgs(['--preset', name])).toThrow(`Unknown preset "${name}"`);
+    },
+  );
+
+  it('rejects --groups with no group names instead of registering zero tools', () => {
+    expect(() => parseArgs(['--groups', ' , '])).toThrow('--groups needs at least one group name');
+  });
+
+  it('accepts --flag=value as well as --flag value', () => {
+    const result = parseArgs(['--transport=http', '--port=4000', '--groups=rules,recurring', '--read-only']);
+    expect(result).toMatchObject({
+      transport: 'http',
+      port: 4000,
+      portWasExplicit: true,
+      filterOptions: { groups: ['rules', 'recurring'], readOnly: true },
+    });
   });
 });

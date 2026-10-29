@@ -39,7 +39,7 @@ const UNRELEASED = 'Unreleased';
  * would swallow it — stays in the section body and trips the immutability check. Releases add a
  * definition here for the new version, which is the only reason this block is excluded at all.
  */
-const LINK_DEFINITION = /^\[(?:Unreleased|\d+\.\d+\.\d+)\]:\s/;
+const LINK_DEFINITION = /^\[(?:Unreleased|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\]:\s/;
 
 /** Where the trailing link-reference block starts, scanning from the end of the file. */
 function trailingLinkBlockStart(lines) {
@@ -148,15 +148,58 @@ export function changedReleasedSections(baselineText, currentText, allowedEdits 
   return problems;
 }
 
-/** Parse an `X.Y.Z` version for ordering purposes; missing components sort as 0. */
-function compareVersions(a, b) {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
+const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
+/**
+ * Semver precedence for prerelease identifiers (semver.org item 11): numeric identifiers compare
+ * numerically and sort below alphanumeric ones, alphanumeric compare lexically, and a longer list
+ * wins when every shared identifier is equal. So `alpha.2 < alpha.10`, which a plain string or
+ * `Number()` comparison gets wrong.
+ */
+function comparePrerelease(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    if (a[i] === undefined) return -1;
+    if (b[i] === undefined) return 1;
+    const aNumeric = /^\d+$/.test(a[i]);
+    const bNumeric = /^\d+$/.test(b[i]);
+    if (aNumeric && bNumeric) {
+      const diff = Number(a[i]) - Number(b[i]);
+      if (diff !== 0) return diff;
+    } else if (aNumeric) {
+      return -1;
+    } else if (bNumeric) {
+      return 1;
+    } else if (a[i] !== b[i]) {
+      return a[i] < b[i] ? -1 : 1;
+    }
   }
   return 0;
+}
+
+/**
+ * Order two versions by semver precedence: `1.0.0-alpha.1 < 1.0.0-rc.1 < 1.0.0`. Anything that is
+ * not a full `X.Y.Z[-pre]` falls back to comparing dotted numbers, missing components as 0.
+ */
+export function compareVersions(a, b) {
+  const ma = SEMVER.exec(a);
+  const mb = SEMVER.exec(b);
+  if (!ma || !mb) {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+      const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  }
+  for (let i = 1; i <= 3; i += 1) {
+    const diff = Number(ma[i]) - Number(mb[i]);
+    if (diff !== 0) return diff;
+  }
+  if (ma[4] === undefined && mb[4] === undefined) return 0;
+  if (ma[4] === undefined) return 1;
+  if (mb[4] === undefined) return -1;
+  return comparePrerelease(ma[4].split('.'), mb[4].split('.'));
 }
 
 /**
@@ -282,10 +325,14 @@ export function loadAllowedEdits(
  */
 export function baselineTag(run = (args) => execFileSync('git', args, { encoding: 'utf8' })) {
   const onHead = new Set(run(['tag', '--points-at', 'HEAD']).split('\n').filter(Boolean));
+  // git's version sort ranks `v1.0.0-alpha.1` above `v1.0.0` (the longer name wins) unless
+  // `versionsort.suffix` is configured, which would make the "newest tag" after a stable release
+  // its own prerelease. Re-sort by semver precedence here instead of depending on git config.
   const tags = run(['tag', '--list', 'v*', '--sort=-v:refname'])
     .split('\n')
     .filter(Boolean)
-    .filter((tag) => !onHead.has(tag));
+    .filter((tag) => !onHead.has(tag))
+    .sort((a, b) => compareVersions(b.slice(1), a.slice(1)) || 0);
   return tags[0] ?? null;
 }
 

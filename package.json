@@ -1,6 +1,6 @@
 {
   "name": "@daften/fireflyiii-mcp",
-  "version": "0.5.5",
+  "version": "1.0.0-alpha.1",
   "description": "MCP server for Firefly III personal finance manager",
   "type": "module",
   "bin": {
@@ -20,8 +20,9 @@
     "dev": "dotenv -e .env -- tsx src/index.ts",
     "format": "biome format --write src/",
     "lint": "biome check src/",
-    "check": "biome ci src/ && tsc --noEmit && vitest run",
+    "check": "biome ci src/ && tsc --noEmit && tsc -p tsconfig.test.json && vitest run",
     "test": "vitest run",
+    "typecheck:tests": "tsc -p tsconfig.test.json",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:integration": "dotenv -e .env.test -- vitest run src/tests/integration.test.ts",
@@ -61,7 +62,7 @@
     "hono": "^4.13.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.12",
+    "@biomejs/biome": "2.5.15",
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^5.0.0",
     "dotenv-cli": "^11.0.0",

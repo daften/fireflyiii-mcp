@@ -10,7 +10,7 @@ import {
   unwrapSingle,
 } from '../transform.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { defineTool } from './_helpers.js';
+import { defineTool, idSchema } from './_helpers.js';
 
 export async function fetchLinkTypes(
   client: FireflyClient,
@@ -84,7 +84,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       description:
         'Get all links attached to a specific transaction journal entry. Use get_transactions to find valid journal IDs.',
       inputSchema: {
-        journal_id: z.string().describe('Transaction journal ID'),
+        journal_id: idSchema.describe('Transaction journal ID'),
         page: z.number().int().positive().optional().default(1).describe('Page number'),
         limit: z.number().int().positive().max(100).optional().default(50).describe('Results per page (max 100)'),
       },
@@ -103,7 +103,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
     {
       title: 'Get Transaction Link',
       description: 'Get a single transaction link by ID.',
-      inputSchema: { id: z.string().describe('Transaction link ID') },
+      inputSchema: { id: idSchema.describe('Transaction link ID') },
       annotations: READ_ANNOTATIONS,
     },
     ({ id }) => fetchTransactionLink(client, id),
@@ -134,7 +134,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
       title: 'Update Transaction Link',
       description: 'Update an existing transaction link. Only fields provided will be changed.',
       inputSchema: {
-        id: z.string().describe('Transaction link ID'),
+        id: idSchema.describe('Transaction link ID'),
         link_type_id: z.string().optional().describe('Link type ID'),
         inward_id: z.string().optional().describe('Inward transaction journal ID'),
         outward_id: z.string().optional().describe('Outward transaction journal ID'),
@@ -151,7 +151,7 @@ export function registerTransactionLinkTools(server: McpServer, client: FireflyC
     {
       title: 'Delete Transaction Link',
       description: 'Permanently delete a link between two transactions. **This action cannot be undone.**',
-      inputSchema: { id: z.string().describe('Transaction link ID') },
+      inputSchema: { id: idSchema.describe('Transaction link ID') },
       annotations: DELETE_ANNOTATIONS,
     },
     ({ id }) => deleteTransactionLink(client, id),

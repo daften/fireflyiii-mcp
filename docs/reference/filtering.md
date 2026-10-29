@@ -1,6 +1,6 @@
 # Tool filtering
 
-With 140 tools across 14 groups, loading everything consumes significant context window space. Three flags let you control exactly which tools are registered.
+With 137 tools across 14 groups, loading everything consumes significant context window space. Three flags let you control exactly which tools are registered.
 
 ## --preset \<name\>
 
@@ -10,10 +10,10 @@ Load a named subset of tool groups:
 |--------|----------------|-------|
 | `minimal` | accounts, transactions | 15 |
 | `default` | accounts, transactions, budgets, categories, bills | 37 |
-| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 44 |
+| `budgeting` | accounts, transactions, budgets, categories, bills, piggy-banks | 42 |
 | `insights` | accounts, transactions, categories, reports | 57 |
 | `automation` | accounts, transactions, rules, recurring | 37 |
-| `full` | all 14 groups | 140 |
+| `full` | all 14 groups | 137 |
 
 ```bash
 node dist/index.js --preset default
@@ -32,14 +32,16 @@ node dist/index.js --groups accounts,transactions,reports
 
 ## --read-only
 
-Filter any selection down to read-only tools (`get_*`, `search_*`, `test_*`). All create, update, delete, trigger, and upload tools are excluded. Can combine with `--preset` or `--groups`.
+Filter any selection down to read-only tools: every tool annotated `readOnlyHint: true`, which is all `get_*`, `search_*` and `test_*` tools plus the `export_*` tools and `download_attachment` (84 tools with no other filter). All create, update, delete, trigger, and upload tools are excluded. Can combine with `--preset` or `--groups`.
+
+Unrecognized flags are an error rather than being ignored, so a typo such as `--readonly` stops the server with a suggestion instead of starting it with write access. Value flags accept both `--flag value` and `--flag=value`.
 
 ```bash
 node dist/index.js --preset default --read-only
 node dist/index.js --groups rules --read-only
 ```
 
-Without any filter flags the server registers all 140 tools (equivalent to `--preset full`).
+Without any filter flags the server registers all 137 tools (equivalent to `--preset full`).
 
 ## Environment variable equivalents
 
@@ -49,7 +51,7 @@ Each flag has an environment variable fallback, useful for npm/stdio and Docker 
 |----------|-----------------|---------|
 | `MCP_PRESET` | `--preset <name>` | `MCP_PRESET=default` |
 | `MCP_GROUPS` | `--groups <list>` | `MCP_GROUPS=accounts,transactions` |
-| `MCP_READ_ONLY` | `--read-only` | `MCP_READ_ONLY=true` (also accepts `1`) |
+| `MCP_READ_ONLY` | `--read-only` | `MCP_READ_ONLY=true` (also accepts `1`; `false`, `0` or empty mean off; any other value is an error) |
 
 `MCP_PRESET` and `MCP_GROUPS` are mutually exclusive.
 

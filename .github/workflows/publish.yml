@@ -25,10 +25,23 @@ jobs:
     permissions:
       contents: read
     outputs:
+      # The exact commit every later job builds. Each job used to check out `develop` on its own,
+      # so a push landing mid-run could publish a commit that `verify` never tested. Later jobs check
+      # out the same trusted ref as this job, then pin to this commit once `git merge-base` confirms
+      # it is on that ref. (Passing it to actions/checkout's `ref` directly trips CodeQL's
+      # actions/cache-poisoning/poisonable-step, which treats a job output named like a SHA as a
+      # pull request head it cannot trust.)
+      sha: ${{ steps.resolve.outputs.sha }}
       channel: ${{ steps.resolve.outputs.channel }}
       should_publish: ${{ steps.resolve.outputs.should_publish }}
       version: ${{ steps.resolve.outputs.version }}
       npm_tag: ${{ steps.resolve.outputs.npm_tag }}
+      # 'true' for a prerelease tag (v1.0.0-alpha.1, -beta.N, -rc.N): it publishes to the npm
+      # `next` dist-tag, never moves `latest`, and the GitHub Release is marked a pre-release.
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      # 'true' when `next` (npm dist-tag and Docker tag) should point at this release: every
+      # prerelease, and a stable release only when it is newer than every existing tag.
+      update_next: ${{ steps.resolve.outputs.update_next }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,27 +51,47 @@ jobs:
 
       - name: Resolve channel and version
         id: resolve
+        env:
+          # env indirection, not inline ${{ }} interpolation, for anything spliced into shell.
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ github.event.inputs.force }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            # Tag push -> release. Version comes from the tag; npm 'latest' dist-tag.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" = "push" ]; then
+            # Tag push -> release. Version comes from the tag. A stable tag publishes to npm
+            # 'latest'; a prerelease tag (v1.0.0-alpha.1, -beta.N, -rc.N) publishes to 'next' and
+            # leaves `latest` alone. classify rejects a tag that is not semver or not one of those
+            # three prerelease forms, before anything is written to the outputs.
             VERSION="${GITHUB_REF_NAME#v}"
+            CLASS=$(node scripts/release-version.mjs classify "$VERSION")
+            printf '%s\n' "$CLASS" >> "$GITHUB_OUTPUT"
+            # `next` is the newest tagged release of any kind, so it only moves forward: a stable
+            # release moves it only when nothing newer is tagged (a 0.5.7 hotfix must not pull it
+            # back from 1.0.0-rc.1), and a prerelease older than an existing tag is refused.
+            NEWEST=$(node scripts/release-version.mjs is-newest "$VERSION" $(git tag --list 'v*'))
+            if [ "$NEWEST" != "true" ] && printf '%s\n' "$CLASS" | grep -qx 'prerelease=true'; then
+              echo "::error::v${VERSION} is a prerelease older than an existing tag; refusing to publish it to 'next'."
+              exit 1
+            fi
+            echo "update_next=$NEWEST" >> "$GITHUB_OUTPUT"
             echo "channel=release" >> "$GITHUB_OUTPUT"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
             echo "Release channel: v$VERSION"
           else
             # schedule / workflow_dispatch -> nightly. Prerelease version, 'nightly' dist-tag.
-            NEXT=$(node -p "const [a,b,c]=require('./package.json').version.split('.').map(Number); [a,b,c+1].join('.')")
+            NEXT=$(node scripts/release-version.mjs nightly-base "$(node -p "require('./package.json').version")")
             STAMP=$(date -u +%Y%m%dT%H%M)
             VERSION="${NEXT}-nightly.${STAMP}"
             echo "channel=nightly" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "npm_tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "update_next=false" >> "$GITHUB_OUTPUT"
             echo "Nightly channel: $VERSION"
             # Change-guard: publish only if HEAD differs from the rolling nightly tag.
             HEAD_SHA=$(git rev-parse HEAD)
-            if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            if [ "$FORCE" = "true" ]; then
               echo "force=true requested; publishing."
               echo "should_publish=true" >> "$GITHUB_OUTPUT"
             else
@@ -88,9 +121,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
-          # Tags needed by the changelog guard below, which compares each released section
-          # against the tag that published it.
+          # Full history for the pin below, and tags for the changelog guard, which compares each
+          # released section against the tag that published it.
           fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - uses: actions/setup-node@v7
         with:
@@ -102,10 +142,25 @@ jobs:
       - name: Guard CHANGELOG.md against silent union-merge corruption
         run: node scripts/changelog-guard.mjs
 
+      - name: Validate the tag matches package.json
+        if: needs.setup.outputs.channel == 'release'
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          # npm publishes package.json's version while Docker and the release notes use the tag's, so a
+          # mismatch would ship different versions under one tag (npm's step would even skip silently
+          # if package.json's version was already published).
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "$VERSION" ]; then
+            echo "::error file=package.json::Tag v${VERSION} does not match package.json version ${PKG_VERSION}."
+            exit 1
+          fi
+
       - name: Validate CHANGELOG entry exists for this tag
         if: needs.setup.outputs.channel == 'release'
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
         run: |
-          VERSION="${{ needs.setup.outputs.version }}"
           if ! grep -E "^## \[${VERSION}\]" CHANGELOG.md > /dev/null; then
             echo "::error file=CHANGELOG.md::No '## [${VERSION}]' section found in CHANGELOG.md. Add a release entry before tagging."
             exit 1
@@ -135,6 +190,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
+          fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - uses: actions/setup-node@v7
         with:
@@ -145,15 +208,35 @@ jobs:
 
       - name: Set nightly version (in-CI only, not committed)
         if: needs.setup.outputs.channel == 'nightly'
-        run: npm version "${{ needs.setup.outputs.version }}" --no-git-tag-version
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: npm version "$VERSION" --no-git-tag-version
 
       - name: Publish to npm (skip if this version already exists)
+        env:
+          NPM_TAG: ${{ needs.setup.outputs.npm_tag }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if npm view "@daften/fireflyiii-mcp@${VERSION}" version > /dev/null 2>&1; then
             echo "v${VERSION} is already published to npm; skipping publish (idempotent re-run)."
           else
-            npm publish --provenance --tag "${{ needs.setup.outputs.npm_tag }}"
+            npm publish --provenance --tag "$NPM_TAG"
+          fi
+
+      # A prerelease already published to `next` above. A stable release publishes to `latest`, so
+      # `next` has to be pointed at it separately, or `@next` would trail `@latest`. Moving a
+      # dist-tag needs the "Allow npm dist-tag" permission on the package's trusted-publisher
+      # config (or a token). When that is missing the release is still good, so this step must not
+      # fail the run: it prints the exact command to run by hand instead.
+      - name: Point the next dist-tag at this stable release
+        if: needs.setup.outputs.channel == 'release' && needs.setup.outputs.npm_tag == 'latest' && needs.setup.outputs.update_next == 'true'
+        continue-on-error: true
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          if ! npm dist-tag add "@daften/fireflyiii-mcp@${VERSION}" next; then
+            echo "::warning::Could not move the npm 'next' dist-tag. Run: npm dist-tag add @daften/fireflyiii-mcp@${VERSION} next"
+            exit 1
           fi
 
   publish-docker:
@@ -166,37 +249,47 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
+          fetch-depth: 0
+
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Release pushes semver + latest; nightly pushes only nightly tags. The
-      # `enable` flag selects per channel so neither leaks into the other.
+      # `enable` flag selects per channel so neither leaks into the other. A prerelease release
+      # pushes only its exact version and `:next`: `latest`, `1` and `1.0` keep pointing at the
+      # newest stable image. `:next` follows the newest tagged release of any kind, so a stable
+      # release that is the newest tag moves it too.
       - name: Docker tags + labels
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/daften/fireflyiii-mcp
           tags: |
             type=semver,pattern={{version}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=raw,value=next,enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.update_next == 'true' }}
             type=raw,value=nightly,enable=${{ needs.setup.outputs.channel == 'nightly' }}
             type=raw,value=nightly-{{date 'YYYYMMDD'}},enable=${{ needs.setup.outputs.channel == 'nightly' }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: true
@@ -215,6 +308,13 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           fetch-depth: 0
 
+      - name: Pin to the commit setup resolved
+        env:
+          SHA: ${{ needs.setup.outputs.sha }}
+        run: |
+          git merge-base --is-ancestor "$SHA" HEAD || { echo "::error::$SHA is not on the ref this run publishes."; exit 1; }
+          git checkout --quiet --detach "$SHA"
+
       - name: Resolve built commit
         id: built
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -224,8 +324,9 @@ jobs:
       # body_path. CHANGELOG.md is the single source of truth for release notes.
       - name: Extract changelog section for release notes
         if: needs.setup.outputs.channel == 'release'
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
         run: |
-          VERSION="${{ needs.setup.outputs.version }}"
           awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { f = 1; next }
             f && /^## \[/ { exit }
@@ -240,10 +341,14 @@ jobs:
 
       - name: Create GitHub Release from changelog
         if: needs.setup.outputs.channel == 'release'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           body_path: release-notes.md
           generate_release_notes: false
+          # A prerelease is flagged as such and never becomes the repository's "latest release".
+          # For a stable release make_latest is left empty, i.e. the action's own default.
+          prerelease: ${{ needs.setup.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.setup.outputs.prerelease == 'true' && 'false' || '' }}
 
       - name: Move rolling nightly tag to HEAD
         if: needs.setup.outputs.channel == 'nightly'
@@ -253,7 +358,7 @@ jobs:
 
       - name: Create/update nightly pre-release
         if: needs.setup.outputs.channel == 'nightly'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: nightly
           target_commitish: ${{ steps.built.outputs.sha }}

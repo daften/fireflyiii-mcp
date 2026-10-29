@@ -143,6 +143,26 @@ describe('createRecurrence', () => {
     );
   });
 
+  it('sends foreign_amount and foreign_currency_code for a recurrence paid in another currency', async () => {
+    mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await createRecurrence(mockClient, {
+      type: 'withdrawal',
+      title: 'Streaming',
+      first_date: '2026-06-01',
+      repeat_type: 'monthly',
+      repeat_moment: '1',
+      amount: '9.00',
+      transaction_description: 'Streaming (USD)',
+      source_id: '1',
+      destination_id: '5',
+      foreign_amount: '10.00',
+      foreign_currency_code: 'USD',
+    });
+    expect(vi.mocked(mockClient.post).mock.calls[0][1]).toMatchObject({
+      transactions: [{ amount: '9.00', foreign_amount: '10.00', foreign_currency_code: 'USD' }],
+    });
+  });
+
   it('returns unwrapped single', async () => {
     mockClient.post = vi.fn().mockResolvedValueOnce(writeSingleFixture);
     const result = await createRecurrence(mockClient, {
@@ -188,6 +208,27 @@ describe('updateRecurrence', () => {
       transactions: [{ amount: '1000.00', description: 'Updated rent' }],
     });
   });
+
+  it('sends foreign_amount and foreign_currency_code together', async () => {
+    mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);
+    await updateRecurrence(mockClient, '1', { foreign_amount: '11.00', foreign_currency_code: 'USD' });
+    expect(mockClient.put).toHaveBeenCalledWith('/recurrences/1', {
+      transactions: [{ foreign_amount: '11.00', foreign_currency_code: 'USD' }],
+    });
+  });
+
+  // Firefly III rejects either one alone on a recurrence update, even when the recurrence already has
+  // the other (verified on 6.7.7), and its error does not say the unchanged one has to be resent.
+  it.each([{ foreign_amount: '11.00' }, { foreign_currency_code: 'USD' }])(
+    'refuses %j without the other foreign field',
+    async (fields) => {
+      mockClient.put = vi.fn();
+      await expect(updateRecurrence(mockClient, '1', fields)).rejects.toThrow(
+        'Pass foreign_amount and foreign_currency_code together, even if one of them is unchanged',
+      );
+      expect(mockClient.put).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns unwrapped single', async () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(writeSingleFixture);

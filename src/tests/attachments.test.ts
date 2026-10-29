@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { FireflyClient } from '../client.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { type FireflyClient, FireflyClient as RealFireflyClient } from '../client.js';
 import {
   createAttachment,
   deleteAttachment,
@@ -7,6 +7,8 @@ import {
   downloadAttachmentContent,
   fetchAttachment,
   fetchAttachments,
+  MAX_FILE_ATTACHMENT_BYTES,
+  MAX_IMAGE_ATTACHMENT_BYTES,
   registerAttachmentTools,
   updateAttachment,
   uploadAttachment,
@@ -143,17 +145,26 @@ describe('uploadAttachment', () => {
 });
 
 describe('downloadAttachment', () => {
-  it('calls getBinary on /attachments/:id/download and returns base64 content with metadata', async () => {
+  const metadata = (attributes: Record<string, unknown>) => ({
+    data: { id: '7', type: 'attachments', attributes, links: {} },
+  });
+
+  it('reads the metadata first and takes the type and name from it, not from the download', async () => {
+    // Firefly III serves every download as application/octet-stream; only the metadata knows the type.
     const mockFull = {
       ...mockClient,
+      get: vi.fn().mockResolvedValueOnce(metadata({ filename: 'receipt.pdf', mime: 'application/pdf', size: 15 })),
       getBinary: vi.fn().mockResolvedValueOnce({
         data: Buffer.from('receipt content'),
-        contentType: 'application/pdf',
-        filename: 'receipt.pdf',
+        contentType: 'application/octet-stream',
+        filename: 'download',
       }),
     } as unknown as FireflyClient;
     const result = await downloadAttachment(mockFull, '7');
-    expect(mockFull.getBinary).toHaveBeenCalledWith('/attachments/7/download');
+    expect(mockFull.get).toHaveBeenCalledWith('/attachments/7');
+    expect(mockFull.getBinary).toHaveBeenCalledWith('/attachments/7/download', undefined, {
+      maxBytes: MAX_FILE_ATTACHMENT_BYTES,
+    });
     expect(result).toEqual({
       content_base64: Buffer.from('receipt content').toString('base64'),
       content_type: 'application/pdf',
@@ -215,9 +226,12 @@ describe('handler smoke — attachments', () => {
   it('download_attachment handler returns an image block for image attachments', async () => {
     const { server, handlers } = createMockServer();
     const client = {
+      get: vi.fn().mockResolvedValueOnce({
+        data: { id: '7', type: 'attachments', attributes: { filename: 'receipt.png', mime: 'image/png', size: 4 } },
+      }),
       getBinary: vi.fn().mockResolvedValueOnce({
         data: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
-        contentType: 'image/png',
+        contentType: 'application/octet-stream', // what Firefly III actually sends
         filename: 'receipt.png',
       }),
     } as unknown as FireflyClient;
@@ -228,9 +242,51 @@ describe('handler smoke — attachments', () => {
 
   it('download_attachment handler returns isError on failure', async () => {
     const { server, handlers } = createMockServer();
-    const client = { getBinary: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
+    const client = { get: vi.fn().mockRejectedValueOnce(new Error('Network error')) } as unknown as FireflyClient;
     registerAttachmentTools(server, client);
     const result = await handlers.get('download_attachment')!({ id: '7' });
     expect(result).toMatchObject({ isError: true });
+  });
+});
+
+describe('download size limit', () => {
+  /** A fake Firefly III: metadata as JSON, the file as an octet-stream of `bytes` with no Content-Length. */
+  function fakeFirefly(meta: Record<string, unknown>, bytes: number) {
+    return vi.fn(async (url: string) => {
+      if (url.endsWith('/attachments/7')) {
+        return Response.json({ data: { id: '7', type: 'attachments', attributes: meta } });
+      }
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(bytes));
+            controller.close();
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/octet-stream' } },
+      );
+    });
+  }
+  const client = () => new RealFireflyClient('https://firefly.example.com', 'token');
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ['image/png', MAX_IMAGE_ATTACHMENT_BYTES],
+    ['application/pdf', MAX_FILE_ATTACHMENT_BYTES],
+  ])('allows a %s up to its limit and refuses one byte more while streaming', async (mime, limit) => {
+    vi.stubGlobal('fetch', fakeFirefly({ filename: 'f', mime }, limit));
+    await expect(downloadAttachment(client(), '7')).resolves.toMatchObject({ content_type: mime });
+    vi.stubGlobal('fetch', fakeFirefly({ filename: 'f', mime }, limit + 1));
+    await expect(downloadAttachment(client(), '7')).rejects.toThrow('Attachment 7 is too large to return here');
+  });
+
+  it('refuses from the stored size without downloading the file', async () => {
+    const fetchSpy = fakeFirefly({ filename: 'scan.pdf', mime: 'application/pdf', size: 10 * 1024 * 1024 }, 1);
+    vi.stubGlobal('fetch', fetchSpy);
+    await expect(downloadAttachment(client(), '7')).rejects.toThrow('(10240 KiB)');
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // the metadata request only
   });
 });

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FireflyClient } from '../client.js';
 import {
-  createObjectGroup,
   deleteObjectGroup,
   fetchObjectGroup,
   fetchObjectGroupBills,
@@ -38,14 +37,6 @@ describe('fetchObjectGroup', () => {
   });
 });
 
-describe('createObjectGroup', () => {
-  it('posts to /object-groups', async () => {
-    mockClient.post = vi.fn().mockResolvedValueOnce(singleFixture);
-    await createObjectGroup(mockClient, { title: 'Savings' });
-    expect(mockClient.post).toHaveBeenCalledWith('/object-groups', { title: 'Savings' });
-  });
-});
-
 describe('updateObjectGroup', () => {
   it('puts to /object-groups/:id', async () => {
     mockClient.put = vi.fn().mockResolvedValueOnce(singleFixture);
@@ -76,6 +67,14 @@ describe('fetchObjectGroupPiggyBanks', () => {
     mockClient.get = vi.fn().mockResolvedValueOnce(listFixture);
     await fetchObjectGroupPiggyBanks(mockClient, '1', { page: 1, limit: 50 });
     expect(mockClient.get).toHaveBeenCalledWith('/object-groups/1/piggy-banks', { page: 1, limit: 50 });
+  });
+});
+
+describe('registerObjectGroupTools', () => {
+  it('does not offer create_object_group: Firefly III has no API to create one', () => {
+    const { server, handlers } = createMockServer();
+    registerObjectGroupTools(server, mockClient);
+    expect(handlers.has('create_object_group')).toBe(false);
   });
 });
 

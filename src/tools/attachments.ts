@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { FireflyClient } from '../client.js';
+import { type FireflyClient, ResponseTooLargeError } from '../client.js';
 import {
   type JsonApiListResponse,
   type JsonApiSingleResponse,
@@ -10,7 +10,7 @@ import {
   unwrapSingle,
 } from '../transform.js';
 import { DELETE_ANNOTATIONS, READ_ANNOTATIONS, UPDATE_ANNOTATIONS, WRITE_ANNOTATIONS } from './_annotations.js';
-import { type ContentResult, defineContentTool, defineTool } from './_helpers.js';
+import { type ContentResult, defineContentTool, defineTool, idSchema } from './_helpers.js';
 
 // ---- Attachment fetch + CRUD ----
 
@@ -64,12 +64,43 @@ export interface DownloadedAttachment {
   filename: string;
 }
 
+// download_attachment hands the file to the model: an image as an image block, anything else as
+// base64 text, which costs roughly one token per 3 bytes of file. Larger files are refused rather
+// than flooding (or overflowing) the context window.
+export const MAX_IMAGE_ATTACHMENT_BYTES = 3 * 1024 * 1024;
+export const MAX_FILE_ATTACHMENT_BYTES = 256 * 1024;
+
+const isImage = (contentType: string) => contentType.split(';')[0].trim().toLowerCase().startsWith('image/');
+const kib = (bytes: number) => `${Math.round(bytes / 1024)} KiB`;
+
+/**
+ * Downloads an attachment, reading its metadata first: Firefly III serves every download as
+ * application/octet-stream, so the stored `mime` is the only way to tell an image from a PDF, and the
+ * stored `size` lets an oversized file be refused without downloading it at all.
+ */
 export async function downloadAttachment(client: FireflyClient, id: string): Promise<DownloadedAttachment> {
-  const { data, contentType, filename } = await client.getBinary(`/attachments/${id}/download`);
+  const meta = await fetchAttachment(client, id);
+  const mime = typeof meta.mime === 'string' && meta.mime !== '' ? meta.mime : undefined;
+  const limit = mime && isImage(mime) ? MAX_IMAGE_ATTACHMENT_BYTES : MAX_FILE_ATTACHMENT_BYTES;
+  const tooLarge = (size?: number) =>
+    new Error(
+      `Attachment ${id} is too large to return here${size === undefined ? '' : ` (${kib(size)})`}: the limit is ${kib(MAX_IMAGE_ATTACHMENT_BYTES)} for images and ${kib(MAX_FILE_ATTACHMENT_BYTES)} for other files. Use get_attachment for its details, and open the file in Firefly III.`,
+    );
+  const declaredSize = Number(meta.size);
+  if (Number.isFinite(declaredSize) && declaredSize > limit) throw tooLarge(declaredSize);
+
+  let file: Awaited<ReturnType<FireflyClient['getBinary']>>;
+  try {
+    // The limit is enforced on the bytes as well, in case the stored size is stale.
+    file = await client.getBinary(`/attachments/${id}/download`, undefined, { maxBytes: limit });
+  } catch (err) {
+    if (!(err instanceof ResponseTooLargeError)) throw err;
+    throw tooLarge(err.size);
+  }
   return {
-    content_base64: data.toString('base64'),
-    content_type: contentType,
-    filename,
+    content_base64: file.data.toString('base64'),
+    content_type: mime ?? file.contentType,
+    filename: typeof meta.filename === 'string' && meta.filename !== '' ? meta.filename : file.filename,
   };
 }
 
@@ -116,7 +147,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       title: 'Get Attachment',
       description: 'Get a single file attachment by its numeric ID. Use get_attachments to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Attachment ID'),
+        id: idSchema.describe('Attachment ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -159,7 +190,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       description:
         'Update attachment metadata. Only fields provided will be changed. Use get_attachment to confirm the ID before updating.',
       inputSchema: {
-        id: z.string().describe('Attachment ID — use get_attachments to find valid IDs'),
+        id: idSchema.describe('Attachment ID — use get_attachments to find valid IDs'),
         filename: z.string().optional().describe('Filename including extension'),
         title: z.string().optional().describe('Human-readable title'),
         notes: z.string().optional().describe('Notes'),
@@ -182,7 +213,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       description:
         'Permanently delete an attachment and its file data from Firefly III. **This action cannot be undone.** Use get_attachment to confirm before deleting.',
       inputSchema: {
-        id: z.string().describe('Attachment ID — use get_attachments to find valid IDs'),
+        id: idSchema.describe('Attachment ID — use get_attachments to find valid IDs'),
       },
       annotations: DELETE_ANNOTATIONS,
     },
@@ -197,7 +228,7 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
       description:
         'Upload the binary content for an existing attachment record. Call create_attachment first to get the attachment ID, then call this tool with the base64-encoded file content. The two-step workflow: (1) create_attachment → get ID, (2) upload_attachment with that ID and content_base64.',
       inputSchema: {
-        id: z.string().describe('Attachment ID from create_attachment'),
+        id: idSchema.describe('Attachment ID from create_attachment'),
         content_base64: z.string().describe('File content encoded as base64'),
       },
       annotations: WRITE_ANNOTATIONS,
@@ -211,9 +242,9 @@ export function registerAttachmentTools(server: McpServer, client: FireflyClient
     {
       title: 'Download Attachment',
       description:
-        'Download a file attachment (such as an invoice, PDF, or image receipt) by its ID. Image attachments are returned as a rendered image; other files are returned as their filename, MIME content type, and Base64-encoded content. Use get_attachments to find valid IDs.',
+        'Download a file attachment (such as an invoice, PDF, or image receipt) by its ID. Image attachments are returned as a rendered image (up to 3 MiB); other files are returned as their filename, MIME content type, and Base64-encoded content (up to 256 KiB). Larger files are refused. Use get_attachments to find valid IDs.',
       inputSchema: {
-        id: z.string().describe('Attachment ID'),
+        id: idSchema.describe('Attachment ID'),
       },
       annotations: READ_ANNOTATIONS,
     },
