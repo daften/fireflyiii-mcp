@@ -4,6 +4,7 @@ import {
   baselineTag,
   changedReleasedSections,
   check,
+  compareVersions,
   duplicateHeadings,
   duplicateLinkLabels,
   duplicateSections,
@@ -268,4 +269,97 @@ test('duplicateLinkLabels rejects a repeated compare-link definition', () => {
     '[0.5.0]: https://example.com/compare/v0.4.0...v0.5.0\n[0.5.0]: https://example.com/compare/v0.4.7...v0.5.0',
   );
   assert.match(duplicateLinkLabels(doubled).join('\n'), /defined more than once/);
+});
+
+// Prerelease support: a `1.0.0-alpha.1` tag and changelog section must order, link and be chosen as
+// a baseline by semver precedence, not by Number() on dotted parts (which gives NaN) or by git's
+// version sort (which ranks the prerelease above the stable release it leads up to).
+test('compareVersions follows semver precedence, including the spec example chain', () => {
+  const ascending = [
+    '0.5.5',
+    '1.0.0-alpha',
+    '1.0.0-alpha.1',
+    '1.0.0-alpha.beta',
+    '1.0.0-beta',
+    '1.0.0-beta.2',
+    '1.0.0-beta.11',
+    '1.0.0-rc.1',
+    '1.0.0',
+    '1.0.1',
+  ];
+  for (let i = 1; i < ascending.length; i += 1) {
+    assert.ok(compareVersions(ascending[i], ascending[i - 1]) > 0, `${ascending[i]} > ${ascending[i - 1]}`);
+    assert.ok(compareVersions(ascending[i - 1], ascending[i]) < 0, `${ascending[i - 1]} < ${ascending[i]}`);
+  }
+  assert.equal(compareVersions('1.0.0-alpha.1', '1.0.0-alpha.1'), 0);
+  assert.equal(compareVersions('1.0.0', '1.0.0'), 0);
+  // alpha.2 sorts before alpha.10 (numeric identifiers), but the single identifier alpha10 sorts
+  // before alpha2 (lexical), which is why releases are named alpha.N.
+  assert.ok(compareVersions('1.0.0-alpha.10', '1.0.0-alpha.2') > 0);
+  assert.ok(compareVersions('1.0.0-alpha10', '1.0.0-alpha2') < 0);
+});
+
+test('compareVersions keeps its lenient behaviour for non-semver labels', () => {
+  assert.ok(compareVersions('1.1', '1.0.5') > 0);
+  assert.equal(compareVersions('2', '2.0.0'), 0);
+});
+
+test('baselineTag ranks a stable release above its own prerelease whatever git sorts first', () => {
+  const exec = (tags) => (args) => (args[1] === '--points-at' ? '' : tags);
+  // git's version sort lists the longer name first, i.e. the prerelease above the stable tag.
+  assert.equal(baselineTag(exec('v1.0.0-alpha.1\nv1.0.0\nv0.5.5\n')), 'v1.0.0');
+  assert.equal(baselineTag(exec('v1.0.0-alpha.2\nv1.0.0-alpha.1\nv0.5.5\n')), 'v1.0.0-alpha.2');
+  assert.equal(baselineTag(exec('v1.0.0-alpha.1\nv0.5.5\n')), 'v1.0.0-alpha.1');
+});
+
+test('baselineTag at publish time of a prerelease steps back to the previous release', () => {
+  const exec = (args) => (args[1] === '--points-at' ? 'v1.0.0-alpha.1\n' : 'v1.0.0-alpha.1\nv0.5.5\n');
+  assert.equal(baselineTag(exec), 'v0.5.5');
+});
+
+const withPrerelease = `# Changelog
+
+## [Unreleased]
+
+## [1.0.0-alpha.1] - 2026-11-01
+
+### Added
+
+- Alpha thing
+
+## [0.5.5] - 2026-10-21
+
+### Fixed
+
+- Older thing
+
+[Unreleased]: https://example.com/compare/v1.0.0-alpha.1...HEAD
+[1.0.0-alpha.1]: https://example.com/compare/v0.5.5...v1.0.0-alpha.1
+[0.5.5]: https://example.com/compare/v0.5.4...v0.5.5
+`;
+
+test('a prerelease section above its predecessor is in order, and below its own stable release is not', () => {
+  assert.deepEqual(sectionOrder(withPrerelease), []);
+  const wrong = withPrerelease.replace('## [1.0.0-alpha.1] - 2026-11-01', '## [1.0.0-alpha.1] - 2026-11-01').replace(
+    '## [0.5.5] - 2026-10-21',
+    '## [1.0.0] - 2026-12-01\n\n### Added\n\n- Stable\n\n## [0.5.5] - 2026-10-21',
+  );
+  // 1.0.0 now sits below 1.0.0-alpha.1: out of order.
+  assert.match(sectionOrder(wrong).join('\n'), /out of order/);
+});
+
+test('prerelease link definitions are part of the trailing link block, not the oldest section', () => {
+  const sections = parseSections(withPrerelease);
+  assert.deepEqual(sections.map((s) => s.version), ['Unreleased', '1.0.0-alpha.1', '0.5.5']);
+  assert.doesNotMatch(sections.at(-1).body, /example\.com/);
+  assert.deepEqual(duplicateLinkLabels(withPrerelease), []);
+  const doubled = `${withPrerelease}[1.0.0-alpha.1]: https://example.com/other\n`;
+  assert.match(duplicateLinkLabels(doubled).join('\n'), /1\.0\.0-alpha\.1/);
+});
+
+test('a changelog gaining a prerelease section passes the immutability check', () => {
+  const before = withPrerelease
+    .replace(/## \[1\.0\.0-alpha\.1\][\s\S]*?(?=## \[0\.5\.5\])/, '')
+    .replace(/\[1\.0\.0-alpha\.1\]:.*\n/, '');
+  assert.deepEqual(check(before, withPrerelease), []);
 });

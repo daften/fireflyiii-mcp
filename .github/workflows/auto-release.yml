@@ -70,6 +70,12 @@ jobs:
         with:
           node-version: 24
 
+      # `npm version patch` on 1.0.0-alpha.1 yields 1.0.0, so a security merge landing while main
+      # sits on a prerelease would publish the stable release unannounced. Fail loudly instead.
+      - name: Refuse to bump over a prerelease version
+        if: steps.guard.outputs.release == 'true'
+        run: node scripts/release-version.mjs assert-stable "$(node -p "require('./package.json').version")"
+
       - name: Bump patch version
         if: steps.guard.outputs.release == 'true'
         id: bump

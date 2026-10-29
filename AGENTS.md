@@ -532,6 +532,19 @@ A manual hotfix (a fix merged straight to `main`, typically a dependency CVE Dep
 3. **Cut the release branch from `main`, not `develop`** (`git checkout -b release/X.Y.Z origin/main`), so the release contains only the hotfix and none of `develop`'s unreleased work. Promote `main`'s `[Unreleased]` and bump the patch version as in steps 3–5 above, then PR, merge, tag and push the tag as in steps 6–8.
 4. **Expect the post-release back-merge to fail too** whenever `develop` has pending `[Unreleased]` entries: the union merge splices them into the section that just shipped, and the guard rejects the edit to a released section. Resolve it the same way as in step 2, but make the released `## [X.Y.Z]` section identical to the tag (`git show vX.Y.Z:CHANGELOG.md`), remove the bullets that just shipped from `develop`'s `[Unreleased]`, keep `develop`'s own pending entries there, and add the `[X.Y.Z]:` link reference. `node scripts/changelog-guard.mjs` must report the file consistent with the new tag before you push.
 
+### Prerelease releases (alpha / beta / rc)
+
+A prerelease ships through the normal `release/X.Y.Z-alpha.N` → `main` PR and tag flow above; only the version string and what the tag publishes differ. `scripts/release-version.mjs` is the single place that classifies a version, and `publish.yml`, `auto-release.yml` and `changelog-guard.mjs` all go through it or share its rules.
+
+- **Name it `X.Y.Z-alpha.N`, with a dot before the number.** Semver compares `alpha.2 < alpha.10` numerically, but the single identifier `alpha10` sorts *before* `alpha2`. Tag it `vX.Y.Z-alpha.N`; the changelog section is `## [X.Y.Z-alpha.N]` and it gets a link reference like any other.
+- **npm:** published under the dist-tag named by the leading identifier (`alpha`, `beta`, `rc`; a purely numeric one is `next`), never `latest`. `latest` and `nightly` are rejected as identifiers. Install with `npm i @daften/fireflyiii-mcp@alpha`.
+- **Docker:** only `:X.Y.Z-alpha.N` and `:alpha`. `:latest`, `:X` and `:X.Y` keep pointing at the newest stable image.
+- **GitHub Release:** marked a pre-release and never the repository's "latest release".
+- **`auto-release.yml` refuses to run while `package.json` is a prerelease** (`npm version patch` on `1.0.0-alpha.1` yields the stable `1.0.0`, so an unattended security release would publish it by accident). The workflow fails loudly on the Dependabot merge; cut that release by hand, as the next prerelease or as the stable version.
+- **Graduating:** the next release branch sets `version` to `X.Y.Z` and adds `## [X.Y.Z]`. The prerelease sections stay below it, immutable like any other.
+- **Nightlies** keep working: on a prerelease `package.json` the nightly version is `X.Y.Z-nightly.<stamp>`, which sorts after every `X.Y.Z-alpha.*` and before `X.Y.Z`.
+- `changelog-guard` orders sections and picks its baseline tag by semver precedence (`1.0.0-alpha.1 < 1.0.0-rc.1 < 1.0.0`) rather than git's version sort, which ranks `v1.0.0-alpha.1` *above* `v1.0.0`.
+
 ### Nightly builds
 
 Nightly publishing lives in the **same `publish.yml` workflow** as tagged releases — deliberately, because npm trusted publishing (OIDC) allows only one trusted-publisher workflow file per package, so both channels must publish from `publish.yml` to share that config (no `NPM_TOKEN` needed). A `setup` job resolves the *channel* per run:

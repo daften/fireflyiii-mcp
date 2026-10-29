@@ -36,6 +36,9 @@ jobs:
       should_publish: ${{ steps.resolve.outputs.should_publish }}
       version: ${{ steps.resolve.outputs.version }}
       npm_tag: ${{ steps.resolve.outputs.npm_tag }}
+      # 'true' for a tag with a prerelease suffix (v1.0.0-alpha.1): it publishes under its own
+      # npm dist-tag, never moves `latest`, and the GitHub Release is marked a pre-release.
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -52,21 +55,24 @@ jobs:
         run: |
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ "$EVENT" = "push" ]; then
-            # Tag push -> release. Version comes from the tag; npm 'latest' dist-tag.
+            # Tag push -> release. Version comes from the tag. A stable tag publishes to npm
+            # 'latest'; a prerelease tag (v1.0.0-alpha.1) publishes under its own dist-tag
+            # ('alpha') and leaves `latest` alone. classify also rejects a tag that is not semver.
             VERSION="${GITHUB_REF_NAME#v}"
+            node scripts/release-version.mjs classify "$VERSION" >> "$GITHUB_OUTPUT"
             echo "channel=release" >> "$GITHUB_OUTPUT"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
             echo "Release channel: v$VERSION"
           else
             # schedule / workflow_dispatch -> nightly. Prerelease version, 'nightly' dist-tag.
-            NEXT=$(node -p "const [a,b,c]=require('./package.json').version.split('.').map(Number); [a,b,c+1].join('.')")
+            NEXT=$(node scripts/release-version.mjs nightly-base "$(node -p "require('./package.json').version")")
             STAMP=$(date -u +%Y%m%dT%H%M)
             VERSION="${NEXT}-nightly.${STAMP}"
             echo "channel=nightly" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "npm_tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
             echo "Nightly channel: $VERSION"
             # Change-guard: publish only if HEAD differs from the rolling nightly tag.
             HEAD_SHA=$(git rev-parse HEAD)
@@ -233,7 +239,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Release pushes semver + latest; nightly pushes only nightly tags. The
-      # `enable` flag selects per channel so neither leaks into the other.
+      # `enable` flag selects per channel so neither leaks into the other. A prerelease release
+      # pushes only its exact version and its dist-tag (:alpha): `latest`, `1` and `1.0` keep
+      # pointing at the newest stable image.
       - name: Docker tags + labels
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -241,9 +249,10 @@ jobs:
           images: ghcr.io/daften/fireflyiii-mcp
           tags: |
             type=semver,pattern={{version}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' }}
-            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=semver,pattern={{major}},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=raw,value=latest,enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease != 'true' }}
+            type=raw,value=${{ needs.setup.outputs.npm_tag }},enable=${{ needs.setup.outputs.channel == 'release' && needs.setup.outputs.prerelease == 'true' }}
             type=raw,value=nightly,enable=${{ needs.setup.outputs.channel == 'nightly' }}
             type=raw,value=nightly-{{date 'YYYYMMDD'}},enable=${{ needs.setup.outputs.channel == 'nightly' }}
 
@@ -304,6 +313,10 @@ jobs:
         with:
           body_path: release-notes.md
           generate_release_notes: false
+          # A prerelease is flagged as such and never becomes the repository's "latest release".
+          # For a stable release make_latest is left empty, i.e. the action's own default.
+          prerelease: ${{ needs.setup.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.setup.outputs.prerelease == 'true' && 'false' || '' }}
 
       - name: Move rolling nightly tag to HEAD
         if: needs.setup.outputs.channel == 'nightly'
