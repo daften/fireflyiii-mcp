@@ -534,15 +534,18 @@ A manual hotfix (a fix merged straight to `main`, typically a dependency CVE Dep
 
 ### Prerelease releases (alpha / beta / rc)
 
-A prerelease ships through the normal `release/X.Y.Z-alpha.N` → `main` PR and tag flow above; only the version string and what the tag publishes differ. `scripts/release-version.mjs` is the single place that classifies a version, and `publish.yml`, `auto-release.yml` and `changelog-guard.mjs` all go through it or share its rules.
+A prerelease ships through the normal `release/X.Y.Z-alpha.N` → `main` PR and tag flow above; only the version string and what the tag publishes differ. `scripts/release-version.mjs` is the single place that decides what a version means, and `publish.yml`, `auto-release.yml` and `changelog-guard.mjs` all go through it or share its rules.
 
-- **Name it `X.Y.Z-alpha.N`, with a dot before the number.** Semver compares `alpha.2 < alpha.10` numerically, but the single identifier `alpha10` sorts *before* `alpha2`. Tag it `vX.Y.Z-alpha.N`; the changelog section is `## [X.Y.Z-alpha.N]` and it gets a link reference like any other.
-- **npm:** published under the dist-tag named by the leading identifier (`alpha`, `beta`, `rc`; a purely numeric one is `next`), never `latest`. `latest` and `nightly` are rejected as identifiers. Install with `npm i @daften/fireflyiii-mcp@alpha`.
-- **Docker:** only `:X.Y.Z-alpha.N` and `:alpha`. `:latest`, `:X` and `:X.Y` keep pointing at the newest stable image.
-- **GitHub Release:** marked a pre-release and never the repository's "latest release".
+- **The vocabulary is closed: `X.Y.Z-alpha.N`, `X.Y.Z-beta.N`, `X.Y.Z-rc.N`, with a dot and a number without leading zeros.** Anything else (`-alpha1`, `-dev.1`, `-foo.2`, `-1`) fails the tag push before anything is published. The dot matters: semver compares `alpha.2 < alpha.10` numerically, but the single identifier `alpha10` sorts *before* `alpha2`. The three stages sort in maturity order on their own (`alpha < beta < rc < stable`). Tag it `vX.Y.Z-alpha.N`; the changelog section is `## [X.Y.Z-alpha.N]` and it gets a link reference like any other.
+- **One prerelease channel, `next`, not one per stage.** `next` is "the newest tagged release of any kind". A prerelease moves it, and so does a stable release that is newer than every existing tag, so `@next` never trails `@latest`.
+  - npm: a prerelease publishes with `--tag next` and never touches `latest`; install with `npm i @daften/fireflyiii-mcp@next`.
+  - Docker: a prerelease pushes `:X.Y.Z-alpha.N` and `:next`; `:latest`, `:X` and `:X.Y` keep pointing at the newest stable image. A stable release that is the newest tag also pushes `:next`.
+  - GitHub Release: marked a pre-release and never the repository's "latest release".
+- **`next` only moves forward.** `is-newest` compares the tag being released with every existing `v*` tag. A stable hotfix on an old line (`0.5.7` while `1.0.0-rc.1` exists) leaves `next` alone, and a prerelease older than an existing tag (`1.0.0-rc.2` after `1.0.0`) is refused outright.
+- **Moving `next` on a stable release is a separate npm call** (`npm dist-tag add`), which trusted publishing only performs when the package's trusted-publisher config has the "Allow npm dist-tag" permission enabled. The step is `continue-on-error`: the release stays good if it is missing, and the run prints the command to run by hand: `npm dist-tag add @daften/fireflyiii-mcp@X.Y.Z next`.
 - **`auto-release.yml` refuses to run while `package.json` is a prerelease** (`npm version patch` on `1.0.0-alpha.1` yields the stable `1.0.0`, so an unattended security release would publish it by accident). The workflow fails loudly on the Dependabot merge; cut that release by hand, as the next prerelease or as the stable version.
 - **Graduating:** the next release branch sets `version` to `X.Y.Z` and adds `## [X.Y.Z]`. The prerelease sections stay below it, immutable like any other.
-- **Nightlies** keep working: on a prerelease `package.json` the nightly version is `X.Y.Z-nightly.<stamp>`, which sorts after every `X.Y.Z-alpha.*` and before `X.Y.Z`.
+- **Nightlies** are a different channel (`develop`, never tagged) and keep working: on a prerelease `package.json` the nightly version is `X.Y.Z-nightly.<stamp>`, which sorts after every `X.Y.Z-alpha.*` and before `X.Y.Z`.
 - `changelog-guard` orders sections and picks its baseline tag by semver precedence (`1.0.0-alpha.1 < 1.0.0-rc.1 < 1.0.0`) rather than git's version sort, which ranks `v1.0.0-alpha.1` *above* `v1.0.0`.
 
 ### Nightly builds

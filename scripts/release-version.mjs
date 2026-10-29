@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Version classification for the release workflows.
+ * Version policy for the release workflows.
  *
  * `publish.yml` and `auto-release.yml` used to assume every version is a plain `X.Y.Z`: a `v*` tag
  * always published to npm `latest`, the nightly version came from `split('.').map(Number)` (which
@@ -8,17 +8,27 @@
  * the stable release. This module is the one place that decides what a version means, so the
  * workflows share the decision and the tests can exercise it.
  *
- *   node scripts/release-version.mjs classify <version>       -> prerelease=<bool> / npm_tag=<tag>
- *   node scripts/release-version.mjs nightly-base <version>   -> X.Y.Z the nightly version builds on
- *   node scripts/release-version.mjs assert-stable <version>  -> exit 1 for a prerelease
+ * Release channels:
+ *   - stable      `X.Y.Z`               npm `latest`, Docker `latest` + `X.Y.Z` + `X.Y` + `X`
+ *   - prerelease  `X.Y.Z-(alpha|beta|rc).N`   npm `next`, Docker `X.Y.Z-pre.N` + `next`
+ *   - `next` is "the newest tagged release of any kind": a prerelease moves it, and so does a stable
+ *     release that is newer than everything already tagged, so it never trails `latest`.
+ *   - nightly     built in CI from `develop`, never tagged, never goes through `classify`.
+ *
+ *   node scripts/release-version.mjs classify <version>            -> prerelease=<bool> / npm_tag=<tag>
+ *   node scripts/release-version.mjs is-newest <version> [tag...]  -> true|false
+ *   node scripts/release-version.mjs nightly-base <version>        -> X.Y.Z the nightly version builds on
+ *   node scripts/release-version.mjs assert-stable <version>       -> exit 1 for a prerelease
  */
 import { pathToFileURL } from 'node:url';
+import { compareVersions } from './changelog-guard.mjs';
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
-// `latest` is what a plain install resolves and `nightly` belongs to the nightly channel; a
-// prerelease named after either would publish over it.
-const RESERVED_NPM_TAGS = new Set(['latest', 'nightly']);
+// Semver allows any prerelease identifier; the project does not. Three stages, each followed by a
+// number with no leading zero. They sort in maturity order (alpha < beta < rc) under semver's
+// lexical rule for alphanumeric identifiers, which is what makes the ordering work without help.
+const PRERELEASE = /^(alpha|beta|rc)\.(0|[1-9][0-9]*)$/;
 
 function parse(version) {
   const match = SEMVER.exec(version);
@@ -29,20 +39,38 @@ function parse(version) {
   return { major: Number(major), minor: Number(minor), patch: Number(patch), prerelease: prerelease ?? null };
 }
 
+/** True for any semver prerelease, including ones the release policy would refuse to publish. */
+export function isPrerelease(version) {
+  return parse(version).prerelease !== null;
+}
+
 /**
- * Release-channel facts for a version being tagged. A stable version publishes to `latest`; a
- * prerelease publishes under the dist-tag named by its leading identifier (`1.0.0-alpha.1` and
- * `1.0.0-alpha1` both -> `alpha`; a purely numeric one -> `next`) and never to `latest`.
+ * Release-channel facts for a version being tagged. A stable version publishes to `latest`. A
+ * prerelease must be `alpha.N`, `beta.N` or `rc.N` and publishes to `next`, never `latest`.
  */
 export function classify(version) {
   const { prerelease } = parse(version);
   if (prerelease === null) return { prerelease: false, npmTag: 'latest' };
-  const lead = /^[A-Za-z][A-Za-z-]*/.exec(prerelease);
-  const npmTag = lead ? lead[0] : 'next';
-  if (RESERVED_NPM_TAGS.has(npmTag)) {
-    throw new Error(`The prerelease identifier '${npmTag}' in '${version}' is reserved; pick another (alpha, beta, rc).`);
+  if (!PRERELEASE.test(prerelease)) {
+    throw new Error(
+      `The prerelease '${prerelease}' in '${version}' is not allowed. Use alpha.N, beta.N or rc.N ` +
+        '(for example 1.0.0-alpha.1), so the stages sort in maturity order.',
+    );
   }
-  return { prerelease: true, npmTag };
+  return { prerelease: true, npmTag: 'next' };
+}
+
+/**
+ * True when `version` has higher semver precedence than every tag in `tags` (`vX.Y.Z[-pre]`; the
+ * tag for `version` itself and anything that is not a version tag are ignored). The `next` channel
+ * only ever moves forward, so a stable hotfix on an old line cannot pull it back from `1.0.0-rc.1`.
+ */
+export function isNewest(version, tags) {
+  parse(version);
+  return tags
+    .map((tag) => tag.replace(/^v/, ''))
+    .filter((other) => SEMVER.test(other) && other !== version)
+    .every((other) => compareVersions(version, other) > 0);
 }
 
 /**
@@ -58,7 +86,7 @@ export function nightlyBase(version) {
 
 /** `npm version patch` on a prerelease yields the stable release, so automation must not run on one. */
 export function assertStable(version) {
-  if (classify(version).prerelease) {
+  if (isPrerelease(version)) {
     throw new Error(
       `package.json is at the prerelease ${version}. Automated security releases bump the patch ` +
         'version, which for a prerelease means publishing the stable release by accident. Cut this ' +
@@ -68,13 +96,15 @@ export function assertStable(version) {
 }
 
 function main(argv) {
-  const [command, version] = argv;
+  const [command, version, ...rest] = argv;
   try {
-    if (!version) throw new Error(`usage: release-version.mjs <classify|nightly-base|assert-stable> <version>`);
+    if (!version) throw new Error('usage: release-version.mjs <classify|is-newest|nightly-base|assert-stable> <version> [tag...]');
     if (command === 'classify') {
       const { prerelease, npmTag } = classify(version);
       console.log(`prerelease=${prerelease}`);
       console.log(`npm_tag=${npmTag}`);
+    } else if (command === 'is-newest') {
+      console.log(String(isNewest(version, rest)));
     } else if (command === 'nightly-base') {
       console.log(nightlyBase(version));
     } else if (command === 'assert-stable') {
