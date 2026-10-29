@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Bumped vulnerable runtime dependencies in the lockfile**, resolving the advisories the nightly strict audit was reporting:
+  - `zod` 4.5.4 to 4.6.7 ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high): memory exhaustion when validating oversized constrained collections. `zod` is a direct dependency; the `package.json` range is unchanged.
+  - Transitive `body-parser` 2.3.0 to 2.4.0 ([GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828), high): denial of service via trailing bytes after a compressed request body.
+  - Transitive `fast-uri` 3.1.8 to 3.1.9 ([GHSA-w74x-v6f9-j3xg](https://github.com/advisories/GHSA-w74x-v6f9-j3xg), [GHSA-xhq7-xmqj-769h](https://github.com/advisories/GHSA-xhq7-xmqj-769h), [GHSA-wjr9-j795-jxcr](https://github.com/advisories/GHSA-wjr9-j795-jxcr), [GHSA-333x-w4r6-6crp](https://github.com/advisories/GHSA-333x-w4r6-6crp); moderate): URI parsing and normalization flaws.
+  - Transitive `ip-address` 10.7.2 to 10.7.5 ([GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5), moderate): quadratic-time parsing of long zone identifiers.
+  - Transitive `qs` 6.16.0 to 6.17.0 ([GHSA-6pq8-jhm2-2vcw](https://github.com/advisories/GHSA-6pq8-jhm2-2vcw), moderate): uncaught `TypeError` in `qs.stringify` with `arrayFormat: 'comma'`.
+
 ## [0.5.5] - 2026-10-21
 
 ### Security
