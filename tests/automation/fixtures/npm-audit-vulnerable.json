@@ -1,0 +1,249 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@hono/node-server": {
+      "name": "@hono/node-server",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1243661,
+          "name": "@hono/node-server",
+          "dependency": "@hono/node-server",
+          "title": "@hono/node-server: `serveStatic` decodes the request path a second time, leading to bypass of middleware on static paths",
+          "url": "https://github.com/advisories/GHSA-rmxm-3fg6-px4f",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-174"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": ">=1.19.10 <2.1.3"
+        }
+      ],
+      "effects": [],
+      "range": "1.19.10 - 2.1.2",
+      "nodes": [
+        "node_modules/@hono/node-server"
+      ],
+      "fixAvailable": true
+    },
+    "body-parser": {
+      "name": "body-parser",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1243074,
+          "name": "body-parser",
+          "dependency": "body-parser",
+          "title": "body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body",
+          "url": "https://github.com/advisories/GHSA-27r3-jxmh-p828",
+          "severity": "high",
+          "cwe": [
+            "CWE-248"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=2.0.0 <2.4.0"
+        }
+      ],
+      "effects": [],
+      "range": "2.0.0 - 2.3.0",
+      "nodes": [
+        "node_modules/body-parser"
+      ],
+      "fixAvailable": true
+    },
+    "fast-uri": {
+      "name": "fast-uri",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1243098,
+          "name": "fast-uri",
+          "dependency": "fast-uri",
+          "title": "fast-uri vulnerable to URI scheme spoofing via percent-encoded scheme decoding",
+          "url": "https://github.com/advisories/GHSA-w74x-v6f9-j3xg",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-172",
+            "CWE-180"
+          ],
+          "cvss": {
+            "score": 6.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+          },
+          "range": ">=3.0.0 <3.1.9"
+        },
+        {
+          "source": 1243101,
+          "name": "fast-uri",
+          "dependency": "fast-uri",
+          "title": "fast-uri vulnerable to improper path equivalence in relative reference normalization",
+          "url": "https://github.com/advisories/GHSA-xhq7-xmqj-769h",
+          "severity": "low",
+          "cwe": [
+            "CWE-41"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+          },
+          "range": ">=3.0.0 <3.1.9"
+        },
+        {
+          "source": 1243104,
+          "name": "fast-uri",
+          "dependency": "fast-uri",
+          "title": "fast-uri vulnerable to host confusion via unchecked WHATWG host canonicalization",
+          "url": "https://github.com/advisories/GHSA-wjr9-j795-jxcr",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-20",
+            "CWE-436"
+          ],
+          "cvss": {
+            "score": 4.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+          },
+          "range": ">=3.1.3 <3.1.9"
+        },
+        {
+          "source": 1243107,
+          "name": "fast-uri",
+          "dependency": "fast-uri",
+          "title": "fast-uri vulnerable to scheme injection via an unescaped first-segment colon in suffix references",
+          "url": "https://github.com/advisories/GHSA-333x-w4r6-6crp",
+          "severity": "low",
+          "cwe": [
+            "CWE-41",
+            "CWE-116"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+          },
+          "range": ">=3.0.0 <3.1.9"
+        }
+      ],
+      "effects": [],
+      "range": "3.0.0 - 3.1.8",
+      "nodes": [
+        "node_modules/fast-uri"
+      ],
+      "fixAvailable": true
+    },
+    "ip-address": {
+      "name": "ip-address",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1242883,
+          "name": "ip-address",
+          "dependency": "ip-address",
+          "title": "ip-address: Address6 matches a zone identifier in quadratic time ahead of its length limit, allowing a single long string to stall the process",
+          "url": "https://github.com/advisories/GHSA-rxp7-6hxx-x8q5",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<=10.7.3"
+        }
+      ],
+      "effects": [],
+      "range": "<=10.7.3",
+      "nodes": [
+        "node_modules/ip-address"
+      ],
+      "fixAvailable": true
+    },
+    "qs": {
+      "name": "qs",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1243687,
+          "name": "qs",
+          "dependency": "qs",
+          "title": "qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS)",
+          "url": "https://github.com/advisories/GHSA-6pq8-jhm2-2vcw",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-248",
+            "CWE-704"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": ">=6.7.0 <=6.16.0"
+        }
+      ],
+      "effects": [],
+      "range": "6.7.0 - 6.16.0",
+      "nodes": [
+        "node_modules/qs"
+      ],
+      "fixAvailable": true
+    },
+    "zod": {
+      "name": "zod",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1243066,
+          "name": "zod",
+          "dependency": "zod",
+          "title": "Zod can exhaust memory while validating oversized constrained collections",
+          "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+          "severity": "high",
+          "cwe": [
+            "CWE-770"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<4.6.6"
+        }
+      ],
+      "effects": [],
+      "range": "<4.6.6",
+      "nodes": [
+        "node_modules/zod"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 4,
+      "high": 2,
+      "critical": 0,
+      "total": 6
+    },
+    "dependencies": {
+      "prod": 94,
+      "dev": 227,
+      "optional": 81,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 320
+    }
+  }
+}

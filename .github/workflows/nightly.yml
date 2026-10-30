@@ -57,7 +57,9 @@ jobs:
   # The strict absolute audit lives here (not in PR CI — see ci.yml's audit
   # job comment). Red means an advisory is outstanding on develop, including
   # unfixable ones waiting on upstream; it alerts the maintainer via the
-  # scheduled-workflow failure email without blocking any merge.
+  # scheduled-workflow failure email without blocking any merge. When it
+  # fails, audit-remediate.yml (triggered by this workflow's completion)
+  # opens a PR with the lockfile fix for whatever can be fixed.
   strict-audit:
     runs-on: ubuntu-latest
     permissions:
