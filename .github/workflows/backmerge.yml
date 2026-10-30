@@ -69,6 +69,20 @@ jobs:
               exit 0
             fi
 
+            # A hotfix on main that adds a "### Security" bullet under [Unreleased] meets develop's own
+            # "### Security" heading there: merge=union keeps both, git calls it clean, and the guard
+            # below would reject two headings with the same name. Folding them is mechanical (one right
+            # answer, AGENTS.md "Hotfix releases"), so do it here instead of opening a PR for it. Only
+            # [Unreleased] is touched. A failure of the fold itself must not break the back-merge: the
+            # guard still runs, and a PR is still the fallback.
+            if ! node scripts/changelog-fold-headings.mjs; then
+              echo "::warning::changelog-fold-headings.mjs failed; continuing to the guard."
+            fi
+            if ! git diff --quiet -- CHANGELOG.md; then
+              git add CHANGELOG.md
+              git commit --quiet -m 'chore: fold duplicate changelog headings after back-merge'
+            fi
+
             # A clean git merge is not proof the union driver filed CHANGELOG.md's lines under the
             # right section (see scripts/changelog-guard.mjs) — and this is the one place that
             # corruption is introduced, before it reaches develop with no PR to catch it. Compare

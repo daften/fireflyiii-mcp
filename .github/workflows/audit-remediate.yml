@@ -1,0 +1,186 @@
+name: Audit remediation
+
+# When the nightly strict audit goes red, open a PR that fixes it. This is the hand-made hotfix from
+# AGENTS.md ("Automated security releases": when strict-audit is red with no open Dependabot PR, fix
+# it by hand) done by a workflow: update just the vulnerable lockfile entries (`npm update <pkg>`,
+# never `npm audit fix`, which refreshes unrelated packages too), add a "### Security" bullet under
+# [Unreleased], and open a PR. Dependabot often does not raise a security PR for these advisories,
+# which is why the nightly audit stayed red for days at a time.
+#
+# What it deliberately does NOT do: merge, tag or release anything. A human reviews and merges the
+# PR (as a merge commit), and a release is still cut by hand. auto-release.yml only fires for
+# Dependabot merges, and this PR is not one.
+#
+# The branch it fixes: `main` first (it is what ships; the fix reaches `develop` through backmerge.yml),
+# then `develop` for an advisory that only exists there. It does nothing while one of its own PRs or a
+# Dependabot security PR is open, so it never duplicates a fix that is already on its way.
+# RELEASE_TOKEN, not GITHUB_TOKEN: a PR created with GITHUB_TOKEN does not trigger CI.
+
+on:
+  workflow_run:
+    workflows: ['Nightly Integration Tests']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute the fix and print it, but push nothing and open no PR'
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: audit-remediate
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    # After a failed nightly, or by hand. The nightly has two jobs and a failure of the integration
+    # job also lands here; the audit below then finds nothing to fix and the run ends quietly.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      REPO: ${{ github.repository }}
+      # Empty for workflow_run (a real run); 'true' by default for a manual one.
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+          persist-credentials: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Skip when a fix PR is already open
+        id: open
+        run: |
+          # Its own earlier PR, or a Dependabot security PR (head branches look like
+          # dependabot/npm_and_yarn/security-fixes-<hash>): either one is already the fix.
+          OPEN=$(gh pr list --repo "$REPO" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("automation/audit-fix-") or startswith("dependabot/npm_and_yarn/security-fixes"))] | length')
+          echo "open=$OPEN" >> "$GITHUB_OUTPUT"
+          if [ "$OPEN" != "0" ]; then
+            echo "::notice::A fix PR (this workflow's or Dependabot's) is already open; not opening another."
+          fi
+
+      - name: Find the branch that needs a fix
+        id: plan
+        if: steps.open.outputs.open == '0'
+        run: |
+          # The script comes from the workflow's own ref (main) and is copied out first, so switching
+          # branches below cannot change the logic that is running.
+          cp scripts/audit-remediate.mjs "$RUNNER_TEMP/audit-remediate.mjs"
+          for BASE in main develop; do
+            git checkout --quiet -B work "origin/$BASE"
+            # `npm audit` exits 1 when it finds something, which is the case we are here for.
+            npm audit --omit=dev --json > "$RUNNER_TEMP/audit-before.json" || true
+            # A failed audit (registry unreachable) makes `plan` exit non-zero and fails this step
+            # instead of reading as "nothing to fix".
+            PACKAGES=$(node "$RUNNER_TEMP/audit-remediate.mjs" plan "$RUNNER_TEMP/audit-before.json")
+            if [ -n "$PACKAGES" ]; then
+              printf '%s\n' "$PACKAGES" > "$RUNNER_TEMP/packages.txt"
+              echo "base=$BASE" >> "$GITHUB_OUTPUT"
+              echo "Fixable advisories on $BASE: $(tr '\n' ' ' < "$RUNNER_TEMP/packages.txt")"
+              exit 0
+            fi
+            echo "$BASE: no fixable moderate+ advisory."
+          done
+          echo "Nothing to remediate on main or develop."
+
+      - name: Update the vulnerable lockfile entries
+        id: update
+        if: steps.plan.outputs.base != ''
+        run: |
+          cp package-lock.json "$RUNNER_TEMP/lock-before.json"
+          xargs npm update --package-lock-only --ignore-scripts < "$RUNNER_TEMP/packages.txt"
+          # The promise of this PR is "lockfile only". npm update respects the ranges in package.json,
+          # so a change there would mean something unexpected happened: stop instead of shipping it.
+          if ! git diff --quiet -- package.json; then
+            echo "::error::npm update modified package.json; refusing to open a PR."
+            git diff -- package.json
+            exit 1
+          fi
+          if git diff --quiet -- package-lock.json; then
+            echo "::warning::npm update changed nothing, so the advisories are not fixable within the current ranges."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git diff --stat
+
+      - name: Re-audit and write the changelog entry
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          npm audit --omit=dev --json > "$RUNNER_TEMP/audit-after.json" || true
+          node "$RUNNER_TEMP/audit-remediate.mjs" changelog \
+            "$RUNNER_TEMP/audit-before.json" "$RUNNER_TEMP/lock-before.json" package-lock.json CHANGELOG.md
+          node "$RUNNER_TEMP/audit-remediate.mjs" summary \
+            "$RUNNER_TEMP/audit-before.json" "$RUNNER_TEMP/audit-after.json" \
+            "$RUNNER_TEMP/lock-before.json" package-lock.json > "$RUNNER_TEMP/summary.md"
+
+      - name: Open the PR
+        if: steps.update.outputs.changed == 'true'
+        env:
+          BASE: ${{ steps.plan.outputs.base }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          COUNT=$(wc -l < "$RUNNER_TEMP/packages.txt")
+          if [ "$COUNT" -le 3 ]; then
+            WHAT=$(paste -sd, "$RUNNER_TEMP/packages.txt" | sed 's/,/, /g')
+          else
+            WHAT="$COUNT dependencies with security advisories"
+          fi
+          TITLE="fix(deps): bump ${WHAT} to patched versions (automated)"
+          BRANCH="automation/audit-fix-${BASE}-${GITHUB_RUN_ID}"
+
+          git add package-lock.json CHANGELOG.md
+          git commit --quiet -m "$TITLE"
+
+          if [ "$BASE" = "main" ]; then
+            FOLLOW_UP='This targets `main`, the branch that ships. After you merge it, `backmerge.yml` carries it into `develop` (which is what the nightly audit checks). Nothing is released automatically: cut a patch release by hand when you want it published (AGENTS.md, "Hotfix releases").'
+          else
+            FOLLOW_UP='This advisory exists only on `develop`, so the PR targets `develop` and ships with the next release.'
+          fi
+          {
+            echo '## Summary'
+            echo
+            echo "Opened by \`audit-remediate.yml\` after the nightly strict audit failed ([run]($RUN_URL)). It runs \`npm update --package-lock-only\` for only the packages below, so \`package.json\` and unrelated packages are untouched, and adds the \`### Security\` entry under \`[Unreleased]\`."
+            echo
+            echo "$FOLLOW_UP"
+            echo
+            echo '**Merge as a merge commit, never squash or rebase.**'
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo '## Type of change'
+            echo
+            echo '- [x] chore (dependencies, config, scaffolding)'
+            echo
+            echo '## Checklist'
+            echo
+            echo '- [ ] Tests added or updated (lockfile only; CI runs the existing suite)'
+            echo '- [x] Changelog entry added'
+          } > "$RUNNER_TEMP/body.md"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: would push $BRANCH and open a PR into $BASE titled:"
+            echo "  $TITLE"
+            git show --stat --format='%an <%ae>%n%s' HEAD
+            echo '----- PR body -----'
+            cat "$RUNNER_TEMP/body.md"
+            exit 0
+          fi
+
+          git push origin "HEAD:refs/heads/$BRANCH"
+          gh pr create --repo "$REPO" --base "$BASE" --head "$BRANCH" \
+            --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
