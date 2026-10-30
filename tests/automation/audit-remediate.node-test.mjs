@@ -10,6 +10,7 @@ import {
   addSecurityBullets,
   advisoriesByPackage,
   describeChanges,
+  hasAuditedChange,
   lockVersions,
   planUpdates,
   securityBullets,
@@ -242,6 +243,44 @@ test('the CLI: plan lists packages, changelog edits the file in place, bad input
     assert.equal(failed.status, 1);
     assert.match(failed.stderr, /^::error::npm audit failed: offline/);
     assert.equal(run('bogus').status, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('hasAuditedChange ignores lockfile text that changed without any audited version changing', () => {
+  const before = lock({
+    'node_modules/zod': { version: '4.5.4' },
+    'node_modules/@rolldown/binding-linux-x64-gnu': { version: '1.0.0', dev: true, optional: true, libc: ['glibc'] },
+  });
+  // A different npm version drops `libc` from an unrelated optional dev entry: text differs, versions do not.
+  const reformatted = lock({
+    'node_modules/zod': { version: '4.5.4' },
+    'node_modules/@rolldown/binding-linux-x64-gnu': { version: '1.0.0', dev: true, optional: true },
+  });
+  assert.notEqual(before, reformatted);
+  assert.equal(hasAuditedChange(realAudit, before, reformatted), false);
+
+  const updated = lock({
+    'node_modules/zod': { version: '4.6.7' },
+    'node_modules/@rolldown/binding-linux-x64-gnu': { version: '1.0.0', dev: true, optional: true },
+  });
+  assert.equal(hasAuditedChange(realAudit, before, updated), true);
+});
+
+test('the CLI `changed` command prints true or false', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'audit-remediate-changed-'));
+  try {
+    const auditPath = join(dir, 'audit.json');
+    const a = join(dir, 'a.json');
+    const b = join(dir, 'b.json');
+    writeFileSync(auditPath, realAudit);
+    writeFileSync(a, lock({ 'node_modules/zod': { version: '4.5.4' } }));
+    writeFileSync(b, lock({ 'node_modules/zod': { version: '4.6.7' } }));
+    const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+    assert.equal(run('changed', auditPath, a, b).stdout, 'true\n');
+    assert.equal(run('changed', auditPath, a, a).stdout, 'false\n');
+    assert.equal(run('changed', auditPath, a).status, 1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
