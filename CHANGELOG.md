@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The nightly audit now fixes itself where it can. `audit-remediate.yml` runs after a failed nightly, finds the packages `npm audit` flags at moderate or above on `main` (then `develop`), updates only those lockfile entries with `npm update --package-lock-only`, adds the `### Security` bullets under `[Unreleased]` and opens one PR. It never merges, tags or releases, refuses to touch `package.json`, leaves major bumps and unpatched advisories alone, and fails instead of reporting success when `npm audit` itself fails. The nightly `strict-audit` was red on 22 of the 29 scheduled runs in October because Dependabot often opened no security PR for these advisories. A manual run is a dry run by default.
+- `backmerge.yml` folds duplicate `### ` headings in `[Unreleased]` (`scripts/changelog-fold-headings.mjs`) before the changelog guard runs. A hotfix on `main` that adds `### Security` met `develop`'s own `### Security` heading, `merge=union` kept both, and the guard rejected the result, so 19 of the last 30 back-merges ended in a PR for a human to move the bullets. Dated sections are never touched.
+
 ## [1.0.0-alpha.1] - 2026-10-29
 
 First prerelease of 1.0. It is published to the `next` channel only, so `latest` stays on 0.5.5 until the stable release: install it with `npm install @daften/fireflyiii-mcp@next` or `docker pull ghcr.io/daften/fireflyiii-mcp:next`, or pin `1.0.0-alpha.1`. It contains **breaking changes** (see Changed and Removed), fixes that stop `update_transaction` from destroying split transactions, and several security fixes.
