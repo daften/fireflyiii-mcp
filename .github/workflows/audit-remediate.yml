@@ -15,6 +15,9 @@ name: Audit remediation
 # then `develop` for an advisory that only exists there. It does nothing while one of its own PRs or a
 # Dependabot security PR is open, so it never duplicates a fix that is already on its way.
 # RELEASE_TOKEN, not GITHUB_TOKEN: a PR created with GITHUB_TOKEN does not trigger CI.
+#
+# Every outcome is also written to the run's job summary and, where it matters, a notice annotation,
+# so a quiet "nothing to fix" run can be read on the run page without opening or downloading the log.
 
 on:
   workflow_run:
@@ -66,8 +69,10 @@ jobs:
           OPEN=$(gh pr list --repo "$REPO" --state open --json headRefName \
             --jq '[.[] | select(.headRefName | startswith("automation/audit-fix-") or startswith("dependabot/npm_and_yarn/security-fixes"))] | length')
           echo "open=$OPEN" >> "$GITHUB_OUTPUT"
+          echo '### Audit remediation' >> "$GITHUB_STEP_SUMMARY"
           if [ "$OPEN" != "0" ]; then
             echo "::notice::A fix PR (this workflow's or Dependabot's) is already open; not opening another."
+            echo "Skipped: a fix PR (this workflow's or Dependabot's) is already open, so no new one was opened." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Find the branch that needs a fix
@@ -88,11 +93,17 @@ jobs:
               printf '%s\n' "$PACKAGES" > "$RUNNER_TEMP/packages.txt"
               echo "base=$BASE" >> "$GITHUB_OUTPUT"
               echo "Fixable advisories on $BASE: $(tr '\n' ' ' < "$RUNNER_TEMP/packages.txt")"
+              {
+                echo "Fixable advisories found on **$BASE**: $(tr '\n' ' ' < "$RUNNER_TEMP/packages.txt")"
+                echo
+              } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             echo "$BASE: no fixable moderate+ advisory."
           done
           echo "Nothing to remediate on main or develop."
+          echo "::notice::Nothing to remediate: no fixable moderate+ advisory on main or develop."
+          echo "No fixable moderate or higher advisory on **main** or **develop**, so nothing was changed and no PR was opened." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Update the vulnerable lockfile entries
         id: update
@@ -107,8 +118,15 @@ jobs:
             git diff -- package.json
             exit 1
           fi
-          if git diff --quiet -- package-lock.json; then
-            echo "::warning::npm update changed nothing, so the advisories are not fixable within the current ranges."
+          # Compare audited versions, not text: a different npm version can rewrite unrelated parts of
+          # the lockfile (for example the `libc` fields of optional dev entries), and a PR made only of
+          # that would claim a fix it did not make.
+          CHANGED=$(node "$RUNNER_TEMP/audit-remediate.mjs" changed \
+            "$RUNNER_TEMP/audit-before.json" "$RUNNER_TEMP/lock-before.json" package-lock.json)
+          if [ "$CHANGED" != "true" ]; then
+            git checkout -- package-lock.json
+            echo "::warning::npm update did not change the version of any audited package, so the advisories are not fixable within the current ranges."
+            echo "\`npm update\` did not change the version of any audited package, so the advisories are not fixable within the current version ranges. No PR was opened." >> "$GITHUB_STEP_SUMMARY"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -178,9 +196,24 @@ jobs:
             git show --stat --format='%an <%ae>%n%s' HEAD
             echo '----- PR body -----'
             cat "$RUNNER_TEMP/body.md"
+            echo "::notice::Dry run: a fix PR into $BASE is ready but was not pushed."
+            {
+              echo "**Dry run.** Nothing was pushed. A real run would open a PR into **$BASE** titled:"
+              echo
+              echo "> $TITLE"
+              echo
+              cat "$RUNNER_TEMP/summary.md"
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
           git push origin "HEAD:refs/heads/$BRANCH"
-          gh pr create --repo "$REPO" --base "$BASE" --head "$BRANCH" \
-            --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          PR_URL=$(gh pr create --repo "$REPO" --base "$BASE" --head "$BRANCH" \
+            --title "$TITLE" --body-file "$RUNNER_TEMP/body.md")
+          echo "Opened $PR_URL"
+          echo "::notice::Opened the audit fix PR: $PR_URL"
+          {
+            echo "Opened a fix PR into **$BASE**: $PR_URL"
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+          } >> "$GITHUB_STEP_SUMMARY"

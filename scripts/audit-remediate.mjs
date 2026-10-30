@@ -9,6 +9,7 @@
  * the workflow does the git and GitHub plumbing.
  *
  *   plan       <audit.json>                                  vulnerable packages to `npm update`, one per line
+ *   changed    <audit.json> <lock-before> <lock-after>   true when an audited package's version changed
  *   changelog  <audit.json> <lock-before> <lock-after> [CHANGELOG.md]   add the Security bullets in place
  *   summary    <audit-before> <audit-after> <lock-before> <lock-after>  Markdown for the PR body
  *
@@ -119,6 +120,15 @@ export function describeChanges(auditBefore, lockBefore, lockAfter) {
   return changes;
 }
 
+/**
+ * True when the update changed the version of at least one audited package. A lockfile can differ in
+ * text without that: a different npm version rewrites fields such as `libc` on unrelated optional
+ * entries, and a PR made of only that would claim a fix it did not make.
+ */
+export function hasAuditedChange(auditBefore, lockBefore, lockAfter) {
+  return describeChanges(auditBefore, lockBefore, lockAfter).length > 0;
+}
+
 function highestSeverity(advisories) {
   return advisories.reduce((top, a) => (SEVERITY_RANK[a.severity] > SEVERITY_RANK[top] ? a.severity : top), 'info');
 }
@@ -194,6 +204,9 @@ function main(argv) {
       const { update, blocked } = planUpdates(readFileSync(args[0], 'utf8'));
       for (const { name, reason } of blocked) console.error(`::warning::Cannot fix ${name} automatically: ${reason}.`);
       for (const name of update) console.log(name);
+    } else if (command === 'changed') {
+      const [auditPath, lockBefore, lockAfter] = args;
+      console.log(String(hasAuditedChange(readFileSync(auditPath, 'utf8'), readFileSync(lockBefore, 'utf8'), readFileSync(lockAfter, 'utf8'))));
     } else if (command === 'changelog') {
       const [auditPath, lockBefore, lockAfter, changelogPath = 'CHANGELOG.md'] = args;
       const bullets = securityBullets(describeChanges(readFileSync(auditPath, 'utf8'), readFileSync(lockBefore, 'utf8'), readFileSync(lockAfter, 'utf8')));
@@ -207,7 +220,7 @@ function main(argv) {
       const [auditBefore, auditAfter, lockBefore, lockAfter] = args.map((path) => readFileSync(path, 'utf8'));
       console.log(summaryMarkdown(auditBefore, auditAfter, lockBefore, lockAfter));
     } else {
-      throw new Error('usage: audit-remediate.mjs <plan|changelog|summary> ...');
+      throw new Error('usage: audit-remediate.mjs <plan|changed|changelog|summary> ...');
     }
   } catch (error) {
     console.error(`::error::${error.message}`);
