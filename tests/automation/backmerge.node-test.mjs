@@ -66,6 +66,8 @@ for (const scenario of [
   'race',
   'persistent-race',
   'guard-failure',
+  'fold',
+  'fold-script-error',
 ]) {
   test(`backmerge: ${scenario}`, () => {
     const dir = mkdtempSync(join(tmpdir(), 'backmerge-test-'));
@@ -80,7 +82,12 @@ for (const scenario of [
             merge)
               if [ "$2" = --abort ]; then return 0; fi
               case "$SCENARIO" in conflict|merge-error) return 1 ;; esac ;;
-            diff) if [ "$SCENARIO" = conflict ]; then echo CHANGELOG.md; fi ;;
+            diff)
+              # git diff --quiet exits 1 when CHANGELOG.md changed, i.e. when the fold rewrote it.
+              if [ "$2" = --quiet ]; then [ "$SCENARIO" != fold ]; return; fi
+              if [ "$SCENARIO" = conflict ]; then echo CHANGELOG.md; fi ;;
+            add) return 0 ;;
+            commit) echo "fold commit" >&2 ;;
             push)
               pushes=$((pushes+1))
               echo "push attempt" >&2
@@ -99,10 +106,12 @@ for (const scenario of [
         }
         # changelog-guard.mjs shells out to the real git binary, which this mock (a bash function)
         # cannot intercept, so the whole "node scripts/changelog-guard.mjs" call is faked here
-        # instead. Every scenario but guard-failure represents a clean CHANGELOG.md.
+        # instead. Every scenario but guard-failure represents a clean CHANGELOG.md. The fold script is
+        # faked the same way; the fold scenario makes git diff --quiet report that it rewrote the file.
         node() {
-          case "$SCENARIO" in
-            guard-failure) return 1 ;;
+          case "$SCENARIO:$1" in
+            guard-failure:scripts/changelog-guard.mjs) return 1 ;;
+            fold-script-error:scripts/changelog-fold-headings.mjs) return 1 ;;
             *) return 0 ;;
           esac
         }
@@ -126,8 +135,13 @@ for (const scenario of [
         race: 2,
         'persistent-race': 3,
         'guard-failure': 0,
+        fold: 1,
+        'fold-script-error': 1,
       };
       assert.equal((result.stderr.match(/push attempt/g) || []).length, expected[scenario]);
+      // The fold commit is made only when the fold changed CHANGELOG.md, and before the guard and the push.
+      assert.equal((result.stderr.match(/fold commit/g) || []).length, scenario === 'fold' ? 1 : 0);
+      if (scenario === 'fold-script-error') assert.match(result.stdout, /changelog-fold-headings\.mjs failed; continuing/);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 }
