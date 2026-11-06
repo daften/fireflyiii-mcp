@@ -34,6 +34,23 @@ docker run \
 
 `MCP_BASE_URL` is the externally reachable URL of your container, used to build OAuth redirect URIs. If omitted, the server falls back to the `Host` request header, which is unreliable behind a reverse proxy.
 
+### Separate internal and public Firefly URLs
+
+If containers reach Firefly III through Docker DNS but users access it through a public hostname, set `FIREFLY_PUBLIC_URL` for browser authorization redirects:
+
+```yaml
+environment:
+  FIREFLY_URL: http://firefly-app:8080
+  FIREFLY_PUBLIC_URL: https://finance.example.com
+  FIREFLY_OAUTH_CLIENT_ID: your-client-id
+  MCP_BASE_URL: https://mcp.example.com
+```
+
+API calls, token exchange and token refresh still use the internal `FIREFLY_URL`.
+The callback registered in Firefly III remains `https://mcp.example.com/oauth/callback`.
+Without `FIREFLY_PUBLIC_URL`, authorization redirects use `FIREFLY_URL` as before.
+Use HTTPS for the public URL. HTTP is suitable only for trusted internal networks or loopback.
+
 ### Limit which tools are loaded
 
 ```bash

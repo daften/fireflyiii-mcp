@@ -178,6 +178,27 @@ export function createOAuthHandler(
   oauthClientId: string | undefined,
   mcpHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
 ): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> {
+  let authorizationBaseUrl = fireflyUrl;
+  const publicUrl = process.env.FIREFLY_PUBLIC_URL?.trim();
+  if (oauthClientId && publicUrl) {
+    let parsed: URL;
+    try {
+      parsed = new URL(publicUrl);
+    } catch {
+      throw new Error('FIREFLY_PUBLIC_URL must be an absolute HTTP(S) base URL');
+    }
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error('FIREFLY_PUBLIC_URL must be an HTTP(S) base URL without credentials, query or fragment');
+    }
+    authorizationBaseUrl = parsed.toString().replace(/\/+$/, '');
+  }
+
   const FLOW_TTL_MS = 10 * 60 * 1000;
   const pendingFlows = new Map<string, { redirectUri: string; createdAt: number }>();
 
@@ -304,7 +325,7 @@ export function createOAuthHandler(
         pendingFlows.set(state, { redirectUri: clientRedirectUri, createdAt: Date.now() });
         scheduleEviction();
       }
-      const fireflyAuthUrl = new URL(`${fireflyUrl}/oauth/authorize`);
+      const fireflyAuthUrl = new URL(`${authorizationBaseUrl}/oauth/authorize`);
       incomingUrl.searchParams.forEach((value, key) => {
         fireflyAuthUrl.searchParams.set(key, key === 'redirect_uri' ? `${baseUrl}/oauth/callback` : value);
       });

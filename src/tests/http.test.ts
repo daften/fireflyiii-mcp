@@ -183,6 +183,88 @@ describe('createOAuthHandler — authorize proxy', () => {
   });
 });
 
+describe('createOAuthHandler — separate public Firefly URL', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('uses the public URL only for browser authorization, keeping token requests internal', async () => {
+    vi.stubEnv('FIREFLY_PUBLIC_URL', 'https://finance.example.com/firefly/');
+    vi.stubEnv('MCP_BASE_URL', 'https://mcp.example.com');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response('{"access_token":"test-token"}', {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    const handler = createOAuthHandler('http://firefly-app:8080', 'client-id-123', vi.fn());
+    const authRes = mockRes();
+    await handler(
+      mockReq(
+        'GET',
+        '/oauth/authorize?response_type=code&client_id=client-id-123&redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback&state=abc&code_challenge=xyz&code_challenge_method=S256',
+      ) as http.IncomingMessage,
+      authRes as unknown as http.ServerResponse,
+    );
+    const location = new URL(authRes.writtenHeaders.Location as string);
+    expect(authRes.statusCode).toBe(302);
+    expect(`${location.origin}${location.pathname}`).toBe('https://finance.example.com/firefly/oauth/authorize');
+    expect(location.searchParams.get('redirect_uri')).toBe('https://mcp.example.com/oauth/callback');
+    expect(location.searchParams.get('state')).toBe('abc');
+    expect(location.searchParams.get('code_challenge')).toBe('xyz');
+    expect(location.searchParams.get('code_challenge_method')).toBe('S256');
+
+    for (const grant of ['authorization_code', 'refresh_token']) {
+      const tokenRes = mockRes();
+      await handler(
+        mockReq(
+          'POST',
+          '/oauth/token',
+          {},
+          `grant_type=${grant}&code=test-code&refresh_token=test-refresh&redirect_uri=http://localhost:9999/callback`,
+        ) as http.IncomingMessage,
+        tokenRes as unknown as http.ServerResponse,
+      );
+      expect(tokenRes.statusCode).toBe(200);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        'http://firefly-app:8080/oauth/token',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      const options = fetchMock.mock.calls.at(-1)?.[1];
+      expect(new URLSearchParams(options?.body as string).get('redirect_uri')).toBe(
+        'https://mcp.example.com/oauth/callback',
+      );
+    }
+  });
+
+  it.each(['', '   '])('falls back to FIREFLY_URL for an empty public URL (%j)', async (publicUrl) => {
+    vi.stubEnv('FIREFLY_PUBLIC_URL', publicUrl);
+    const handler = createOAuthHandler('http://firefly-app:8080', 'client-id', vi.fn());
+    const res = mockRes();
+    await handler(mockReq('GET', '/oauth/authorize') as http.IncomingMessage, res as unknown as http.ServerResponse);
+    expect(new URL(res.writtenHeaders.Location as string).origin).toBe('http://firefly-app:8080');
+  });
+
+  it.each([
+    'not-a-url',
+    'javascript:alert(1)',
+    'https://user:password@finance.example.com',
+    'https://finance.example.com?query=1',
+    'https://finance.example.com#fragment',
+  ])('rejects an invalid public URL without exposing its value (%s)', (publicUrl) => {
+    vi.stubEnv('FIREFLY_PUBLIC_URL', publicUrl);
+    expect(() => createOAuthHandler('http://firefly-app:8080', 'client-id', vi.fn())).toThrow(
+      /^FIREFLY_PUBLIC_URL must be/,
+    );
+  });
+
+  it('ignores the public URL in PAT-only mode', () => {
+    vi.stubEnv('FIREFLY_PUBLIC_URL', 'not-a-url');
+    expect(() => createOAuthHandler('http://firefly-app:8080', undefined, vi.fn())).not.toThrow();
+  });
+});
+
 describe('createOAuthHandler — registration endpoint', () => {
   it('returns 201 with stable proxy callback URL instead of client redirect_uri', async () => {
     const mcpHandler = vi.fn();

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `FIREFLY_PUBLIC_URL` allows browser OAuth authorization to use a public Firefly URL while API and token requests use the internal `FIREFLY_URL`.
+
 ## [1.0.0-alpha.1] - 2026-10-29
 
 First prerelease of 1.0. It is published to the `next` channel only, so `latest` stays on 0.5.5 until the stable release: install it with `npm install @daften/fireflyiii-mcp@next` or `docker pull ghcr.io/daften/fireflyiii-mcp:next`, or pin `1.0.0-alpha.1`. It contains **breaking changes** (see Changed and Removed), fixes that stop `update_transaction` from destroying split transactions, and several security fixes.
