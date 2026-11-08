@@ -204,6 +204,14 @@ jobs:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
+      # Moving a dist-tag with trusted publishing needs npm >= 11.21.0, newer than the npm that
+      # node 24 bundles (https://github.com/semantic-release/npm/issues/1023). Install it before
+      # publishing so the publish and the dist-tag step use the same npm.
+      - name: Use an npm that can move dist-tags with trusted publishing
+        run: |
+          npm install -g npm@11.21.0
+          npm --version
+
       - run: npm ci
 
       - name: Set nightly version (in-CI only, not committed)
@@ -226,7 +234,8 @@ jobs:
       # A prerelease already published to `next` above. A stable release publishes to `latest`, so
       # `next` has to be pointed at it separately, or `@next` would trail `@latest`. Moving a
       # dist-tag needs the "Allow npm dist-tag" permission on the package's trusted-publisher
-      # config (or a token). When that is missing the release is still good, so this step must not
+      # config and npm >= 11.21.0 (installed above; see
+      # https://github.com/semantic-release/npm/issues/1023), or a token. When that is missing the release is still good, so this step must not
       # fail the run: it prints the exact command to run by hand instead.
       - name: Point the next dist-tag at this stable release
         if: needs.setup.outputs.channel == 'release' && needs.setup.outputs.npm_tag == 'latest' && needs.setup.outputs.update_next == 'true'
