@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-08
+
+First stable 1.0 release. It graduates 1.0.0-alpha.1 with no change to the tools, so `latest` moves from 0.5.5 to 1.0.0. If you are upgrading from 0.5.x, read the **Breaking** entries under 1.0.0-alpha.1 below (budget limits, piggy banks, split transactions, command-line arguments and `MCP_READ_ONLY`).
+
 ### Changed
 
 - The nightly audit now fixes itself where it can. `audit-remediate.yml` runs after a failed nightly, finds the packages `npm audit` flags at moderate or above on `main` (then `develop`), updates only those lockfile entries with `npm update --package-lock-only`, adds the `### Security` bullets under `[Unreleased]` and opens one PR. It never merges, tags or releases, refuses to touch `package.json`, leaves major bumps and unpatched advisories alone, and fails instead of reporting success when `npm audit` itself fails. The nightly `strict-audit` was red on 22 of the 29 scheduled runs in October because Dependabot often opened no security PR for these advisories. A manual run is a dry run by default.
@@ -311,7 +315,8 @@ First prerelease of 1.0. It is published to the `next` channel only, so `latest`
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0-alpha.1...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0-alpha.1...v1.0.0
 [1.0.0-alpha.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.5...v1.0.0-alpha.1
 [0.5.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.3...v0.5.4
