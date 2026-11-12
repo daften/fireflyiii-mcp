@@ -16,6 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Verify CHANGELOG.md is updated
@@ -48,6 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           # Tags included: a released section is compared against the tag that published it, not
           # against whatever the base branch happens to hold now.
           fetch-depth: 0
@@ -80,6 +82,8 @@ jobs:
     name: test (node ${{ matrix.node-version }})
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -134,6 +138,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:

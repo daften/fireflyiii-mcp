@@ -18,8 +18,26 @@
  * `via` array that is an object is a real advisory; a string only names another vulnerable package
  * this one depends on, so those are never updated for their own sake.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+/**
+ * Resolve a CLI path argument and refuse anything outside the working directory or the temp
+ * directories the workflows and tests use (`$RUNNER_TEMP`, `os.tmpdir()`). The arguments come from
+ * our own workflows, but a path that escapes those roots is never intended, so fail closed.
+ */
+function safePath(path) {
+  const roots = [process.cwd(), tmpdir(), process.env.RUNNER_TEMP]
+    .filter(Boolean)
+    .map((root) => realpathSync(resolve(root)));
+  const target = realpathSync(resolve(path));
+  if (!roots.some((root) => target === root || target.startsWith(root + sep))) {
+    throw new Error(`refusing to touch ${path}: outside the working and temp directories`);
+  }
+  return target;
+}
 
 // Same gate as the nightly audit (`--audit-level=moderate`): it decides which packages are fixed.
 // Once a package is being updated, every advisory the update resolves is reported, low ones too.
@@ -201,23 +219,24 @@ function main(argv) {
   const [command, ...args] = argv;
   try {
     if (command === 'plan') {
-      const { update, blocked } = planUpdates(readFileSync(args[0], 'utf8'));
+      const { update, blocked } = planUpdates(readFileSync(safePath(args[0]), 'utf8'));
       for (const { name, reason } of blocked) console.error(`::warning::Cannot fix ${name} automatically: ${reason}.`);
       for (const name of update) console.log(name);
     } else if (command === 'changed') {
       const [auditPath, lockBefore, lockAfter] = args;
-      console.log(String(hasAuditedChange(readFileSync(auditPath, 'utf8'), readFileSync(lockBefore, 'utf8'), readFileSync(lockAfter, 'utf8'))));
+      console.log(String(hasAuditedChange(readFileSync(safePath(auditPath), 'utf8'), readFileSync(safePath(lockBefore), 'utf8'), readFileSync(safePath(lockAfter), 'utf8'))));
     } else if (command === 'changelog') {
       const [auditPath, lockBefore, lockAfter, changelogPath = 'CHANGELOG.md'] = args;
-      const bullets = securityBullets(describeChanges(readFileSync(auditPath, 'utf8'), readFileSync(lockBefore, 'utf8'), readFileSync(lockAfter, 'utf8')));
+      const bullets = securityBullets(describeChanges(readFileSync(safePath(auditPath), 'utf8'), readFileSync(safePath(lockBefore), 'utf8'), readFileSync(safePath(lockAfter), 'utf8')));
       if (bullets.length === 0) {
         console.log('audit-remediate: the lockfile changes touch no audited package; CHANGELOG.md left alone.');
         return;
       }
-      writeFileSync(changelogPath, addSecurityBullets(readFileSync(changelogPath, 'utf8'), bullets));
+      const changelog = safePath(changelogPath);
+      writeFileSync(changelog, addSecurityBullets(readFileSync(changelog, 'utf8'), bullets));
       console.log(bullets.join('\n'));
     } else if (command === 'summary') {
-      const [auditBefore, auditAfter, lockBefore, lockAfter] = args.map((path) => readFileSync(path, 'utf8'));
+      const [auditBefore, auditAfter, lockBefore, lockAfter] = args.map((path) => readFileSync(safePath(path), 'utf8'));
       console.log(summaryMarkdown(auditBefore, auditAfter, lockBefore, lockAfter));
     } else {
       throw new Error('usage: audit-remediate.mjs <plan|changed|changelog|summary> ...');

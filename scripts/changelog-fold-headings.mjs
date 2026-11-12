@@ -14,8 +14,26 @@
  *
  *   node scripts/changelog-fold-headings.mjs [path/to/CHANGELOG.md]
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+/**
+ * Resolve a CLI path argument and refuse anything outside the working directory or the temp
+ * directories the workflows and tests use (`$RUNNER_TEMP`, `os.tmpdir()`). The arguments come from
+ * our own workflows, but a path that escapes those roots is never intended, so fail closed.
+ */
+function safePath(path) {
+  const roots = [process.cwd(), tmpdir(), process.env.RUNNER_TEMP]
+    .filter(Boolean)
+    .map((root) => realpathSync(resolve(root)));
+  const target = realpathSync(resolve(path));
+  if (!roots.some((root) => target === root || target.startsWith(root + sep))) {
+    throw new Error(`refusing to touch ${path}: outside the working and temp directories`);
+  }
+  return target;
+}
 
 const UNRELEASED_HEADING = /^## \[Unreleased\]\s*$/;
 const ANY_VERSION_HEADING = /^## \[/;
@@ -88,7 +106,7 @@ export function foldDuplicateHeadings(text) {
 }
 
 function main(argv) {
-  const path = argv[0] ?? 'CHANGELOG.md';
+  const path = safePath(argv[0] ?? 'CHANGELOG.md');
   const before = readFileSync(path, 'utf8');
   const { text, folded } = foldDuplicateHeadings(before);
   if (folded.length === 0) {
