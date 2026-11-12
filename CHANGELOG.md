@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1-beta.1] - 2026-11-12
+
+Prerelease of 1.0.1 with security hardening only, published to the `next` channel: install it with `npm install @daften/fireflyiii-mcp@next` or `docker pull ghcr.io/daften/fireflyiii-mcp:next`, or pin `1.0.1-beta.1`. `latest` stays on 1.0.0. No tool behaviour changes.
+
 ### Security
 
 - Bumped `jose` from 6.2.3 to 6.2.17 in the lockfile (AIKIDO-2026-584205; it comes in through `@modelcontextprotocol/sdk`).
@@ -321,7 +325,8 @@ First prerelease of 1.0. It is published to the `next` channel only, so `latest`
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.1-beta.1...HEAD
+[1.0.1-beta.1]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0...v1.0.1-beta.1
 [1.0.0]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0-alpha.1...v1.0.0
 [1.0.0-alpha.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.5...v1.0.0-alpha.1
 [0.5.5]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.4...v0.5.5
