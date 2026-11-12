@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Bumped `jose` from 6.2.3 to 6.2.17 in the lockfile (AIKIDO-2026-584205; it comes in through `@modelcontextprotocol/sdk`).
+- `scripts/audit-remediate.mjs` and `scripts/changelog-fold-headings.mjs` now refuse any path argument that resolves outside the working directory or the temp directories (`$RUNNER_TEMP`, the OS temp dir), instead of reading or writing whatever they are given.
+- Every `actions/checkout` step now sets `persist-credentials` explicitly: `false` everywhere except the two jobs that push (`auto-release.yml`'s release commit and tag, and `publish.yml`'s `nightly` tag), so jobs that only build, test or scan no longer leave the token in `.git/config`.
+
 ## [1.0.0] - 2026-11-08
 
 First stable 1.0 release. It graduates 1.0.0-alpha.1 with no change to the tools, so `latest` moves from 0.5.5 to 1.0.0. If you are upgrading from 0.5.x, read the **Breaking** entries under 1.0.0-alpha.1 below (budget limits, piggy banks, split transactions, command-line arguments and `MCP_READ_ONLY`).
