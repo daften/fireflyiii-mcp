@@ -45,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           fetch-depth: 0
           fetch-tags: true
@@ -120,6 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           # Full history for the pin below, and tags for the changelog guard, which compares each
           # released section against the tag that published it.
@@ -189,6 +191,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           fetch-depth: 0
 
@@ -257,6 +260,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           fetch-depth: 0
 
@@ -314,6 +318,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: true
           ref: ${{ github.event_name == 'push' && github.ref || 'develop' }}
           fetch-depth: 0
 
