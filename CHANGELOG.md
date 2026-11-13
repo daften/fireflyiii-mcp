@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-13
+
+Stable 1.0.1, so `latest` moves from 1.0.0 to 1.0.1. It graduates 1.0.1-beta.1 (see its **Security** entries below) and adds two dependency fixes. No tool behaviour changes.
+
+### Security
+
+- Bumped `@hono/node-server` from 2.1.5 to 2.1.8 in the lockfile. 2.1.6 rejects a raw backslash in the request path, which the URL parser had turned into `/` and so let a request slip past path-based rules at a reverse proxy ([GHSA-jpvv-r467-5p4w](https://github.com/advisories/GHSA-jpvv-r467-5p4w), CVE-2026-126210); the 2.1.6 and 2.1.7 releases also fix WebSocket upgrade and `serveStatic` advisories this server does not use.
+- Bumped `hono` from 4.13.13 to 4.13.18 in the lockfile, fixing five advisories Dependabot raised alerts for but opened no PR: `mount()` forwarding a path that skips middleware scoped inside the mount prefix ([GHSA-4m76-xfj5-7975](https://github.com/advisories/GHSA-4m76-xfj5-7975)), RegExpRouter skipping wildcard middleware for some route sets ([GHSA-h7mg-cq63-vhpq](https://github.com/advisories/GHSA-h7mg-cq63-vhpq)), `validator('form')` skipping validation for some multipart requests ([GHSA-4h7h-rv7c-7m2v](https://github.com/advisories/GHSA-4h7h-rv7c-7m2v)), `csrf()` not checking `text/ping` requests ([GHSA-46wx-v44x-9hh2](https://github.com/advisories/GHSA-46wx-v44x-9hh2)) and HTML injection through the `css` helper ([GHSA-3gg2-335m-rxc6](https://github.com/advisories/GHSA-3gg2-335m-rxc6)).
+
 ## [1.0.1-beta.1] - 2026-11-12
 
 Prerelease of 1.0.1 with security hardening only, published to the `next` channel: install it with `npm install @daften/fireflyiii-mcp@next` or `docker pull ghcr.io/daften/fireflyiii-mcp:next`, or pin `1.0.1-beta.1`. `latest` stays on 1.0.0. No tool behaviour changes.
@@ -325,7 +334,8 @@ First prerelease of 1.0. It is published to the `next` channel only, so `latest`
 - npm publish provenance via GitHub OIDC.
 - GitHub Release auto-created from the tag annotation on each `v*` tag push.
 
-[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.1-beta.1...HEAD
+[Unreleased]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.1-beta.1...v1.0.1
 [1.0.1-beta.1]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0...v1.0.1-beta.1
 [1.0.0]: https://github.com/daften/fireflyiii-mcp/compare/v1.0.0-alpha.1...v1.0.0
 [1.0.0-alpha.1]: https://github.com/daften/fireflyiii-mcp/compare/v0.5.5...v1.0.0-alpha.1
