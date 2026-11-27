@@ -59,6 +59,7 @@ require '/var/www/html/vendor/autoload.php';
 $app = require_once '/var/www/html/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
+use FireflyIII\Support\Authentication\HandlesUserRegistrationTrait;
 use FireflyIII\User;
 use Illuminate\Support\Facades\Hash;
 $user = new User([
@@ -68,6 +69,20 @@ $user = new User([
 ]);
 $user->save();
 try { $user->assignRole('owner'); } catch (Throwable $e) {}
+// Firefly III 6.x requires every user to belong to a user group, and direct
+// user creation skips the registration flow that makes one. Call the same
+// trait the registration controller uses. Do not use the artisan command
+// correction:create-group-memberships: since 6.7.10 it is a no-op that exits 0.
+$registrar = new class {
+    use HandlesUserRegistrationTrait;
+    public function run(User $u): void { $this->createGroupMembership($u, true); }
+};
+$registrar->run($user);
+$user->refresh();
+if (null === $user->user_group_id) {
+    fwrite(STDERR, "User has no user group after createGroupMembership\n");
+    exit(1);
+}
 $token = $user->createToken('CI Integration Test');
 echo 'TOKEN:' . ($token->plainTextToken ?? $token->accessToken ?? '');
 PHPEOF
@@ -75,14 +90,12 @@ PHPEOF
 docker cp "$PHP_TMP" "$CONTAINER:/tmp/ci-create-user.php"
 rm -f "$PHP_TMP"
 
-RAW=$(docker exec "$CONTAINER" php /tmp/ci-create-user.php 2>&1)
+if ! RAW=$(docker exec "$CONTAINER" php /tmp/ci-create-user.php 2>&1); then
+  echo "User bootstrap script failed:" >&2
+  echo "$RAW" >&2
+  exit 1
+fi
 docker exec "$CONTAINER" rm -f /tmp/ci-create-user.php 2>/dev/null || true
-
-# Firefly III 6.x requires every user to belong to a user group.
-# Direct user creation (without the normal registration flow) skips that —
-# this correction command creates the missing group membership.
-echo "Creating user group membership …" >&2
-docker exec "$CONTAINER" php artisan correction:create-group-memberships >&2
 
 TOKEN=$(echo "$RAW" | grep -o 'TOKEN:.*' | sed 's/TOKEN://')
 
