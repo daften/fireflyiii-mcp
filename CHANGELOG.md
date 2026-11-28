@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The nightly integration tests pass again on Firefly III 6.7.12. That release made `php artisan correction:create-group-memberships` a no-op, so `scripts/ci-create-token.sh` left the CI user without a user group and every API call returned a 500. The script now creates the membership through Firefly's own `HandlesUserRegistrationTrait`, fails if the user still has no group, and prints the bootstrap output when it fails. The piggy bank update integration test runs on SQLite again, since 6.7.12 fixes the `bcsub()` 500 it was skipped for ([firefly-iii#13063](https://github.com/firefly-iii/firefly-iii/issues/13063)).
+
 ## [1.0.1] - 2026-11-13
 
 Stable 1.0.1, so `latest` moves from 1.0.0 to 1.0.1. It graduates 1.0.1-beta.1 (see its **Security** entries below) and adds two dependency fixes. No tool behaviour changes.
