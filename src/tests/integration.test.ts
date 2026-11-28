@@ -16,7 +16,7 @@ import { fetchCurrencies } from '../tools/currencies.js';
 import { deleteObjectGroup, fetchObjectGroups } from '../tools/object-groups.js';
 import { createPiggyBank, deletePiggyBank, updatePiggyBank } from '../tools/piggy-banks.js';
 import { createRecurrence, deleteRecurrence, updateRecurrence } from '../tools/recurring.js';
-import { fetchAbout, fetchNetWorth, fetchSummary, fetchTags, registerReportTools } from '../tools/reports.js';
+import { fetchNetWorth, fetchSummary, fetchTags, registerReportTools } from '../tools/reports.js';
 import { createRule, createRuleGroup, deleteRuleGroup } from '../tools/rules.js';
 import {
   bulkUpdateTransactions,
@@ -268,10 +268,7 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
     type Split = { transaction_journal_id: string; description: string; amount: string; notes?: string | null };
     const splitsOf = (group: Record<string, unknown>) => group.transactions as Split[];
 
-    let dbDriver = '';
-
     beforeAll(async () => {
-      dbDriver = ((await fetchAbout(client)) as { data: { driver: string } }).data.driver;
       const asset = async (name: string, opening: string) =>
         (
           await createAccount(client, {
@@ -378,11 +375,7 @@ describe.skipIf(SKIP)('Integration: Firefly III live connection', () => {
       expect(piggy.accounts as unknown[]).toHaveLength(2);
     });
 
-    it('update_piggy_bank changes one account and keeps the others linked', async (ctx) => {
-      // Firefly III 6.7.7 on SQLite (the CI container's database) answers every piggy bank
-      // current_amount update with a 500, "bcsub(): Argument #2 ($num2) must be of type string, int
-      // given", even for a single-account PUT this server never touches. MySQL and PostgreSQL work.
-      if (dbDriver === 'sqlite') ctx.skip();
+    it('update_piggy_bank changes one account and keeps the others linked', async () => {
       if (!piggyId) throw new Error('piggy bank was not created; see the create test above');
       const updated = await updatePiggyBank(client, piggyId, {
         accounts: [{ account_id: accounts.savings, current_amount: '40' }],
